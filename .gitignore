@@ -1,0 +1,31 @@
+# macOS / OS artifacts
+.DS_Store
+
+# Locks / logs
+*.lock
+*.log
+
+# Caches and temp dirs
+cache/
+tmp/
+SavedState/
+sockets/
+
+# Databases and large binary indices
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.mmdb
+*.mdb
+
+# Common build/vendor (建议移至项目级 .gitignore)
+node_modules/
+dist/
+build/
+vendor/
+*.zwc
+
+# Misc backups（按需取舍）
+*.bak*
+*~
