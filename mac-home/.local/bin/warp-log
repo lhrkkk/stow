@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Open Warp logs directory (~/@log/warp)
+DIR="$HOME/@log/warp"
+mkdir -p "$DIR"
+open "$DIR"
+

@@ -1,0 +1,49 @@
+#!/usr/bin/env zsh
+# Recompile zsh-related scripts to .zwc for faster startup
+# - Compiles Zim modules, Zim init, your zsh files, and .zcompdump
+
+emulate -L zsh
+setopt err_return
+
+# 1) Compile Zim modules (if zimfw is available)
+if (( $+commands[zimfw] )); then
+  zimfw compile -q
+fi
+
+# 2) Compile Zim top-level init (gives noticeable benefit)
+if [[ -f "$HOME/.zim/init.zsh" ]]; then
+  if [[ ! -f "$HOME/.zim/init.zsh.zwc" || "$HOME/.zim/init.zsh" -nt "$HOME/.zim/init.zsh.zwc" ]]; then
+    zcompile "$HOME/.zim/init.zsh"
+  fi
+fi
+
+# 3) Compile your zsh configs and functions (only when needed)
+autoload -Uz zrecompile
+typeset -a files
+files=(
+  "$HOME/.zshrc"
+  "$HOME/.config/zsh/zshrc"
+  "$HOME/.config/zsh"/*.zsh(N)
+  "$HOME/.config/zsh/functions"/*.zsh(N)
+)
+
+typeset -i compiled=0 skipped=0
+for f in "${files[@]}"; do
+  [[ -e "$f" ]] || continue
+  if [[ ! -e "$f.zwc" || "$f" -nt "$f.zwc" ]]; then
+    zrecompile -pq -- "$f" && compiled+=1
+  else
+    skipped+=1
+  fi
+done
+
+# 4) Compile completion dump (after compinit has run at least once)
+dump="${ZDOTDIR:-$HOME}/.zcompdump"
+if [[ -f "$dump" ]]; then
+  if [[ ! -f "$dump.zwc" || "$dump" -nt "$dump.zwc" ]]; then
+    zcompile "$dump"
+  fi
+fi
+
+print -r -- "Recompile done: compiled=$compiled skipped=$skipped"
+

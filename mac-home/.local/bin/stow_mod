@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+用法:
+  stow_mod <preview|apply> <modules>
+
+说明:
+  - modules 为逗号分隔的模块名，针对包内 .config 下的子目录，例如:
+      wezterm,zsh,helix
+  - 仅家目录 dotfiles 可用前缀 dot:，例如:
+      dot:tmux.conf,zshrc,zimrc
+
+可选环境变量/参数:
+  STOW_DIR  (默认: "$HOME/_env/stow")
+  TARGET    (默认: "$HOME")
+  PACKAGE   (默认: "mac-home")
+  也可通过参数覆盖: --stow-dir DIR  --target DIR  --package NAME
+
+示例:
+  stow_mod preview wezterm
+  stow_mod apply wezterm,zsh,helix
+  stow_mod apply dot:tmux.conf,zshrc
+EOF
+}
+
+STOW_DIR="${STOW_DIR:-$HOME/_env/stow}"
+TARGET="${TARGET:-$HOME}"
+PACKAGE="${PACKAGE:-mac-home}"
+
+if [[ $# -lt 2 ]]; then
+  usage
+  exit 1
+fi
+
+MODE="$1"; shift
+MODULES="$1"; shift
+
+# 解析可选参数
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --stow-dir) STOW_DIR="$2"; shift 2;;
+    --target)   TARGET="$2";   shift 2;;
+    --package)  PACKAGE="$2";  shift 2;;
+    -h|--help)  usage; exit 0;;
+    *) echo "未知参数: $1"; usage; exit 1;;
+  esac
+done
+
+# 构建白名单正则: 我们将 --ignore 设为 ^(?!REGEX).* 来只处理白名单子集
+build_regex_modules() {
+  local csv="$1"
+  local IFS=','; read -r -a arr <<<"$csv"
+  local parts=()
+  local m
+  for m in "${arr[@]}"; do
+    m="${m## }"; m="${m%% }"  # trim
+    [[ -z "$m" ]] && continue
+    # 仅允许字母数字和常见分隔符，其他统一转义
+    m=$(printf '%s' "$m" | sed -E 's/([.^$*+?(){}\[\]|\\])/\\\1/g')
+    parts+=("$m")
+  done
+  if [[ ${#parts[@]} -eq 0 ]]; then
+    echo ""
+  else
+    printf '(\\.config/(%s)(/|$))' "$(IFS='|'; echo "${parts[*]}")"
+  fi
+}
+
+build_regex_dotfiles() {
+  local csv="$1"
+  local IFS=','; read -r -a arr <<<"$csv"
+  local parts=()
+  local f
+  for f in "${arr[@]}"; do
+    f="${f## }"; f="${f%% }"
+    [[ -z "$f" ]] && continue
+    # 转义点等元字符
+    f=$(printf '%s' "$f" | sed -E 's/([.^$*+?(){}\[\]|\\])/\\\1/g')
+    parts+=("$f")
+  done
+  if [[ ${#parts[@]} -eq 0 ]]; then
+    echo ""
+  else
+    printf '(\\.(%s)$)' "$(IFS='|'; echo "${parts[*]}")"
+  fi
+}
+
+REGEX=""
+if [[ "$MODULES" == dot:* ]]; then
+  REGEX=$(build_regex_dotfiles "${MODULES#dot:}")
+else
+  REGEX=$(build_regex_modules "$MODULES")
+fi
+
+if [[ -z "$REGEX" ]]; then
+  echo "无法从模块列表生成匹配规则，请检查输入: $MODULES" >&2
+  exit 1
+fi
+
+IGNORE_REGEX="^(?!$REGEX).*"
+
+# 预览或执行
+case "$MODE" in
+  preview)
+    stow -nvt "$TARGET" -d "$STOW_DIR" --adopt --ignore="$IGNORE_REGEX" "$PACKAGE"
+    ;;
+  apply)
+    stow -vt "$TARGET" -d "$STOW_DIR" --adopt --ignore="$IGNORE_REGEX" "$PACKAGE"
+    ;;
+  *)
+    echo "MODE 只能是 preview 或 apply" >&2
+    usage
+    exit 1
+    ;;
+ esac
+
