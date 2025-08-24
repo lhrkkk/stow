@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# stowx: helper for managing GNU Stow dotfiles
+# Defaults align with your workflows:
+#   STOW_DIR: $HOME/_env/stow
+#   TARGET:   $HOME
+#   Default package: mac-home
+
+usage() {
+  cat <<'EOF'
+Usage:
+  stowx <command> [options] [packages...]
+
+Commands:
+  preview       预览变更（等价: stow -nvt "$TARGET" -d "$STOW_DIR" -S <pkgs>）
+  apply         应用链接（等价: stow -vt  "$TARGET" -d "$STOW_DIR" -S <pkgs>）
+  adopt         覆盖式部署：stow -S --adopt，然后可选 git restore . 还原仓库（谨慎）
+  grab          抓取文件/文件夹到指定包内并建立链接（stow 化单个路径）
+  unstow        取消链接（stow -D）
+  restow        重新链接（stow -R）
+  list          列出可用包（STOW_DIR 下的目录）
+  help          显示帮助
+
+Options:
+  -d, --dir <path>       STOW_DIR（默认: $HOME/_env/stow）
+  -t, --target <path>    目标目录（默认: $HOME）
+  -n, --dry-run          预演（为 adopt/apply/unstow/restow 添加 -n）
+  -v, --verbose          增强调试输出（为 stow 添加 -v）
+  -p, --package <name>   指定包，可重复；也可直接作为位置参数（grab 推荐仅一个包）
+  -y, --yes              非交互确认危险操作（adopt/覆盖同名目标时）
+      --no-restore       adopt 后不要执行 git restore .
+
+缺省包: mac-home
+示例：
+  预览:   stowx preview
+  应用:   stowx apply
+  覆盖:   stowx adopt -y
+  抓取:   stowx grab -p mac-home ~/.config/wezterm/wezterm.lua
+  取消:   stowx unstow mac-home
+EOF
+}
+
+log() { printf "[stowx] %s\n" "$*"; }
+err() { printf "[stowx][ERR] %s\n" "$*" 1>&2; }
+die() { err "$*"; exit 1; }
+
+# Defaults
+STOW_DIR=${STOW_DIR:-"$HOME/_env/stow"}
+TARGET=${TARGET:-"$HOME"}
+VERBOSE=0
+DRY_RUN=0
+DO_RESTORE=1
+YES=0
+CMD=""
+PACKAGES=()
+POSITIONALS=()
+PATHS=()
+
+need_cmd() { command -v "$1" >/dev/null 2>&1 || die "未找到命令: $1"; }
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      preview|apply|adopt|grab|unstow|restow|list|help)
+        CMD="$1"; shift ;;
+      -d|--dir)
+        [[ $# -ge 2 ]] || die "--dir 需要参数"; STOW_DIR="$2"; shift 2 ;;
+      -t|--target)
+        [[ $# -ge 2 ]] || die "--target 需要参数"; TARGET="$2"; shift 2 ;;
+      -n|--dry-run)
+        DRY_RUN=1; shift ;;
+      -v|--verbose)
+        VERBOSE=1; shift ;;
+      -p|--package)
+        [[ $# -ge 2 ]] || die "--package 需要参数"; PACKAGES+=("$2"); shift 2 ;;
+      -y|--yes)
+        YES=1; shift ;;
+      --no-restore)
+        DO_RESTORE=0; shift ;;
+      --)
+        shift; break ;;
+      -h|--help)
+        CMD="help"; shift ;;
+      *)
+        POSITIONALS+=("$1"); shift ;;
+    esac
+  done
+  # consume rest as positionals
+  while [[ $# -gt 0 ]]; do POSITIONALS+=("$1"); shift; done
+}
+
+confirm() {
+  local prompt="$1"
+  if [[ $YES -eq 1 ]]; then return 0; fi
+  read -r -p "$prompt [y/N] " ans || true
+  [[ "$ans" == "y" || "$ans" == "Y" ]] || return 1
+}
+
+build_opts() {
+  STOW_OPTS=( -t "$TARGET" -d "$STOW_DIR" )
+  if [[ $VERBOSE -eq 1 ]]; then STOW_OPTS=( -v "${STOW_OPTS[@]}" ); fi
+  if [[ $DRY_RUN -eq 1 ]]; then STOW_OPTS=( -n "${STOW_OPTS[@]}" ); fi
+}
+
+run_stow() {
+  need_cmd stow
+  build_opts
+  local subopts=("$@")
+  log "stow ${STOW_OPTS[*]} ${subopts[*]} -- ${PACKAGES[*]}"
+  stow "${STOW_OPTS[@]}" "${subopts[@]}" -- "${PACKAGES[@]}"
+}
+
+ensure_packages() {
+  if [[ ${#PACKAGES[@]} -eq 0 ]]; then
+    PACKAGES=("mac-home")
+  fi
+}
+
+# Normalize a source path: expand leading ~, make absolute relative to $TARGET by default
+norm_src() {
+  local p="$1"
+  [[ "$p" == ~* ]] && p="${p/#~/$HOME}"
+  if [[ "$p" != /* ]]; then p="$TARGET/$p"; fi
+  printf '%s' "$p"
+}
+
+# Ensure a path resides under $TARGET and return its relative form
+rel_under_target() {
+  local abs="$1"
+  case "$abs" in
+    "$TARGET"/*) printf '%s' "${abs#${TARGET}/}" ;;
+    *) return 1 ;;
+  esac
+}
+
+cmd_preview() { ensure_packages; run_stow -n -v -S; }
+cmd_apply()   { ensure_packages; run_stow -S; }
+cmd_unstow()  { ensure_packages; run_stow -D; }
+cmd_restow()  { ensure_packages; run_stow -R; }
+
+cmd_grab() {
+  ensure_packages
+  if [[ ${#PACKAGES[@]} -gt 1 ]]; then
+    die "grab 目前仅支持单个包，请用 -p 指定一个包（当前: ${PACKAGES[*]}）"
+  fi
+  local pkg="${PACKAGES[0]}"
+  if [[ ${#PATHS[@]} -eq 0 ]]; then
+    die "grab 需要至少一个要抓取的路径"
+  fi
+  need_cmd mkdir; need_cmd mv
+  local moved_any=0
+  for src_in in "${PATHS[@]}"; do
+    local abs src rel dst dstdir
+    abs=$(norm_src "$src_in")
+    if [[ ! -e "$abs" ]]; then
+      err "跳过：不存在的路径 -> $abs"
+      continue
+    fi
+    rel=$(rel_under_target "$abs") || { err "跳过：不在 TARGET 范围内 -> $abs"; continue; }
+    dst="$STOW_DIR/$pkg/$rel"
+    dstdir=$(dirname "$dst")
+    if [[ $DRY_RUN -eq 1 ]]; then
+      log "DRY-RUN: 将创建目录 $dstdir 并移动 $abs -> $dst"
+    else
+      mkdir -p "$dstdir"
+      if [[ -e "$dst" ]]; then
+        if [[ $YES -eq 1 ]]; then
+          log "目标已存在，覆盖：$dst"
+          rm -rf "$dst"
+        else
+          confirm "目标已存在：$dst。是否覆盖？" || { err "已跳过 $abs"; continue; }
+          rm -rf "$dst"
+        fi
+      fi
+      mv "$abs" "$dst"
+      moved_any=1
+      log "已移动：$abs -> $dst"
+    fi
+  done
+  # After moving, restow the package to create symlinks
+  if [[ $DRY_RUN -eq 1 ]]; then
+    log "DRY-RUN: 将执行链接操作以更新符号链接（restow/apply）"
+  else
+    # Prefer restow; if it fails (e.g. first time, nothing to restow), fallback to apply (-S)
+    if run_stow -R; then
+      :
+    else
+      log "restow 失败，尝试 apply (-S)"
+      run_stow -S
+    fi
+  fi
+}
+
+cmd_adopt() {
+  ensure_packages
+  if [[ $DRY_RUN -eq 1 ]]; then
+    log "adopt 以干跑模式执行"
+    run_stow -S --adopt
+    return 0
+  fi
+  confirm "将以覆盖方式部署（--adopt），并可能以 git restore . 还原仓库修改。确认继续吗？" || die "已取消"
+  run_stow -S --adopt
+  if [[ $DO_RESTORE -eq 1 ]]; then
+    for pkg in "${PACKAGES[@]}"; do
+      local repo="$STOW_DIR/$pkg"
+      if git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        log "git restore . @ $repo"
+        git -C "$repo" restore .
+      else
+        log "跳过 git restore：$repo 不是 git 仓库"
+      fi
+    done
+  else
+    log "已跳过 git restore ."
+  fi
+}
+
+cmd_list() {
+  [[ -d "$STOW_DIR" ]] || die "STOW_DIR 不存在: $STOW_DIR"
+  find "$STOW_DIR" -mindepth 1 -maxdepth 1 -type d -prune -exec basename {} \; | sort
+}
+
+main() {
+  parse_args "$@"
+  # Map POSITIONALS depending on command
+  if [[ "${CMD:-}" == "grab" ]]; then
+    PATHS=("${POSITIONALS[@]}")
+    if [[ ${#PACKAGES[@]} -eq 0 ]]; then PACKAGES=("mac-home"); fi
+  else
+    if [[ ${#PACKAGES[@]} -eq 0 && ${#POSITIONALS[@]} -gt 0 ]]; then
+      PACKAGES=("${POSITIONALS[@]}")
+    fi
+  fi
+  case "${CMD:-}" in
+    preview) cmd_preview ;;
+    apply)   cmd_apply   ;;
+    adopt)   cmd_adopt   ;;
+    grab)    cmd_grab    ;;
+    unstow)  cmd_unstow  ;;
+    restow)  cmd_restow  ;;
+    list)    cmd_list    ;;
+    help|"") usage ;;
+    *) err "未知命令: $CMD"; usage; exit 2 ;;
+  esac
+}
+
+main "$@"
+

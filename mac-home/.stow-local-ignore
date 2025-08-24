@@ -1,6 +1,6 @@
 ^\.git(ignore)?$
 ^\.gitmodules$
-^WARP\.md$
+# ^WARP\.md$
 ^\.stow-local-ignore$
 \.DS_Store$
 ^\.cursorindexingignore$

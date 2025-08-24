@@ -95,3 +95,14 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
   - 若存在 ~/.tmux.conf 中与 powerline 集成的实际片段，可纳入本文件“示例片段”便于复制粘贴。
   - 若后续添加 Neovim 配置（~/.config/nvim），建议在此补充其插件管理器、启动/诊断命令与关键模块分层说明。
 
+六、Stow 规则引用
+
+- 规则文件路径：/Users/lhr/_env/stow/STOW.md
+- 摘要：使用 GNU Stow 管理 dotfiles，STOW_DIR=$HOME/_env/stow，TARGET=$HOME，默认包 mac-home；提供辅助脚本 ~/.local/bin/stowx，支持 preview/apply/adopt/grab/unstow/restow/list。
+- 快速命令：
+  -  stowx preview      （等价: stow -nvt "$HOME" -d "$HOME/_env/stow" -S mac-home）
+  -  stowx apply        （等价: stow -vt  "$HOME" -d "$HOME/_env/stow" -S mac-home）
+  -  stowx adopt -y     （等价: stow -vt  "$HOME" -d "$HOME/_env/stow" -S --adopt mac-home）
+  -  stowx grab -p mac-home <路径>
+- 代理注意：命令前加空格避免写入历史；adopt/覆盖操作须确认；优先先预览再 apply。
+

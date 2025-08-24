@@ -1,3 +1,7 @@
+
+# GNU Stow base directory
+export STOW_DIR="$HOME/_env/stow"
+
 # ==== Paths (trimmed and deduplicated) ====
 export XDG_CONFIG_HOME="$HOME/.config"
 # export LOCALBIN="$XDG_CONFIG_HOME/bin"

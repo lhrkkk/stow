@@ -15,3 +15,10 @@
 **/.gitignore/**
 /Users/lhr/Library/Caches/**
 
+/Users/lhr/@self/pdfbook/read/普林斯顿数学指南(全三卷带目录） ((英)高尔斯(Gowers T.)主编, 齐民友 译) (Z-Library).pdf
+/Users/lhr/_pub/@数据/GraphDTA
+/Users/lhr/_pub/@数据/GraphDTA/BatchDTA_processed_data
+/Users/lhr/_pub/@数据/GraphDTA/BindingDB_All_202506_tsv.zip
+/Users/lhr/_pub/@数据/GraphDTA/BindingDB_All_3D_202507_sdf.zip
+/Users/lhr/_pub/@数据/GraphDTA/processed_data.zip
+/Users/lhr/_pub/@资料/@产品/宿州学院讲座/ref

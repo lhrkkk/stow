@@ -1,0 +1,19 @@
+# See ~/.config/zsh/functions/_ami_safe_autoload_dir.zsh for comments
+_ami_safe_autoload_dir() {
+  emulate -L zsh
+  setopt local_options null_glob
+  local dir="$1"
+  [[ -d $dir ]] || return 0
+  local -a _ami_funcs=()
+  local _ami_f _name
+  for _ami_f in "$dir"/*(N); do
+    [[ -f $_ami_f || -h $_ami_f ]] || continue
+    _name="${_ami_f:t}"
+    _name="${_name%.zsh}"
+    _ami_funcs+=("${_name}")
+  done
+  # 去重
+  typeset -Ua _ami_funcs
+  (( $#_ami_funcs )) && autoload -U ${_ami_funcs}
+}
+
