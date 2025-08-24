@@ -1,3 +1,8 @@
+.cursor/
+!.cursor/rules/
+!.cursor/rules/*.mdc
+.cursor/rules/derived-cursor-rules.mdc
+
 # macOS / OS artifacts
 .DS_Store
 

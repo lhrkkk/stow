@@ -2,7 +2,102 @@
   "title": "Extracted from profile 1",
   "rules": [
     {
-      "description": "Map left_command + w/t/r/i/n/p/b/c/q to control + same letter",
+      "description": "Google Chrome: Command + Shift + C → Copy URL and unfocus address bar",
+      "manipulators": [
+        {
+          "conditions": [
+            {
+              "bundle_identifiers": [
+                "^com\\.google\\.Chrome$",
+                "org.mozilla.firefox",
+                "com.bot.pc.doubao"
+              ],
+              "type": "frontmost_application_if"
+            }
+          ],
+          "from": {
+            "key_code": "c",
+            "modifiers": {
+              "mandatory": [
+                "command",
+                "shift"
+              ],
+              "optional": [
+                "any"
+              ]
+            }
+          },
+          "to": [
+            {
+              "key_code": "l",
+              "modifiers": [
+                "command"
+              ]
+            },
+            {
+              "key_code": "c",
+              "modifiers": [
+                "command"
+              ]
+            },
+            {
+              "key_code": "escape"
+            }
+          ],
+          "type": "basic"
+        },
+        {
+          "conditions": [
+            {
+              "bundle_identifiers": [
+                "^com\\.google\\.Chrome$",
+                "org.mozilla.firefox",
+                "com.bot.pc.doubao"
+              ],
+              "type": "frontmost_application_if"
+            }
+          ],
+          "from": {
+            "key_code": "v",
+            "modifiers": {
+              "mandatory": [
+                "command",
+                "shift"
+              ],
+              "optional": [
+                "any"
+              ]
+            }
+          },
+          "to": [
+            {
+              "key_code": "t",
+              "modifiers": [
+                "command"
+              ]
+            },
+            {
+              "key_code": "l",
+              "modifiers": [
+                "command"
+              ]
+            },
+            {
+              "key_code": "v",
+              "modifiers": [
+                "command"
+              ]
+            },
+            {
+              "key_code": "return_or_enter"
+            }
+          ],
+          "type": "basic"
+        }
+      ]
+    },
+    {
+      "description": "Map left_command + w/t/r/i/n/p/b/c/q/g to control + same letter",
       "manipulators": [
         {
           "conditions": [
@@ -11,7 +106,8 @@
                 "^com.googlecode.iterm2",
                 "org.alacritty",
                 "com.github.wez.wezterm",
-                "dev.warp.Warp-Stable"
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
               ],
               "type": "frontmost_application_if"
             }
@@ -44,7 +140,8 @@
                 "^com.googlecode.iterm2",
                 "org.alacritty",
                 "com.github.wez.wezterm",
-                "dev.warp.Warp-Stable"
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
               ],
               "type": "frontmost_application_if"
             }
@@ -77,7 +174,8 @@
                 "^com.googlecode.iterm2",
                 "org.alacritty",
                 "com.github.wez.wezterm",
-                "dev.warp.Warp-Stable"
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
               ],
               "type": "frontmost_application_if"
             }
@@ -110,7 +208,8 @@
                 "^com.googlecode.iterm2",
                 "org.alacritty",
                 "com.github.wez.wezterm",
-                "dev.warp.Warp-Stable"
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
               ],
               "type": "frontmost_application_if"
             }
@@ -143,7 +242,8 @@
                 "^com.googlecode.iterm2",
                 "org.alacritty",
                 "com.github.wez.wezterm",
-                "dev.warp.Warp-Stable"
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
               ],
               "type": "frontmost_application_if"
             }
@@ -176,7 +276,8 @@
                 "^com.googlecode.iterm2",
                 "org.alacritty",
                 "com.github.wez.wezterm",
-                "dev.warp.Warp-Stable"
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
               ],
               "type": "frontmost_application_if"
             }
@@ -209,7 +310,8 @@
                 "^com.googlecode.iterm2",
                 "org.alacritty",
                 "com.github.wez.wezterm",
-                "dev.warp.Warp-Stable"
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
               ],
               "type": "frontmost_application_if"
             }
@@ -242,7 +344,8 @@
                 "^com.googlecode.iterm2",
                 "org.alacritty",
                 "com.github.wez.wezterm",
-                "dev.warp.Warp-Stable"
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
               ],
               "type": "frontmost_application_if"
             }
@@ -275,7 +378,8 @@
                 "^com.googlecode.iterm2",
                 "org.alacritty",
                 "com.github.wez.wezterm",
-                "dev.warp.Warp-Stable"
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
               ],
               "type": "frontmost_application_if"
             }
@@ -300,6 +404,40 @@
             }
           ],
           "type": "basic"
+        },
+        {
+          "conditions": [
+            {
+              "bundle_identifiers": [
+                "^com.googlecode.iterm2",
+                "org.alacritty",
+                "com.github.wez.wezterm",
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
+              ],
+              "type": "frontmost_application_if"
+            }
+          ],
+          "from": {
+            "key_code": "g",
+            "modifiers": {
+              "mandatory": [
+                "left_command"
+              ],
+              "optional": [
+                "any"
+              ]
+            }
+          },
+          "to": [
+            {
+              "key_code": "g",
+              "modifiers": [
+                "control"
+              ]
+            }
+          ],
+          "type": "basic"
         }
       ]
     },
@@ -313,7 +451,8 @@
                 "^com.googlecode.iterm2",
                 "org.alacritty",
                 "com.github.wez.wezterm",
-                "dev.warp.Warp-Stable"
+                "dev.warp.Warp-Stable",
+                "com.mitchellh.ghostty"
               ],
               "type": "frontmost_application_if"
             }
@@ -490,7 +629,7 @@
       ]
     },
     {
-      "description": "option + q,w to command q,w; command tab to control tab ",
+      "description": "option + q to command q; command tab to control tab ",
       "manipulators": [
         {
           "from": {
@@ -536,7 +675,7 @@
             {
               "key_code": "w",
               "modifiers": [
-                "right_command"
+                "left_option"
               ]
             }
           ],

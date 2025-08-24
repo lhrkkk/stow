@@ -1,0 +1,71 @@
+uvsh() {
+    local venv_name=${1:-'.venv'}
+    # normalize provided name: strip any trailing slashes/backslashes
+    venv_name=${venv_name//\//}
+    venv_name=${venv_name//\\/}
+
+    # options
+    local create=0
+    local show_help=0
+
+    # parse flags: allow uvsh -c [name] or uvsh --create [name]
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            -h|--help)
+                show_help=1
+                ;;
+            -c|--create)
+                create=1
+                ;;
+            *)
+                # treat first non-flag as venv name
+                if [[ "$arg" != -* ]]; then
+                    venv_name="$arg"
+                fi
+                ;;
+        esac
+    done
+
+    if (( show_help )); then
+        echo "Usage: uvsh [-c|--create] [venv_name]"
+        echo "       Activates Python virtualenv at ./[venv_name]"
+        echo "       -c, --create   Create venv if missing (prefers 'uv', falls back to python3 -m venv)"
+        return 0
+    fi
+
+    # detect platform layout
+    local venv_bin=
+    if [[ -n "${WINDIR}" || "$OSTYPE" == (cygwin*|msys*|win32*) ]]; then
+        venv_bin='Scripts/activate'
+    else
+        venv_bin='bin/activate'
+    fi
+
+    local activator="${venv_name}/${venv_bin}"
+
+    if [[ ! -f "${activator}" ]]; then
+        if (( create )); then
+            echo "[INFO] Creating Python venv: ${venv_name}"
+            if command -v uv >/dev/null 2>&1; then
+                uv venv "${venv_name}" || { echo "[ERROR] Failed to create venv with uv"; return 1; }
+            else
+                if command -v python3 >/dev/null 2>&1; then
+                    python3 -m venv "${venv_name}" || { echo "[ERROR] Failed to create venv with python3 -m venv"; return 1; }
+                else
+                    echo "[ERROR] 'uv' and 'python3' not found; cannot create venv"
+                    return 1
+                fi
+            fi
+        else
+            echo "[ERROR] Python venv not found: ${venv_name}"
+            echo "        Hint: use 'uvsh -c ${venv_name}' to create it"
+            return 1
+        fi
+    fi
+
+    echo "[INFO] Activate Python venv: ${venv_name} (via ${activator})"
+
+    # shellcheck disable=SC1090
+    . "${activator}"
+}

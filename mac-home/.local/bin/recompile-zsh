@@ -24,7 +24,8 @@ files=(
   "$HOME/.zshrc"
   "$HOME/.config/zsh/zshrc"
   "$HOME/.config/zsh"/*.zsh(N)
-  "$HOME/.config/zsh/functions"/*.zsh(N)
+  # 编译 functions 目录下的所有普通文件（包含无扩展名的函数文件）
+  "$HOME/.config/zsh/functions"/*(.N)
 )
 
 typeset -i compiled=0 skipped=0

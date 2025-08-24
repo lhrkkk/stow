@@ -72,6 +72,14 @@ else
 fi
 
 source ~/.config/zsh/env.zsh
+
+# 使用 fpath + autoload 自动注册 functions 目录中的所有函数（文件名=函数名，无扩展名）
+fpath+="$HOME/.config/zsh/functions"
+typeset -Ua _ami_funcs
+_ami_funcs=("$HOME/.config/zsh/functions"/*(N:t))
+(( $#_ami_funcs )) && autoload -Uz ${_ami_funcs}
+unset _ami_funcs
+
 # direnv 懒加载（方案 B：第一次 cd 触发，附首个提示符兜底）
 if [[ $- == *i* ]] && (( $+commands[direnv] )); then
   autoload -Uz add-zsh-hook
@@ -100,11 +108,6 @@ if [ -f ~/.sconfig/zsh/zshrc ]; then
 	source ~/.sconfig/zsh/zshrc
 fi
 
-
-
-source ~/.config/zsh/functions/cd_git_root.zsh
-source ~/.config/zsh/functions/warp.zsh
-source ~/.config/zsh/functions/uvsh.zsh
 
 # 同步 tmux 环境变量
 source ~/.config/zsh/tmux.zsh

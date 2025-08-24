@@ -1711,7 +1711,7 @@
                         ]
                     },
                     {
-                        "description": "option + q,w to command q,w; command tab to control tab ",
+                        "description": "option + q to command q; command tab to control tab ",
                         "manipulators": [
                             {
                                 "from": {
@@ -1757,7 +1757,7 @@
                                     {
                                         "key_code": "w",
                                         "modifiers": [
-                                            "right_command"
+                                            "left_option"
                                         ]
                                     }
                                 ],

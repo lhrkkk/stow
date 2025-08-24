@@ -1,4 +1,6 @@
-export FZF_DEFAULT_OPTS='--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100 --bind=ctrl-t:top,change:top --bind ctrl-j:down,ctrl-k:up'
+export FZF_DEFAULT_OPTS='--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100 --bind=ctrl-t:top,change:top --bind=ctrl-j:down,ctrl-k:up'
+# export FZF_DEFAULT_OPTS='--bind=ctrl-t:top,change:top --bind ctrl-e:down,ctrl-u:up'
+
 #export FZF_DEFAULT_OPTS='--bind ctrl-j:down,ctrl-k:up --preview "[[ $(file --mime {}) =~ binary ]] && echo {} is a binary file || (ccat --color=always {} || highlight -O ansi -l {} || cat {}) 2> /dev/null | head -500"'
 #export FZF_DEFAULT_COMMAND='ag --hidden --ignore .git -g ""'
 export FZF_DEFAULT_COMMAND='fd'
@@ -10,8 +12,16 @@ export fzf_preview_cmd='[[ $(file --mime {}) =~ binary ]] && echo {} is a binary
 
 _fzf_fpath=${0:h}/fzf
 fpath+=$_fzf_fpath
-autoload -U $_fzf_fpath/*(.:t)
-unset _fzf_fpath
+# 允许目录为空：先收集匹配的函数名（含普通文件与符号链接），再按需 autoload
+typeset -a _fzf_funcs
+for _f in ${_fzf_fpath}/*(N); do
+  [[ -f $_f || -h $_f ]] || continue
+  _fzf_funcs+=(${_f:t})
+done
+if (( $#_fzf_funcs )); then
+  autoload -U ${_fzf_funcs}
+fi
+unset _fzf_fpath _fzf_funcs _f
 
 fzf-redraw-prompt() {
 	local precmd
@@ -42,10 +52,18 @@ zle -N fzf-cd-widget
 bindkey '^t' fzf-cd-widget
 
 fzf-history-widget() {
-	local num=$(fhistory $LBUFFER)
+	local num
+	if whence -w fhistory >/dev/null 2>&1; then
+		num=$(fhistory $LBUFFER)
+	else
+		num=""
+	fi
 	local ret=$?
 	if [[ -n $num ]]; then
 		zle vi-fetch-history -n $num
+	else
+		# 回退：使用内置的增量历史搜索
+		zle history-incremental-search-backward || zle history-beginning-search-backward
 	fi
 	zle reset-prompt
 	return $ret
