@@ -117,14 +117,18 @@ DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
 NOW=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S %Z')
 FILE=""
 
-# 1) 用索引定位（DATE  TITLE  SESSION_ID  FILE）
+# 1) 用索引定位（DATE  TITLE  SESSION_ID  FILE）——跨天：取“最后一次记录”（最近的一篇）
 if [ -f "$INDEX" ]; then
-  FILE=$(awk -F'\t' -v sid="$SID" '$3==sid{print $4; found=1} END{if(!found) print ""}' "$INDEX" 2>/dev/null || true)
+  FILE=$(awk -F'\t' -v sid="$SID" '($3==sid){last=$4} END{if(last) print last; else print ""}' "$INDEX" 2>/dev/null || true)
 fi
-# 2) grep 文件头定位
+# 2) grep 文件头定位（跨天）：在所有日志中查找并选择“最近修改”的一篇
 if [ -z "${FILE}" ]; then
-  # 仅匹配文件头中的完整行
-  FILE=$(grep -l "^Session-ID: ${SID}$" "$DIR"/*.md 2>/dev/null | head -1 || true)
+  # 收集匹配文件（允许“冒号后有空格”的格式）
+  match_list=$(grep -l "^Session-ID:[[:space:]]*${SID}[[:space:]]*$" "$DIR"/*.md 2>/dev/null || true)
+  if [ -n "${match_list:-}" ]; then
+    # 选修改时间最新的一篇
+    FILE=$(ls -t $match_list 2>/dev/null | head -1 || true)
+  fi
 fi
 
 # 3) 无法定位：需要标题以新建文件

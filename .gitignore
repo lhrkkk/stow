@@ -2,6 +2,8 @@
 !.cursor/rules/
 !.cursor/rules/*.mdc
 .cursor/rules/derived-cursor-rules.mdc
+.clj-kondo/
+.lsp/
 
 # macOS / OS artifacts
 .DS_Store

@@ -1,0 +1,18 @@
+;; This global config file is used by all graphs.
+;; Your graph's logseq/config.edn overrides config keys in this file
+;; except for maps which are merged.
+;; As an example of merging, the following global and local configs:
+;;   {:shortcuts {:ui/toggle-theme "t z"}}
+;;   {:shortcuts {:ui/toggle-brackets "t b"}}
+;;
+;;  would result in the final config:
+;;   {:shortcuts {:ui/toggle-theme "t z"
+;;                :ui/toggle-brackets "t b"}}
+
+{:shortcuts {:window/close []
+ :plugin.logseq-todo-plugin/$shortcut$ctrl_t ["meta+t"]
+ :editor/new-block ["enter"]
+ :editor/new-line ["shift+enter" "meta+enter"]
+ :plugin.logseq-todo-plugin/$shortcut$mod_t ["shift+meta+t"]
+ :editor/cycle-todo ["meta+t"]
+ :plugin.logseq-tabs/tabs-toggle-pin []}}

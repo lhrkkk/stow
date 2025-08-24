@@ -21,6 +21,9 @@
 (^|/)tmux/plugins(/|$)
 (^|/)tpm(/|$)
 
-# rclone: keep local only (secrets)
-#^\.config/rclone(/|$)
-
+# 常见文件
+(^|/)\.DS_Store$
+(^|/)\.git($|/)
+^README(\.md)?$
+(^|/)README\.md$
+(^|/)LICENSE$
