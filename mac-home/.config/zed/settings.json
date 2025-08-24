@@ -1,0 +1,35 @@
+// Zed settings
+//
+// For information on how to configure Zed, see the Zed
+// documentation: https://zed.dev/docs/configuring-zed
+//
+// To see all of Zed's default settings without changing your
+// custom settings, run `zed: open default settings` from the
+// command palette (cmd-shift-p / ctrl-shift-p)
+{
+  "agent": {
+    "default_model": {
+      "provider": "google",
+      "model": "gemini-2.0-flash-lite"
+    }
+  },
+  "proxy": "http://127.0.0.1:53373",
+  "ssh_connections": [
+    {
+      "host": "43.137.38.19",
+      "projects": []
+    },
+    {
+      "host": "ssh.paracloud.com",
+      "projects": []
+    }
+  ],
+  "vim_mode": false,
+  "ui_font_size": 16,
+  "buffer_font_size": 15,
+  "theme": {
+    "mode": "system",
+    "light": "One Light",
+    "dark": "One Dark"
+  }
+}

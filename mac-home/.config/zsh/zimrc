@@ -1,0 +1,29 @@
+# Core modules
+zmodule environment
+zmodule git
+zmodule input
+zmodule termtitle
+zmodule utility
+
+# Prompt modules
+zmodule git-info
+zmodule duration-info
+zmodule prompt-pwd
+zmodule magicmace
+
+# Additional utility modules
+zmodule supercrabtree/k
+zmodule hlissner/zsh-autopair
+zmodule pabloariasal/zfm
+# zmodule agkozak/zsh-z  # disabled: using zoxide instead
+
+# Completion modules (order matters!)
+zmodule zsh-users/zsh-completions --fpath src
+# completion must be sourced after all modules that add completion definitions
+# zmodule completion  # disabled: we'll manage compinit lazily in zshrc for faster startup
+
+# Modules that must be initialized last
+zmodule zdharma-continuum/fast-syntax-highlighting
+zmodule zsh-users/zsh-history-substring-search
+zmodule zsh-users/zsh-autosuggestions
+zmodule Aloxaf/fzf-tab

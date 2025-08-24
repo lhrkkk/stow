@@ -1,0 +1,9 @@
+# Helix 配置
+# 更多配置项可参考 :config-open 或官方文档
+
+# 将默认主题设置为与 Neovim 一致的 base16 selenized-light
+# theme = "base16_selenized_light"
+
+# 设置为标准的 selenized light
+theme = "selenized_light"
+

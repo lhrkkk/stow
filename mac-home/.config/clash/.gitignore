@@ -1,0 +1,4 @@
+# Ignore large generated or external data files (local to clash)
+Country.mmdb
+ProxyConfig
+

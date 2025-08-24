@@ -1,0 +1,65 @@
+# Migrated from WezTerm by Agent Mode on 2025-08-15
+# Theme: closest light theme to "Selenized Light (Gogh)"
+# You can run: ghostty +list-themes to explore others.
+
+# Selenized Light - custom palette
+# Applied from user-provided values
+palette = 0=#ece3cc
+palette = 1=#d2212d
+palette = 2=#489100
+palette = 3=#ad8900
+palette = 4=#0072d4
+palette = 5=#ca4898
+palette = 6=#009c8f
+palette = 7=#909995
+palette = 8=#d5cdb6
+palette = 9=#cc1729
+palette = 10=#428b00
+palette = 11=#a78300
+palette = 12=#006dce
+palette = 13=#c44392
+palette = 14=#00978a
+palette = 15=#3a4d53
+background = fbf3db
+foreground = 53676d
+cursor-color = 53676d
+selection-background = ece3cc
+selection-foreground = 00978a
+
+# Fonts
+font-family = "JetBrains Mono, MesloLGS Nerd Font Mono, Symbols Nerd Font Mono"
+font-size = 15
+
+# Window decorations: approximate to INTEGRATED_BUTTONS|RESIZE
+# Ghostty manages decorations via booleans/toggles; leave default (decorations on)
+# and allow resizing.
+
+# Light title bar to match theme (macOS)
+macos-titlebar-style = transparent
+
+# Usability
+scrollback = 20000
+audible-bell = false
+
+# Tab bar styling in Ghostty is limited compared to WezTerm; rely on theme.
+# If you want a minimal look, you can toggle below options:
+# tab-bar = true
+# tab-bar-style = native
+
+# Optional background effects (disabled to match your WezTerm comments)
+# background-opacity = 0.8
+# background-blur-radius = 10
+
+# Keybindings (translated from your WezTerm bindings)
+# - Cmd+W: close current surface (pane if split, otherwise tab/window)
+keybind = super+w=close_surface
+
+# - Ctrl+Space: split right 50%
+keybind = ctrl+space=new_split:right
+
+# - Ctrl+S: split down 50%
+keybind = ctrl+s=new_split:down
+
+# - Ctrl+V: split right 50%
+keybind = ctrl+v=new_split:right
+

@@ -1,0 +1,9 @@
+# Paper Light flavor (local minimal)
+[mgr]
+border_symbol = " "
+border_style  = { fg = "#a0a0a0" }
+
+[status]
+mode_normal = { bg = "#e4e4e4", fg = "#4d4d4c", bold = true }
+mode_select = { bg = "#d7005f", fg = "#eeeeee", bold = true }
+mode_unset  = { bg = "#0087af", fg = "#eeeeee", bold = true }

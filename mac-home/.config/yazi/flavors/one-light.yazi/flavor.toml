@@ -1,0 +1,9 @@
+# One Light flavor (local minimal)
+[mgr]
+border_symbol = " "
+border_style  = { fg = "#9da0a2" }
+
+[status]
+mode_normal = { bg = "#eaeaea", fg = "#383a42", bold = true }
+mode_select = { bg = "#986801", fg = "#fafafa", bold = true }
+mode_unset  = { bg = "#4078f2", fg = "#fafafa", bold = true }

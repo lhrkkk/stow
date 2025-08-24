@@ -1,0 +1,4 @@
+# zim bootstrap to use ~/.config/zsh/zimrc
+if [ -f "$HOME/.config/zsh/zimrc" ]; then
+  source "$HOME/.config/zsh/zimrc"
+fi

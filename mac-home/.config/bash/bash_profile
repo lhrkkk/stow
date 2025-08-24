@@ -1,0 +1,32 @@
+if [ -f ~/.bashrc ]; then
+  . ~/.bashrc
+fi
+
+# export HOMEBREW_BOTTLE_DOMAIN=https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles  # use Aliyun instead
+# export HOMEBREW_BOTTLE_DOMAIN=https://mirrors.ustc.edu.cn/homebrew-bottles  # use Aliyun instead
+# Add Visual Studio Code (code)
+export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"
+
+export PATH="$HOME/.cargo/bin:$PATH"
+export HOMEBREW_BOTTLE_DOMAIN=https://mirrors.aliyun.com/homebrew/homebrew-bottles
+# export PATH="/usr/local/opt/ruby/bin:$PATH"
+
+
+# >>> conda lazy initialize >>>
+# Conda will be initialized on first use by the wrapper defined in ~/.bashrc
+# This optimization saves ~1487ms (the biggest bottleneck!) on shell startup
+# Original conda init block removed to prevent automatic loading
+
+
+export PATH="$HOME/.elan/bin:$PATH"
+# ==== Lazy-load Homebrew environment ====
+# Saves ~27ms on startup by deferring PATH/env setup
+if [[ -x /opt/homebrew/bin/brew ]]; then
+  brew() {
+    # Initialize Homebrew variables once, on first use
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+    unset -f brew
+    brew "$@"
+  }
+fi
+export BASH_SILENCE_DEPRECATION_WARNING=1

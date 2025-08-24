@@ -1,0 +1,15 @@
+# Selenized Light flavor (local, minimal to preserve built-in filetype colors)
+
+[mgr]
+border_symbol = " "
+border_style  = { fg = "#93a1a1" }
+
+[status]
+overall   = { fg = "#586e75", bg = "#fbfbfb" }
+sep_left  = { open = "",  close = "]" }
+sep_right = { open = "[", close = "" }
+
+[mode]
+normal_main = { fg = "#586e75", bg = "#fbfbfb", bold = true }
+select_main = { fg = "#fbfbfb", bg = "#d33682", bold = true }
+unset_main  = { fg = "#fbfbfb", bg = "#268bd2", bold = true }

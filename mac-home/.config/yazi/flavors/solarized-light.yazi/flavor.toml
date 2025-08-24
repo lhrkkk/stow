@@ -1,0 +1,10 @@
+# Solarized Light flavor (local)
+
+[mgr]
+border_symbol = " "
+border_style  = { fg = "gray" }
+
+[status]
+mode_normal = { bg = "#eee8d5", fg = "#073642", bold = true }
+mode_select = { bg = "#b58900", fg = "#fdf6e3", bold = true }
+mode_unset  = { bg = "#268bd2", fg = "#fdf6e3", bold = true }

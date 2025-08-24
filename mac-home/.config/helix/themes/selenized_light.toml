@@ -1,0 +1,114 @@
+# Helix Selenized Light theme (custom)
+# Reference palette based on Selenized Light by Jan W&aogon;growski
+
+# Syntax scopes
+"attribute" = { fg = "orange" }
+"keyword" = { fg = "blue" }
+"keyword.directive" = { fg = "yellow" }
+"namespace" = { fg = "violet" }
+"operator" = { fg = "blue" }
+"special" = { fg = "yellow" }
+"variable.builtin" = { fg = "magenta", modifiers = ["bold"] }
+"variable.function" = { fg = "blue" }
+"type" = { fg = "cyan" }
+"type.builtin" = { fg = "cyan", modifiers = ["bold"] }
+"constructor" = { fg = "blue" }
+"function" = { fg = "blue" }
+"function.macro" = { fg = "violet" }
+"function.builtin" = { fg = "blue", modifiers = ["bold"] }
+"function.special" = { fg = "violet" }
+"comment" = { fg = "ink2" }
+"string" = { fg = "green" }
+"constant" = { fg = "green" }
+"constant.builtin" = { fg = "green", modifiers = ["bold"] }
+"constant.character.escape" = { fg = "red", modifiers = ["bold"] }
+"label" = { fg = "blue" }
+"module" = { fg = "violet" }
+"tag" = { fg = "magenta" }
+
+# Markup
+"markup.heading" = "blue"
+"markup.list" = "red"
+"markup.bold" = { fg = "ink1", modifiers = ["bold"] }
+"markup.italic" = { fg = "violet", modifiers = ["italic"] }
+"markup.strikethrough" = { modifiers = ["crossed_out"] }
+"markup.link.url" = { fg = "cyan", modifiers = ["underlined"] }
+"markup.link.text" = "blue"
+"markup.quote" = "cyan"
+"markup.raw" = "yellow"
+
+# Diff
+"diff.plus" = { fg = "green" }
+"diff.delta" = { fg = "yellow" }
+"diff.minus" = { fg = "red" }
+
+# UI
+"ui.background" = { bg = "paper" }
+"ui.virtual.whitespace" = { fg = "ink3" }
+"ui.virtual.inlay-hint" = { fg = "ink3", modifiers = ["italic"] }
+"ui.virtual.jump-label" = { fg = "red", modifiers = ["bold"] }
+
+"ui.linenr" = { fg = "ink2", bg = "edge" }
+"ui.linenr.selected" = { fg = "blue", modifiers = ["bold"] }
+"ui.cursorline" = { bg = "edge" }
+
+"ui.statusline" = { fg = "paper", bg = "edge" }
+"ui.statusline.normal" = { bg = "blue", fg = "paper" }
+"ui.statusline.insert" = { bg = "green", fg = "paper" }
+"ui.statusline.select" = { bg = "yellow", fg = "paper" }
+"ui.statusline.inactive" = { fg = "ink2", bg = "ink4" }
+
+"ui.popup" = { bg = "edge" }
+"ui.menu.selected" = { fg = "edge", bg = "ink0" }
+"ui.menu" = { fg = "ink1", bg = "edge" }
+"ui.window" = { fg = "paper" }
+"ui.help" = { modifiers = ["reversed"] }
+
+"ui.text" = { fg = "ink1" }
+"ui.text.focus" = { fg = "blue", modifiers = ["bold"] }
+
+"ui.cursor.primary" = { fg = "paper", bg = "ink1" }
+"ui.cursor.select" = { fg = "edge", bg = "cyan" }
+"ui.cursorline.primary" = { bg = "edge" }
+"ui.cursorline.secondary" = { bg = "edge" }
+
+"ui.selection" = { bg = "highlight" }
+"ui.selection.primary" = { bg = "highlight2" }
+
+"ui.virtual.indent-guide" = { fg = "ink4" }
+"ui.virtual.ruler" = { bg = "ink4" }
+
+"warning" =  { fg = "yellow", modifiers= ["bold", "underlined"] }
+"error" = { fg = "red", modifiers= ["bold", "underlined"] }
+"info" = { fg = "blue", modifiers= ["bold", "underlined"] }
+"hint" = { fg = "ink3", modifiers= ["bold", "underlined"] }
+
+"diagnostic.warning" = { underline = { style = "curl", color = "yellow" } }
+"diagnostic.error" = { underline = { style = "curl", color = "red" } }
+"diagnostic.info" = { underline = { style = "curl", color = "blue" } }
+"diagnostic.hint" = { underline = { style = "curl", color = "ink3" } }
+"diagnostic.unnecessary" = { modifiers = ["dim"] }
+"diagnostic.deprecated" = { modifiers = ["crossed_out"] }
+
+[palette]
+# Selenized Light approximate palette
+paper   = "#fbf3db"  # background
+edge    = "#e9e4d0"  # cursorline/line number col
+highlight = "#d8d4c4"
+highlight2 = "#cfcab5"
+
+ink0    = "#909995"
+ink1    = "#526057"
+ink2    = "#5c6a72"
+ink3    = "#7d8787"
+ink4    = "#b9b5aa"
+
+red     = "#d2212d"
+orange  = "#bf8f1d"
+yellow  = "#ad8900"
+green   = "#489100"
+blue    = "#0072d4"
+cyan    = "#009c8f"
+magenta = "#ca4898"
+violet  = "#7759b4"
+

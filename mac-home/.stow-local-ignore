@@ -1,0 +1,24 @@
+^\.git(ignore)?$
+^\.gitmodules$
+^WARP\.md$
+^\.stow-local-ignore$
+\.DS_Store$
+^\.cursorindexingignore$
+^\.cursorrules$
+^\.cursorignore$
+^\.cursorignorerules$
+# 常见临时/缓存
+(^|/)cache(/|$)
+(^|/)Cache(/|$)
+(^|/)tmp(/|$)
+(^|/)SavedState(/|$)
+(^|/)sockets(/|$)
+(^|/)__pycache__(/|$)
+(^|/).+\.zwc$
+# 常见嵌套 Git 目录（避免把第三方插件吸进来）
+(^|/)tmux/plugins(/|$)
+(^|/)tpm(/|$)
+
+# rclone: keep local only (secrets)
+^\.config/rclone(/|$)
+
