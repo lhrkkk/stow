@@ -1,0 +1,17 @@
+# 常见可重建或无需云端备份的目录
+.DS_Store
+**/node_modules/**
+**/.venv/**
+**/.tox/**
+**/.pytest_cache/**
+**/dist/**
+**/build/**
+**/target/**
+**/.next/**
+**/.turbo/**
+**/.cache/**
+**/.git/**
+**/.gitmodules/**
+**/.gitignore/**
+/Users/lhr/Library/Caches/**
+

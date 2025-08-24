@@ -1,0 +1,395 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# restic + rclone + pCloud 备份脚本（白名单优先 + direnv 友好）
+# 用法：
+#   cd ~/.config/restic && direnv allow  # 首次
+#   ./backup_restic_pcloud               # 之后直接运行
+# 变量来源：
+#   - 优先使用环境变量（可由 direnv 的 .envrc/.env.private 提供）：
+#       RESTIC_PASSWORD 或 RESTIC_PASSWORD_COMMAND,
+#       RCLONE_REMOTE_NAME, RESTIC_REPO_NAME, RESTIC_REPOSITORY,
+#       INCLUDE_FILE, EXCLUDES_FILE, RESTIC_TAGS, VERIFY_SUBSET
+#   - 脚本内置默认值作为兜底
+
+# --- 电源/电量策略（可通过环境变量覆盖） ---
+# 默认：仅接电时运行；不在电池上强行防睡
+# 可选：允许在电池且电量≥MIN_BATTERY（%）时运行；如需在电池上也防睡，设 CAFFEINATE_ON_BATTERY=1
+ALLOW_ON_BATTERY=${ALLOW_ON_BATTERY:-0}
+MIN_BATTERY=${MIN_BATTERY:-40}
+CAFFEINATE_ON_BATTERY=${CAFFEINATE_ON_BATTERY:-0}
+DRY_RUN=${DRY_RUN:-0}                        # 1=只打印将要执行的动作与命令，不实际执行
+# 运行中优雅终止策略
+LOW_BATTERY_STOP=${LOW_BATTERY_STOP:-1}      # 低电量时优雅终止备份
+STOP_BATTERY=${STOP_BATTERY:-20}            # 触发优雅终止的电量阈值（%）
+MONITOR_INTERVAL=${MONITOR_INTERVAL:-60}    # 监控间隔（秒）
+STOP_ON_AC_LOSS=${STOP_ON_AC_LOSS:-1}       # 从接电切换到电池时是否终止（当不允许电池运行时）
+STOP_EXIT_ZERO=${STOP_EXIT_ZERO:-1}         # 因策略终止时是否以 0 退出（避免被视为失败）
+
+# 仅在 macOS 下使用 pmset；若不可用则跳过电源判断
+_pmset_ok=0
+if command -v pmset >/dev/null 2>&1; then
+  _pmset_ok=1
+fi
+
+on_ac() {
+  [ "${_pmset_ok}" -eq 1 ] && pmset -g batt | grep -q "AC Power"
+}
+
+battery_pct() {
+  if [ "${_pmset_ok}" -eq 1 ]; then
+    pmset -g batt | grep -Eo '[0-9]+%' | head -1 | tr -d '%'
+  else
+    echo "100"  # 无法检测时假定满电，避免误杀执行
+  fi
+}
+
+# 如需在整个脚本期间防止睡眠，使用 caffeinate -w $$；接电用 -s，电池可选 -i
+_caffeinate_pid=""
+start_caffeinate() {
+  local mode="$1"  # s 或 i
+  if command -v caffeinate >/dev/null 2>&1; then
+    caffeinate -"${mode}" -w $$ &
+    _caffeinate_pid=$!
+  fi
+}
+
+# 监控指定 PID 的进程；当电池低于阈值，或从接电切换到电池（且策略不允许）时，发送 SIGINT 优雅终止
+monitor_power() {
+  local target_pid="$1"
+  while kill -0 "$target_pid" 2>/dev/null; do
+    sleep "${MONITOR_INTERVAL}"
+    [ "${_pmset_ok}" -ne 1 ] && continue
+
+    if on_ac; then
+      continue
+    fi
+
+    # 此时为电池供电
+    if [ "${STOP_ON_AC_LOSS}" = "1" ] && [ "${START_ON_AC}" = "1" ] && [ "${ALLOW_ON_BATTERY}" != "1" ]; then
+      echo "检测到从接电切换到电池：优雅终止备份（SIGINT）…"
+      kill -INT "$target_pid" 2>/dev/null || true
+      break
+    fi
+
+    if [ "${LOW_BATTERY_STOP}" = "1" ]; then
+      local pct
+      pct="$(battery_pct)"
+      if [ -n "${pct}" ] && [ "${pct}" -lt "${STOP_BATTERY}" ]; then
+        echo "电量 ${pct}% 低于 ${STOP_BATTERY}%：优雅终止备份（SIGINT）…"
+        kill -INT "$target_pid" 2>/dev/null || true
+        break
+      fi
+    fi
+  done
+}
+
+cleanup() {
+  if [ -n "${_caffeinate_pid}" ]; then
+    kill "${_caffeinate_pid}" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT HUP INT TERM
+
+# --- 日志大小限制（截断式，避免无限增长；默认 5MB）---
+LOG_MAX_SIZE_MB=${LOG_MAX_SIZE_MB:-5}
+cap_log_if_too_big() {
+  local f="$1"
+  local max_bytes=$((LOG_MAX_SIZE_MB * 1024 * 1024))
+  if [ -f "$f" ]; then
+    local size
+    size=$(stat -f%z "$f" 2>/dev/null || echo 0)
+    if [ -n "$size" ] && [ "$size" -ge "$max_bytes" ]; then
+      : > "$f" || true
+    fi
+  fi
+}
+# 对 LaunchAgent 指定的日志路径做截断检查
+cap_log_if_too_big "$HOME/Library/Logs/restic.daily.log"
+cap_log_if_too_big "$HOME/Library/Logs/restic.daily.err.log"
+
+# --- 日志头与 DRY_RUN 预处理（在依赖检查之前执行） ---
+dt() { date '+%F %T %z'; }
+
+IS_AC=0
+BATTERY_NOW=""
+POLICY_ALLOW_START=1
+POLICY_REASON=""
+
+if [ "${_pmset_ok}" -eq 1 ]; then
+  if on_ac; then IS_AC=1; fi
+  BATTERY_NOW="$(battery_pct)"
+  if [ "$IS_AC" -eq 1 ]; then
+    POLICY_ALLOW_START=1; POLICY_REASON="on AC power"
+  else
+    if [ "${ALLOW_ON_BATTERY}" = "1" ] && [ -n "${BATTERY_NOW}" ] && [ "${BATTERY_NOW}" -ge "${MIN_BATTERY}" ]; then
+      POLICY_ALLOW_START=1; POLICY_REASON="on battery ${BATTERY_NOW}% >= MIN_BATTERY(${MIN_BATTERY}%)"
+    else
+      POLICY_ALLOW_START=0; POLICY_REASON="on battery and below policy/threshold"
+    fi
+  fi
+else
+  POLICY_ALLOW_START=1; POLICY_REASON="pmset unavailable; skipping power gating"
+fi
+
+echo "[$(dt)] policy=$( [ ${POLICY_ALLOW_START} -eq 1 ] && echo allow || echo skip ); power=$( [ ${IS_AC} -eq 1 ] && echo AC || echo Battery ); batt=${BATTERY_NOW:-n/a}%; cfg: ALLOW_ON_BATTERY=${ALLOW_ON_BATTERY}, MIN_BATTERY=${MIN_BATTERY}, CAFFEINATE_ON_BATTERY=${CAFFEINATE_ON_BATTERY}, LOW_BATTERY_STOP=${LOW_BATTERY_STOP}, STOP_BATTERY=${STOP_BATTERY}, MONITOR_INTERVAL=${MONITOR_INTERVAL}, STOP_ON_AC_LOSS=${STOP_ON_AC_LOSS}, STOP_EXIT_ZERO=${STOP_EXIT_ZERO}, DRY_RUN=${DRY_RUN}"
+
+if [ "${DRY_RUN}" = "1" ]; then
+  if [ "${POLICY_ALLOW_START}" -ne 1 ]; then
+    echo "DRY_RUN: would skip backup due to policy: ${POLICY_REASON}"
+    exit 0
+  fi
+
+  # 计算将要使用的关键变量（不做依赖与远端检查）
+  REMOTE_NAME="${RCLONE_REMOTE_NAME:-pcloud}"
+  if [ -n "${RESTIC_REPOSITORY:-}" ]; then
+    :
+  else
+    if command -v scutil >/dev/null 2>&1; then
+      REPO_NAME_DEFAULT="restic-$(scutil --get LocalHostName 2>/dev/null || hostname)"
+    else
+      REPO_NAME_DEFAULT="restic-$(hostname)"
+    fi
+    REPO_NAME="${RESTIC_REPO_NAME:-$REPO_NAME_DEFAULT}"
+    RESTIC_REPOSITORY="rclone:${REMOTE_NAME}:${REPO_NAME}"
+  fi
+
+  INCLUDE_FILE="${INCLUDE_FILE:-$HOME/.config/restic/include.txt}"
+  EXCLUDES_FILE="${EXCLUDES_FILE:-$HOME/.config/restic/excludes.txt}"
+  RESTIC_TAGS="${RESTIC_TAGS:-daily}"
+  VERIFY_SUBSET="${VERIFY_SUBSET:-1%}"
+
+  EXCLUDE_ARGS=()
+  [ -f "$EXCLUDES_FILE" ] && EXCLUDE_ARGS+=("--exclude-file" "$EXCLUDES_FILE")
+
+  TARGETS=()
+  if [ -s "$INCLUDE_FILE" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+      if [ -d "$line" ] || [ -f "$line" ]; then TARGETS+=("$line"); fi
+    done <"$INCLUDE_FILE"
+  else
+    add() { [ -d "$1" ] && TARGETS+=("$1"); }
+    add "$HOME/.dotfiles"
+    add "$HOME/Repos"
+    add "$HOME/Work"
+    add "$HOME/Personal"
+    add "$HOME/Sync"
+    add "$HOME/Bin"
+    add "$HOME/.config/nvim"
+    add "$HOME/.config/wezterm"
+    add "$HOME/.config/git"
+    add "$HOME/.config/zsh"
+  fi
+
+  if [ ${#TARGETS[@]} -eq 0 ]; then
+    echo "DRY_RUN: no targets would be backed up (include list empty)."
+    exit 0
+  fi
+
+  # 预计 caffeinate 行为（仅提示，不实际执行）
+  if [ "${IS_AC}" -eq 1 ]; then
+    echo "DRY_RUN: would keep system awake via: caffeinate -s (AC only)"
+  elif [ "${CAFFEINATE_ON_BATTERY}" = "1" ]; then
+    echo "DRY_RUN: would keep system awake via: caffeinate -i (on battery)"
+  fi
+
+  # 打印将要执行的 restic 命令
+  echo "DRY_RUN: RESTIC_REPOSITORY=${RESTIC_REPOSITORY}"
+  printf "DRY_RUN: would run: restic backup"
+  for arg in "${EXCLUDE_ARGS[@]}"; do printf " %q" "$arg"; done
+  printf " --tag %q" "$RESTIC_TAGS"
+  for t in "${TARGETS[@]}"; do printf " %q" "$t"; done
+  printf "\n"
+  echo "DRY_RUN: would run: restic forget --keep-daily 7 --keep-weekly 5 --keep-monthly 12 --prune"
+  printf "DRY_RUN: would run: restic check --read-data-subset=%q\n" "$VERIFY_SUBSET"
+
+  # 额外上下文：主机与版本、远端可达性（只读探测）
+  HOST_NAME=$(scutil --get LocalHostName 2>/dev/null || hostname)
+  RESTIC_VER=$(command -v restic >/dev/null 2>&1 && restic version 2>/dev/null | head -1 || echo "n/a")
+  RCLONE_VER=$(command -v rclone >/dev/null 2>&1 && rclone --version 2>/dev/null | head -1 || echo "n/a")
+  if command -v rclone >/dev/null 2>&1; then
+    if rclone listremotes 2>/dev/null | grep -q "^${REMOTE_NAME}:"; then
+      REMOTE_PRESENT=yes
+    else
+      REMOTE_PRESENT=no
+    fi
+  else
+    REMOTE_PRESENT=n/a
+  fi
+  echo "DRY_RUN: host=${HOST_NAME}; restic=\"${RESTIC_VER}\"; rclone=\"${RCLONE_VER}\"; remote(${REMOTE_NAME})=${REMOTE_PRESENT}"
+
+  exit 0
+fi
+
+need() { command -v "$1" >/dev/null 2>&1 || { echo "缺少依赖: $1。请先安装。" >&2; exit 1; }; }
+need restic
+need rclone
+
+# --- 运行前的电源/电量门控 ---
+START_ON_AC=0
+if [ "${_pmset_ok}" -eq 1 ]; then
+  if on_ac; then
+    START_ON_AC=1
+    # 接电：允许运行，并防止闲置睡眠
+    start_caffeinate s
+  else
+    START_ON_AC=0
+    # 电池：默认跳过；如允许，则检查电量阈值
+    if [ "${ALLOW_ON_BATTERY}" = "1" ]; then
+      pct="$(battery_pct)"
+      if [ -n "${pct}" ] && [ "${pct}" -lt "${MIN_BATTERY}" ]; then
+        echo "电量 ${pct}% < ${MIN_BATTERY}%：跳过本次备份（电池模式）。"
+        exit 0
+      fi
+      # 可选：在电池上也防睡，谨慎使用
+      if [ "${CAFFEINATE_ON_BATTERY}" = "1" ]; then
+        start_caffeinate i
+      fi
+    else
+      echo "未接电：按策略跳过本次备份（设置 ALLOW_ON_BATTERY=1 可在电池上运行）。"
+      exit 0
+    fi
+  fi
+else
+  # 无法检测电源状态时，不做限制
+  :
+fi
+
+# 默认变量（若未从环境提供）
+REMOTE_NAME="${RCLONE_REMOTE_NAME:-pcloud}"
+if [ -n "${RESTIC_REPOSITORY:-}" ]; then
+  export RESTIC_REPOSITORY
+else
+  if command -v scutil >/dev/null 2>&1; then
+    REPO_NAME_DEFAULT="restic-$(scutil --get LocalHostName 2>/dev/null || hostname)"
+  else
+    REPO_NAME_DEFAULT="restic-$(hostname)"
+  fi
+  REPO_NAME="${RESTIC_REPO_NAME:-$REPO_NAME_DEFAULT}"
+  export RESTIC_REPOSITORY="rclone:${REMOTE_NAME}:${REPO_NAME}"
+fi
+
+# 额外上下文日志（真实运行）：主机、仓库、版本与远端存在性
+HOST_NAME=$(scutil --get LocalHostName 2>/dev/null || hostname)
+RESTIC_VER=$(restic version 2>/dev/null | head -1 || echo "n/a")
+RCLONE_VER=$(rclone --version 2>/dev/null | head -1 || echo "n/a")
+if rclone listremotes 2>/dev/null | grep -q "^${REMOTE_NAME}:"; then
+  REMOTE_PRESENT=yes
+else
+  REMOTE_PRESENT=no
+fi
+echo "[$(dt)] host=${HOST_NAME}; repo=${RESTIC_REPOSITORY}; restic=\"${RESTIC_VER}\"; rclone=\"${RCLONE_VER}\"; remote(${REMOTE_NAME})=${REMOTE_PRESENT}"
+
+INCLUDE_FILE="${INCLUDE_FILE:-$HOME/.config/restic/include.txt}"
+EXCLUDES_FILE="${EXCLUDES_FILE:-$HOME/.config/restic/excludes.txt}"
+RESTIC_TAGS="${RESTIC_TAGS:-daily}"
+VERIFY_SUBSET="${VERIFY_SUBSET:-1%}"
+
+# 必需密钥检查（不打印值）
+if [ -z "${RESTIC_PASSWORD:-}" ] && [ -z "${RESTIC_PASSWORD_COMMAND:-}" ]; then
+  echo "请设置 RESTIC_PASSWORD 或 RESTIC_PASSWORD_COMMAND（推荐 COMMAND，更安全）" >&2
+  exit 1
+fi
+# 若提供了 COMMAND，则显式忽略环境中的明文密码，优先使用命令方式
+if [ -n "${RESTIC_PASSWORD_COMMAND:-}" ]; then
+  unset RESTIC_PASSWORD || true
+fi
+
+# rclone 远端是否存在
+if ! rclone listremotes | grep -q "^${REMOTE_NAME}:"; then
+  echo "未发现 rclone 远端 \"${REMOTE_NAME}\"。请先运行： rclone config 并创建 pcloud 远端，或设置 RCLONE_REMOTE_NAME。" >&2
+  exit 1
+fi
+
+# 读取 include（白名单）。若 include 存在且非空，仅备份其中的路径；否则回退到内置集合（存在才加入）。
+TARGETS=()
+read_include() {
+  local line
+  while IFS= read -r line || [ -n "$line" ]; do
+    # 跳过空行和注释
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    if [ -d "$line" ] || [ -f "$line" ]; then
+      TARGETS+=("$line")
+    else
+      echo "警告：include 中的路径不存在，已跳过 -> $line" >&2
+    fi
+  done <"$1"
+}
+
+if [ -s "$INCLUDE_FILE" ]; then
+  read_include "$INCLUDE_FILE"
+else
+  add() { [ -d "$1" ] && TARGETS+=("$1"); }
+  add "$HOME/.dotfiles"
+  add "$HOME/Repos"
+  add "$HOME/Work"
+  add "$HOME/Personal"
+  add "$HOME/Sync"
+  add "$HOME/Bin"
+  add "$HOME/.config/nvim"
+  add "$HOME/.config/wezterm"
+  add "$HOME/.config/git"
+  add "$HOME/.config/zsh"
+fi
+
+if [ ${#TARGETS[@]} -eq 0 ]; then
+  echo "未发现任何备份目标目录，请在 include.txt 填写路径后重试。" >&2
+  exit 1
+fi
+
+# 初始化仓库（若尚不存在）
+if ! restic snapshots >/dev/null 2>&1; then
+  echo "初始化 restic 仓库: ${RESTIC_REPOSITORY}"
+  restic init
+fi
+
+# 组装排除参数
+EXCLUDE_ARGS=()
+[ -f "$EXCLUDES_FILE" ] && EXCLUDE_ARGS+=("--exclude-file" "$EXCLUDES_FILE")
+
+# 执行备份（在后台运行，并监控电量/电源状态以便优雅终止）
+backup_cmd=(
+  restic backup
+  "${EXCLUDE_ARGS[@]}"
+  --tag "$RESTIC_TAGS"
+  "${TARGETS[@]}"
+)
+"${backup_cmd[@]}" &
+BACKUP_PID=$!
+
+# 条件启动监控（仅当可检测电源，且启用了低电量终止或不允许电池运行时的掉电终止）
+if [ "${_pmset_ok}" -eq 1 ] && { [ "${LOW_BATTERY_STOP}" = "1" ] || { [ "${STOP_ON_AC_LOSS}" = "1" ] && [ "${ALLOW_ON_BATTERY}" != "1" ]; }; }; then
+  monitor_power "$BACKUP_PID" &
+  MONITOR_PID=$!
+fi
+
+# 等待备份结束（在 set -e 下需要临时关闭以捕获退出码）
+set +e
+wait "$BACKUP_PID"
+BACKUP_RC=$?
+set -e
+
+# 停止监控（若存在）
+if [ -n "${MONITOR_PID:-}" ]; then
+  kill "${MONITOR_PID}" 2>/dev/null || true
+fi
+
+# 若因策略中止或发生错误，跳过后续步骤
+if [ "$BACKUP_RC" -ne 0 ]; then
+  echo "备份未完成（退出码 $BACKUP_RC），已跳过 forget/prune/check。"
+  if [ "${STOP_EXIT_ZERO}" = "1" ]; then
+    exit 0
+  else
+    exit "$BACKUP_RC"
+  fi
+fi
+
+# 保留策略 + 清理
+restic forget --keep-daily 7 --keep-weekly 5 --keep-monthly 12 --prune
+
+# 快速校验
+restic check --read-data-subset="$VERIFY_SUBSET"
+
+echo "备份完成 -> ${RESTIC_REPOSITORY}"
+

@@ -45,7 +45,7 @@ alias s1="mosh root@s1"
 alias s2="mosh root@s2"
 
 # EZA (better ls)
-alias ls="eza --color=always --icons=always --group-directories-first"
+alias ls="eza --color=always --group-directories-first"
 alias ll="eza --color=always --long --git --icons=always --group-directories-first"
 alias la="eza --color=always --long --git --icons=always --all --group-directories-first"
 alias lt="eza --color=always --tree --git --icons=always"

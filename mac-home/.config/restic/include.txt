@@ -1,0 +1,11 @@
+# 路径白名单（每行一个绝对路径）
+/Users/lhr/.dotfiles
+/Users/lhr/.config/
+/Users/lhr/_code
+/Users/lhr/_env
+/Users/lhr/_lab
+/Users/lhr/_pub
+# /Users/lhr/@coding
+/Users/lhr/@log
+/Users/lhr/@project
+/Users/lhr/@self

@@ -11,7 +11,7 @@
 #
 # Component load times & savings:
 # • Conda:     1487ms → lazy (saved 1487ms) - 86% of total savings
-# • TheFuck:    186ms → lazy (saved 186ms)  - 11% of total savings  
+# • TheFuck:    186ms → lazy (saved 186ms)  - 11% of total savings
 # • Homebrew:    27ms → lazy (saved 27ms)
 # • FZF:         22ms → 3ms  (saved 19ms)   - using static scripts
 # • Zoxide:      10ms → lazy (saved 10ms)
@@ -89,7 +89,7 @@ _tf_lazy() {
 if command -v brew >/dev/null 2>&1; then
   FZF_BASE="$(brew --prefix)/opt/fzf/shell"
   [ -f "$FZF_BASE/key-bindings.bash" ] && source "$FZF_BASE/key-bindings.bash"
-  
+
   # Lazy-load completion only
   _fzf_lazy_completion() {
     if [ -z "$FZF_COMPLETION_LOADED" ]; then
@@ -97,7 +97,7 @@ if command -v brew >/dev/null 2>&1; then
       export FZF_COMPLETION_LOADED=1
     fi
   }
-  
+
   # Hook into the completion system
   complete -F _fzf_lazy_completion -o default -o bashdefault fzf
 fi
@@ -167,7 +167,7 @@ export BAT_THEME="TwoDark"
 
 # ---- EZA (Better ls) -----
 # Replace ls with eza
-alias ls="eza --color=always --icons=always --group-directories-first"  # 简洁多列显示，目录优先
+alias ls="eza --color=always --group-directories-first"  # 简洁多列显示，目录优先
 alias ll="eza --color=always --long --git --icons=always --group-directories-first"  # 详细信息，目录优先
 alias la="eza --color=always --long --git --icons=always --all --group-directories-first"  # 显示隐藏文件，目录优先
 alias lt="eza --color=always --tree --git --icons=always"  # 树状显示
