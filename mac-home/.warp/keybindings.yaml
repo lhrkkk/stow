@@ -1,0 +1,8 @@
+---
+"input:set_mode_agent": cmd-k
+"workspace:close_active_tab": none
+"pane_group:add_down": ctrl-s
+"terminal:clear_blocks": none
+"pane_group:add_right": ctrl-v
+"input:set_mode_terminal": cmd-j
+"input:enable_auto_detection": cmd-i

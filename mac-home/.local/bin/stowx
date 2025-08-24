@@ -107,8 +107,20 @@ run_stow() {
   need_cmd stow
   build_opts
   local subopts=("$@")
-  log "stow ${STOW_OPTS[*]} ${subopts[*]} -- ${PACKAGES[*]}"
-  stow "${STOW_OPTS[@]}" "${subopts[@]}" -- "${PACKAGES[@]}"
+  # 仅当包名以 '-' 开头时才插入选项结束符 --，以兼容某些 stow 版本在 -- 下的边界行为
+  local sep=()
+  for p in "${PACKAGES[@]}"; do
+    case "$p" in
+      -*) sep=(--); break ;;
+    esac
+  done
+  if [[ ${#sep[@]} -gt 0 ]]; then
+    log "stow ${STOW_OPTS[*]} ${subopts[*]} -- ${PACKAGES[*]}"
+    stow "${STOW_OPTS[@]}" "${subopts[@]}" -- "${PACKAGES[@]}"
+  else
+    log "stow ${STOW_OPTS[*]} ${subopts[*]} ${PACKAGES[*]}"
+    stow "${STOW_OPTS[@]}" "${subopts[@]}" "${PACKAGES[@]}"
+  fi
 }
 
 ensure_packages() {
@@ -161,18 +173,26 @@ cmd_grab() {
     dst="$STOW_DIR/$pkg/$rel"
     dstdir=$(dirname "$dst")
     if [[ $DRY_RUN -eq 1 ]]; then
-      log "DRY-RUN: 将创建目录 $dstdir 并移动 $abs -> $dst"
+      log "DRY-RUN: + mkdir -p \"$dstdir\""
+      if [[ -e "$dst" ]]; then
+        log "DRY-RUN: + rm -rf \"$dst\""
+      fi
+      log "DRY-RUN: + mv \"$abs\" \"$dst\""
     else
+      log "+ mkdir -p \"$dstdir\""
       mkdir -p "$dstdir"
       if [[ -e "$dst" ]]; then
         if [[ $YES -eq 1 ]]; then
           log "目标已存在，覆盖：$dst"
+          log "+ rm -rf \"$dst\""
           rm -rf "$dst"
         else
           confirm "目标已存在：$dst。是否覆盖？" || { err "已跳过 $abs"; continue; }
+          log "+ rm -rf \"$dst\""
           rm -rf "$dst"
         fi
       fi
+      log "+ mv \"$abs\" \"$dst\""
       mv "$abs" "$dst"
       moved_any=1
       log "已移动：$abs -> $dst"
@@ -180,7 +200,15 @@ cmd_grab() {
   done
   # After moving, restow the package to create symlinks
   if [[ $DRY_RUN -eq 1 ]]; then
-    log "DRY-RUN: 将执行链接操作以更新符号链接（restow/apply）"
+    # 构建等效的 stow 选项并打印将执行的命令（均为模拟模式）
+    build_opts
+    # 确保预览输出包含 -n（如果未通过 -n 指定，build_opts 不会注入；此处手动保证）
+    case " ${STOW_OPTS[*]} " in
+      *" -n "*) : ;;
+      *) STOW_OPTS=( -n "${STOW_OPTS[@]}" ) ;;
+    esac
+    log "DRY-RUN: + stow ${STOW_OPTS[*]} -R -- ${PACKAGES[*]}"
+    log "DRY-RUN: + stow ${STOW_OPTS[*]} -S -- ${PACKAGES[*]}"
   else
     # Prefer restow; if it fails (e.g. first time, nothing to restow), fallback to apply (-S)
     if run_stow -R; then
@@ -205,7 +233,7 @@ cmd_adopt() {
     for pkg in "${PACKAGES[@]}"; do
       local repo="$STOW_DIR/$pkg"
       if git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        log "git restore . @ $repo"
+        log "+ git -C \"$repo\" restore ."
         git -C "$repo" restore .
       else
         log "跳过 git restore：$repo 不是 git 仓库"

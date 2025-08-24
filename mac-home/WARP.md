@@ -106,3 +106,66 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
   -  stowx grab -p mac-home <路径>
 - 代理注意：命令前加空格避免写入历史；adopt/覆盖操作须确认；优先先预览再 apply。
 
+七、Warp 会话日志工作流与追加规范（含作用域）
+
+- 目标
+  - 将每次会话要点记录到 ~/@log/warp，按“同一会话统一文件”的方式持续追加，便于检索与审计。
+
+- 目录与命名
+  - 日志目录：~/@log/warp
+  - 文件名：YYYY-MM-DD-中文标题.md（以北京时间的日期命名）
+  - 时间戳：一律使用北京时间，精确到秒（YYYY-MM-DD HH:MM:SS CST）
+
+- 会话标识（Session-ID）与作用域
+  - 默认作用域：tty（每个终端标签一个 ID）
+  - 支持作用域：global / tty / shell
+  - 存储位置：
+    - global：~/.config/warp/session.id
+    - tty：~/.config/warp/sessions/tty-<sanitized_tty>.id
+    - shell：~/.config/warp/sessions/shell-<PPID>.id
+  - 生成时机：新会话开始生成一次，之后复用；不要在同一会话内更换
+  - 定位原则：追加时仅凭 Session-ID 定位当天同一篇；绝不改写已有文件头的 Session-ID
+  - 新建条件：当“按 Session-ID 定位失败”且提供了标题时，才新建当天文件，并在文件头写入 Session-ID
+
+- 更新标识（Update-ID）
+  - 每次追加必须写入唯一 Update-ID，用于标识本次更新
+  - 格式：HHMMSS-短随机hex（例如 142530-a1b2c3）
+  - 作用：便于审计、去重与外部引用具体一次更新
+
+- 命令与工具（本机已安装）
+  - warp-log-session：生成/读取当前会话的 Session-ID（支持 --scope；默认读取/写入 tty 作用域）
+  - warp-log-append：按 Session-ID 追加（找不到才新建）；自动写“北京时间 + Update-ID”；支持 --scope
+  - warp-log、warp-log-latest：打开日志目录/打开最新一篇
+
+- 示例命令（为避免写入 shell 历史，所有命令前均带一个空格）
+  - 开启新会话（本标签/tty）：
+    -  WARP_LOG_SESSION_SCOPE=tty warp-log-session --new
+  - 首次写入（需要标题）：
+    -  warp-log-append -t "中文标题" -m "首次正文"
+  - 同一会话继续追加：
+    -  warp-log-append -m "本次追加内容……"
+    -  echo "多行内容……" | warp-log-append -m -
+    -  warp-log-append -f ~/notes/today.md
+  - 跨会话/跨标签追加：
+    -  warp-log-append --sid "$(warp-log-session --scope tty)" -m "内容"
+  - 打开查看：
+    -  warp-log
+    -  warp-log-latest
+
+- 行为约束（必须遵守）
+  - 只按 Session-ID 定位追加；除非新建，否则不写入/不改写文件头的 Session-ID
+  - 每次追加必须写入 Update-ID 与秒级北京时间
+  - 新会话首次写入必须提供标题；同一会话的后续追加不再需要标题
+  - 若需要“每标签一个会话”，设定：export WARP_LOG_SESSION_SCOPE=tty（默认即为 tty）
+  - 示例命令前一律加空格，避免写入 shell 历史
+
+- 索引（可选优化）
+  - 维护 ~/@log/warp/.index.tsv，记录：DATE<TAB>TITLE<TAB>SESSION_ID<TAB>FILE（如需可扩展第5列为 UPDATE_ID）
+  - 追加失败时的兜底定位：在目录内 grep 文件头的“Session-ID: <sid>”精确匹配行
+
+- 排障速查
+  - 没有当前会话 ID：执行 warp-log-session 或 warp-log-session --new（注意与 --scope 一致）
+  - 新会话首次写入忘带标题：补上 -t "中文标题"
+  - 新命令未生效：rehash 或开启新 shell
+  - 查看最新日志内容： warp-log-latest
+
