@@ -25,6 +25,7 @@ Commands:
 Options:
   -d, --dir <path>       STOW_DIR（默认: $HOME/_env/stow）
   -t, --target <path>    目标目录（默认: $HOME）
+  -C, --relative-to-cwd  grab 的相对路径以当前目录($PWD)为基准（默认以 $TARGET）
   -n, --dry-run          预演（为 adopt/apply/unstow/restow 添加 -n）
   -v, --verbose          增强调试输出（为 stow 添加 -v）
   -p, --package <name>   指定包，可重复；也可直接作为位置参数（grab 推荐仅一个包）
@@ -52,12 +53,38 @@ VERBOSE=0
 DRY_RUN=0
 DO_RESTORE=1
 YES=0
+USE_CWD=0
 CMD=""
 PACKAGES=()
 POSITIONALS=()
 PATHS=()
+GLOBAL_IGNORE=()
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "未找到命令: $1"; }
+
+# Load .stow-global-ignore from STOW_DIR (regex patterns, one per line)
+load_global_ignore() {
+  GLOBAL_IGNORE=()
+  local f="$STOW_DIR/.stow-global-ignore"
+  if [[ -f "$f" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      # skip empty lines and comments
+      [[ -z "$line" ]] && continue
+      [[ "$line" =~ ^[[:space:]]*# ]] && continue
+      GLOBAL_IGNORE+=("$line")
+    done < "$f"
+  fi
+}
+
+# Return 0 if name matches any global ignore regex
+pkg_ignored() {
+  local name="$1"
+  if [[ ${#GLOBAL_IGNORE[@]} -eq 0 ]]; then return 1; fi
+  for pat in "${GLOBAL_IGNORE[@]}"; do
+    if [[ "$name" =~ $pat ]]; then return 0; fi
+  done
+  return 1
+}
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -68,6 +95,8 @@ parse_args() {
         [[ $# -ge 2 ]] || die "--dir 需要参数"; STOW_DIR="$2"; shift 2 ;;
       -t|--target)
         [[ $# -ge 2 ]] || die "--target 需要参数"; TARGET="$2"; shift 2 ;;
+      -C|--relative-to-cwd)
+        USE_CWD=1; shift ;;
       -n|--dry-run)
         DRY_RUN=1; shift ;;
       -v|--verbose)
@@ -127,13 +156,26 @@ ensure_packages() {
   if [[ ${#PACKAGES[@]} -eq 0 ]]; then
     PACKAGES=("mac-home")
   fi
+  # Validate against global ignore patterns
+  load_global_ignore
+  for p in "${PACKAGES[@]}"; do
+    if pkg_ignored "$p"; then
+      die "包名被 .stow-global-ignore 规则匹配：$p"
+    fi
+  done
 }
 
-# Normalize a source path: expand leading ~, make absolute relative to $TARGET by default
+# Normalize a source path: expand leading ~, make absolute relative to base (TARGET by default, or CWD when -C)
 norm_src() {
   local p="$1"
   [[ "$p" == ~* ]] && p="${p/#~/$HOME}"
-  if [[ "$p" != /* ]]; then p="$TARGET/$p"; fi
+  if [[ "$p" != /* ]]; then
+    if [[ $USE_CWD -eq 1 ]]; then
+      p="$PWD/$p"
+    else
+      p="$TARGET/$p"
+    fi
+  fi
   printf '%s' "$p"
 }
 
@@ -246,7 +288,12 @@ cmd_adopt() {
 
 cmd_list() {
   [[ -d "$STOW_DIR" ]] || die "STOW_DIR 不存在: $STOW_DIR"
-  find "$STOW_DIR" -mindepth 1 -maxdepth 1 -type d -prune -exec basename {} \; | sort
+  load_global_ignore
+  while IFS= read -r name; do
+    # 仅列出未被忽略的包目录名
+    if pkg_ignored "$name"; then continue; fi
+    echo "$name"
+  done < <(find "$STOW_DIR" -mindepth 1 -maxdepth 1 -type d -prune -exec basename {} \; | sort)
 }
 
 main() {

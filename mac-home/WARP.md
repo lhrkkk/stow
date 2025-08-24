@@ -103,7 +103,7 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
   -  stowx preview      （等价: stow -nvt "$HOME" -d "$HOME/_env/stow" -S mac-home）
   -  stowx apply        （等价: stow -vt  "$HOME" -d "$HOME/_env/stow" -S mac-home）
   -  stowx adopt -y     （等价: stow -vt  "$HOME" -d "$HOME/_env/stow" -S --adopt mac-home）
-  -  stowx grab -p mac-home <路径>
+  -  stowx grab -p mac-home <路径>（相对路径默认相对 $HOME；若需相对当前目录解析，使用 -C/--relative-to-cwd）
 - 代理注意：命令前加空格避免写入历史；adopt/覆盖操作须确认；优先先预览再 apply。
 
 七、Warp 会话日志工作流与追加规范（含作用域）
@@ -155,6 +155,8 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 - 行为约束（必须遵守）
   - 只按 Session-ID 定位追加；除非新建，否则不写入/不改写文件头的 Session-ID
   - 每次追加必须写入 Update-ID 与秒级北京时间
+  - 每次“追加更新”正文前自动插入 Markdown 分割线（---），便于区分历史块
+  - 增量原则：仅记录自上次更新之后的新变化/决策/动作，避免重复既有内容（必要时以链接/引用指向既有段落）
   - 新会话首次写入必须提供标题；同一会话的后续追加不再需要标题
   - 若需要“每标签一个会话”，设定：export WARP_LOG_SESSION_SCOPE=tty（默认即为 tty）
   - 示例命令前一律加空格，避免写入 shell 历史

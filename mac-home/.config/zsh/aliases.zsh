@@ -58,3 +58,4 @@ _tf_lazy() {
 	fuck "$@"
 }
 
+alias cds="cd $STOW_DIR"

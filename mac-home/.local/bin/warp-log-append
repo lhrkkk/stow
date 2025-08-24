@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# warp-log-append: create or append a Warp session log under ~/@log/warp
+# 行为要点：
+# - 追加时“仅依据当前 Session-ID 定位文件”；不会向已有文件头写入/改写 Session-ID。
+# - 若无法通过 Session-ID 定位到文件，且提供了标题，则新建当天文件并在文件头写入 Session-ID。
+# - 命名：YYYY-MM-DD-中文标题.md；时区：Asia/Shanghai，精确到秒。
+#
+# 用法：
+#   warp-log-append -t <标题> [-m <正文>|-f <文件>|-] [--print] [--show-id]
+#   warp-log-append [-m <正文>|-f <文件>|-] [--print] [--show-id]
+#   warp-log-append --new-session -t <标题> [-m ...]
+#   warp-log-append --sid <SESSION_ID> [...]
+#   warp-log-append --help
+#
+# 说明：
+# - 默认读取 ~/.config/warp/session.id 作为“当前会话 ID”。
+# - 追加：先用索引 ~/@log/warp/.index.tsv 查找，再在目录中 grep 'Session-ID: <sid>' 回退查找。
+# - 新建：只有当“无法通过 Session-ID 定位”且提供了 --title 时才新建并写入 Session-ID；否则报错。
+
+DIR="$HOME/@log/warp"
+INDEX="$DIR/.index.tsv"
+SESSION_FILE="$HOME/.config/warp/session.id"
+mkdir -p "$DIR" "$(dirname "$SESSION_FILE")"
+
+usage() {
+  cat <<'USAGE'
+warp-log-append - 会话日志新建/追加（按 Session-ID 定位）
+
+选项：
+  -t, --title <标题>   新建文件时使用的中文标题（仅在无法定位旧文件时才需要）
+  -m, --message <文本> 正文（Markdown）；传 '-' 则从 stdin 读取
+  -f, --file <路径>    从文件读取正文
+      --sid <ID>       显式指定 Session-ID（否则按 scope 读取）
+      --scope <S>      作用域：global|tty|shell（默认读取 $WARP_LOG_SESSION_SCOPE 或 tty）
+      --new-session    生成新的 Session-ID 并按 scope 写入存储（通常用于新会话）
+      --print          结束时打印最终写入的文件路径
+      --show-id        结束时打印 Session-ID
+      --help           显示帮助
+
+行为说明：
+- 追加时仅通过 Session-ID 定位到既有文件，不会改写该文件的 Session-ID；只在文末追加“更新记录”。
+- 每次追加都会写入一个 Update-ID（格式：HHMMSS-短随机hex），用于唯一标识该次更新。
+- 若无法通过 Session-ID 定位到文件且提供了 --title，则创建当天新文件并在文件头写入 Session-ID。
+- 若既无法定位又未提供 --title，则报错退出。
+USAGE
+}
+
+print_path=0; show_id=0; new_session=0
+TITLE=""; BODY=""; BODY_FILE=""; SID_OVERRIDE=""; scope="${WARP_LOG_SESSION_SCOPE:-tty}"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -t|--title) TITLE=${2:-}; shift 2;;
+    -m|--message) BODY=${2:-}; shift 2;;
+    -f|--file) BODY_FILE=${2:-}; shift 2;;
+    --sid) SID_OVERRIDE=${2:-}; shift 2;;
+    --scope) scope=${2:-}; shift 2;;
+    --new-session) new_session=1; shift;;
+    --print) print_path=1; shift;;
+    --show-id) show_id=1; shift;;
+    --help) usage; exit 0;;
+    *) echo "未知参数: $1" >&2; usage; exit 1;;
+  esac
+done
+
+# 解析正文
+if [ -n "$BODY_FILE" ]; then
+  [ -f "$BODY_FILE" ] || { echo "正文文件不存在: $BODY_FILE" >&2; exit 1; }
+  BODY=$(cat "$BODY_FILE")
+elif [ "${BODY:-}" = "-" ]; then
+  BODY=$(cat -)
+fi
+
+# 作用域 -> session 文件路径
+resolve_session_file() {
+  case "$scope" in
+    global)
+      echo "$HOME/.config/warp/session.id";;
+    tty)
+      local t; t=$(tty 2>/dev/null || true)
+      if [ -z "$t" ] || [[ "$t" == *"not a tty"* ]]; then
+        echo "$HOME/.config/warp/session.id"; return
+      fi
+      local s; s=$(printf '%s' "$t" | sed 's/[^a-zA-Z0-9._-]/_/g')
+      echo "$HOME/.config/warp/sessions/tty-$s.id";;
+    shell)
+      local ppid; ppid=${PPID:-0}
+      if [ "$ppid" -eq 0 ]; then echo "$HOME/.config/warp/session.id"; return; fi
+      echo "$HOME/.config/warp/sessions/shell-$ppid.id";;
+    *) echo "$HOME/.config/warp/session.id";;
+  esac
+}
+
+SESSION_FILE="$(resolve_session_file)"
+mkdir -p "$(dirname "$SESSION_FILE")"
+
+# Session-ID 处理
+if [ -n "$SID_OVERRIDE" ]; then
+  SID="$SID_OVERRIDE"
+else
+  if [ $new_session -eq 1 ]; then
+    ts=$(TZ=Asia/Shanghai date +%Y%m%d-%H%M%S)
+    host=$(scutil --get LocalHostName 2>/dev/null || hostname)
+    rand=$(uuidgen | tr -d '-' | tr 'A-Z' 'a-z' | head -c8)
+    printf "%s" "${ts}-${host}-${rand}" >"$SESSION_FILE"
+  fi
+  if [ ! -s "$SESSION_FILE" ]; then
+    echo "找不到当前 Session-ID：$SESSION_FILE 不存在或为空。请先运行 warp-log-session --new 或使用 --new-session/--sid，并确保 --scope 与本次追加一致。" >&2
+    exit 1
+  fi
+  SID=$(cat "$SESSION_FILE")
+fi
+
+# 时间与文件名基元
+DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
+NOW=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S %Z')
+FILE=""
+
+# 1) 用索引定位（DATE  TITLE  SESSION_ID  FILE）
+if [ -f "$INDEX" ]; then
+  FILE=$(awk -F'\t' -v sid="$SID" '$3==sid{print $4; found=1} END{if(!found) print ""}' "$INDEX" 2>/dev/null || true)
+fi
+# 2) grep 文件头定位
+if [ -z "${FILE}" ]; then
+  # 仅匹配文件头中的完整行
+  FILE=$(grep -l "^Session-ID: ${SID}$" "$DIR"/*.md 2>/dev/null | head -1 || true)
+fi
+
+# 3) 无法定位：需要标题以新建文件
+if [ -z "${FILE}" ]; then
+  [ -n "$TITLE" ] || { echo "无法通过 Session-ID 定位到既有文件，且未提供 --title 用于新建。" >&2; exit 1; }
+  FILE="$DIR/${DATE}-${TITLE}.md"
+  # 新建并写入文件头（包含 Session-ID）
+  printf "# %s\n\n时间（北京时间，精确到秒）：%s\n\nSession-ID: %s\n\n%s\n" \
+    "$TITLE" "$NOW" "$SID" "${BODY:-}" >"$FILE"
+  # 维护索引（幂等追加）
+  { [ -f "$INDEX" ] || : >"$INDEX"; printf "%s\t%s\t%s\t%s\n" "$DATE" "$TITLE" "$SID" "$FILE" >>"$INDEX"; } 2>/dev/null || true
+else
+  # 仅追加更新记录，不改写文件头的 Session-ID（使用 here-doc，避免 printf 与连字符开头文本的兼容性问题）
+  UPDATE_ID="$(TZ=Asia/Shanghai date +%H%M%S)-$(openssl rand -hex 3 2>/dev/null || uuidgen | tr -d '-' | head -c6 | tr 'A-Z' 'a-z')"
+  if [ -n "${BODY:-}" ]; then
+    cat >>"$FILE" <<EOF
+
+---
+附录（更新记录）
+- Update-ID：$UPDATE_ID
+- 最后更新（北京时间）：$NOW
+
+$BODY
+
+EOF
+  else
+    cat >>"$FILE" <<EOF
+
+---
+附录（更新记录）
+- Update-ID：$UPDATE_ID
+- 最后更新（北京时间）：$NOW
+
+EOF
+  fi
+fi
+
+[ $print_path -eq 1 ] && echo "$FILE"
+[ $show_id -eq 1 ] && echo "$SID" >&2
+exit 0
+

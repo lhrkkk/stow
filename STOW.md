@@ -33,10 +33,14 @@
 
 四、抓取能力（grab）
 - 功能：将 TARGET 范围内的文件/目录移动到指定包的对应相对路径下，并自动 `restow` 建立符号链接。
+- 相对路径解析：
+  - 默认：相对于 TARGET（即 `$HOME`）解析。
+  - 可选：使用 `-C/--relative-to-cwd` 时，相对路径相对于当前目录（`$PWD`）解析（仍要求最终路径位于 TARGET 之下，否则跳过）。
 - 用法示例：
   - 抓取单个文件：` stowx grab -p mac-home ~/.config/wezterm/wezterm.lua`
   - 抓取多个路径：` stowx grab -p mac-home ~/.zshrc ~/.gitconfig`
-  - 使用相对路径（相对于 TARGET=`$HOME`）：` stowx grab -p mac-home .ssh/config`
+  - 使用相对路径（默认相对 TARGET=`$HOME`）：` stowx grab -p mac-home .ssh/config`
+  - 使用当前目录相对路径：` stowx grab -C -p mac-home ./WARP.md ./dir/file.txt`
   - 干跑预览抓取：` stowx -n grab -p mac-home ~/.config/karabiner`
   - 同名目标存在时可用 `-y` 覆盖
 - 限制：被抓取路径必须位于 TARGET（默认 `$HOME`）之下；否则跳过并提示。
