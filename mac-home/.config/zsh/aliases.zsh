@@ -1,3 +1,6 @@
+alias e='emacsclient -t -a ""'
+alias et="emacsclient -a false -e '(server-running-p)'"
+alias eq="emacsclient -e '(save-buffers-kill-emacs)'"
 alias av='source venv/bin/activate'
 alias c='clear'
 alias cdiff='colordiff'
@@ -50,12 +53,28 @@ alias ll="eza --color=always --long --git --icons=always --group-directories-fir
 alias la="eza --color=always --long --git --icons=always --all --group-directories-first"
 alias lt="eza --color=always --tree --git --icons=always"
 
-# Lazy-load thefuck
-alias fuck="_tf_lazy"
-_tf_lazy() {
-	unalias fuck 2>/dev/null || true
-	eval "$(thefuck --alias)"
-	fuck "$@"
-}
+# Lazy-load thefuck (safe; avoids alias recursion)
+if (( $+commands[thefuck] )); then
+  fuck() {
+    emulate -L zsh -o no_aliases
+    # Install official implementation for subsequent calls
+    eval "$(thefuck --alias)"
+    # Run the same logic immediately for this first call (don’t call 'fuck' again)
+    TF_PYTHONIOENCODING=$PYTHONIOENCODING
+    export TF_SHELL=zsh
+    export TF_ALIAS=fuck
+    TF_SHELL_ALIASES=$(alias)
+    export TF_SHELL_ALIASES
+    TF_HISTORY="$(fc -ln -10)"
+    export TF_HISTORY
+    export PYTHONIOENCODING=utf-8
+    TF_CMD=$(
+      thefuck THEFUCK_ARGUMENT_PLACEHOLDER "$@"
+    ) && eval $TF_CMD
+    unset TF_HISTORY
+    export PYTHONIOENCODING=$TF_PYTHONIOENCODING
+    test -n "$TF_CMD" && print -s $TF_CMD
+  }
+fi
 
 alias cds="cd $STOW_DIR"

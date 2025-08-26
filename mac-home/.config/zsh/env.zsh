@@ -10,6 +10,8 @@ export GOPATH="$HOME/go"
 
 # Base PATH
 export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.config/emacs/bin:$PATH"
+
 # export PATH="$PATH:$LOCALBIN"
 # export PATH="$PATH:/usr/local/bin"
 # export PATH="$PATH:/opt/homebrew/bin:/opt/homebrew/sbin"

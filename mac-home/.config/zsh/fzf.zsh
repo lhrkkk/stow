@@ -52,21 +52,29 @@ zle -N fzf-cd-widget
 bindkey '^t' fzf-cd-widget
 
 fzf-history-widget() {
-	local num
+	local num had_fhistory=0
 	if whence -w fhistory >/dev/null 2>&1; then
+		had_fhistory=1
 		num=$(fhistory $LBUFFER)
+		local fh_ret=$?
+		# 取消/无选择：直接返回，不进入 bck-i-search
+		if (( fh_ret != 0 )); then
+			zle reset-prompt
+			return 0
+		fi
 	else
 		num=""
 	fi
-	local ret=$?
 	if [[ -n $num ]]; then
 		zle vi-fetch-history -n $num
 	else
-		# 回退：使用内置的增量历史搜索
-		zle history-incremental-search-backward || zle history-beginning-search-backward
+		# 仅当缺少 fhistory 时才回退到增量历史搜索
+		if (( ! had_fhistory )); then
+			zle history-incremental-search-backward || zle history-beginning-search-backward
+		fi
 	fi
 	zle reset-prompt
-	return $ret
+	return 0
 }
 zle -N fzf-history-widget
 bindkey '^R' fzf-history-widget
