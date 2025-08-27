@@ -1,4 +1,8 @@
 # Initialize Zim
+export LANG=zh_CN.UTF-8
+export LC_CTYPE=zh_CN.UTF-8
+unset LC_ALL
+
 export ZIM_HOME=${HOME}/.zim
 
 # 异步（事件循环延后）初始化补全系统：提示符先出来，随后在本 shell 完成 compinit

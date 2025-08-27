@@ -1,0 +1,28 @@
+ew() {
+	emulate -L zsh -o no_aliases
+
+	# 1) 确保 Emacs server 在 GUI 会话里可用：连不上就拉起 Emacs.app 并 (server-start)
+	if ! command emacsclient -e '(progn t)' >/dev/null 2>&1; then
+	  command open -ga Emacs --args --eval \
+		"(progn (require 'server) (unless (server-running-p) (server-start)))"
+	  for i in {1..25}; do
+		command emacsclient -e '(progn t)' >/dev/null 2>&1 && break
+		sleep 0.2
+	  done
+	fi
+
+	# 2) 无可见 GUI frame 时，强制新建一个（-c）
+	if ! command emacsclient -e \
+	  '(catch :ok (dolist (fr (frame-list))
+		 (when (and (frame-visible-p fr) (display-graphic-p fr)) (throw :ok t))) nil)' \
+	  2>/dev/null | grep -q t; then
+	  command emacsclient -n -c >/dev/null 2>&1
+	fi
+
+	# 3) 无参：只激活现有窗口；有参：在现有窗口里打开文件
+	if [[ $# -eq 0 ]]; then
+	  command emacsclient -e '(ignore-errors (select-frame-set-input-focus (selected-frame)))' >/dev/null 2>&1
+	else
+	  command emacsclient -n "$@"
+	fi
+  }

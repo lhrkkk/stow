@@ -1,0 +1,142 @@
+#compdef kh
+# kh — 交互式删除 zsh 历史（基于 fzf）
+# - Tab 多选，Enter 确认
+# - 删除后写回 $HISTFILE，并提示结果
+# 依赖: fzf, zsh 5+
+
+emulate -L zsh -o extendedglob -o noaliases
+setopt local_options no_errexit pipefail
+
+# 尝试弹出任何残留的历史上下文，避免 fc -l 读到空列表
+for _i in {1..5}; do
+  fc -P 2>/dev/null || break
+done
+
+# 帮助
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+  cat <<'KH_HELP'
+kh - 交互式删除 zsh 历史（基于 fzf）
+用法：
+  kh               打开历史选择器（Tab 多选，Enter 确认）
+环境变量：
+  KH_LIMIT=0       限制加载的历史条数（按“记录”计，0 表示不限制）
+  KH_BACKUP=1      删除前备份 HISTFILE（默认 1）
+说明：
+  - 先将当前会话内存历史写入 HISTFILE，然后按“记录（event）”删除：
+    每条记录在文件中按行表示；若为扩展历史，则先去掉前缀后展示。
+  - 删除后会清空并从 HISTFILE 重新加载当前会话历史；其他会话需重新读取后生效。
+KH_HELP
+  return 0
+fi
+
+if ! command -v fzf >/dev/null 2>&1; then
+  print -u2 -- "kh: 需要 fzf，请先安装"
+  return 1
+fi
+
+local histfile limit list
+histfile="${HISTFILE:-$HOME/.zsh_history}"
+limit="${KH_LIMIT:-0}"
+
+# 确保文件包含当前会话最新历史（避免遗漏未写回的条目）
+builtin fc -W "$histfile" 2>/dev/null || true
+
+# 逐行构造“事件”列表：第一列为 "NR:NR"（HISTFILE 的行号范围）
+# 展示顺序为“最新在前”（通过 tail -r 反转）
+# 注意：zsh 历史文件采用“metafied”编码，需在展示前做 unmetafy（0x83 后字节 ^0x20）
+if [[ -f "$histfile" ]]; then
+  list=$(LC_ALL=C awk '
+      BEGIN { OFS=" " }
+      {
+        line=$0
+        if (line ~ /^: [0-9]+:[0-9]+;/) {
+          sub(/^: [0-9]+:[0-9]+;/, "", line)
+        }
+        printf "%d:%d %s\n", NR, NR, line
+      }
+    ' "$histfile" |
+    perl -pe 's/\x83(.)/chr(ord($1)^32)/eg' |
+    tail -r)
+  if [[ -n "$list" && "$limit" != 0 ]]; then
+    list=$(printf "%s\n" "$list" | head -n "$limit")
+  fi
+fi
+if [[ -z "$list" ]]; then
+  print -- "无历史记录"
+  return 0
+fi
+
+local header sel
+header="选择要删除的历史（Tab 多选，Enter 确认；Ctrl-C 取消）"
+sel=$(printf "%s\n" "$list" | \
+  FZF_DEFAULT_OPTS="" fzf --multi --no-sort --tiebreak=index \
+    --height=80% --layout=reverse --info=inline \
+    --prompt='删除历史> ' --header="$header" \
+    --bind='ctrl-a:toggle-all,tab:toggle+down,shift-tab:toggle+up' \
+    --preview 'echo {}' --preview-window=down,5,wrap) || return 0
+
+# 选中的“start:end”范围列表
+local -a ranges
+ranges=(${(f)"$(printf "%s\n" "$sel" | awk '{print $1}')"})
+local n=${#ranges}
+if (( n == 0 )); then
+  print -- "未选择，已取消"
+  return 0
+fi
+
+# 将选择范围展开为要删除的具体行号集合
+local -A __kh_sel
+local pair start end i
+for pair in $ranges; do
+  start=${pair%%:*}
+  end=${pair##*:}
+  # 容错：空值或非法范围直接跳过
+  if [[ -z $start || -z $end ]]; then
+    continue
+  fi
+  if (( end < start )); then
+    local tmp=$start; start=$end; end=$tmp
+  fi
+  # 使用数值循环，避免大括号展开与变量替换顺序导致的问题
+  for (( i = start; i <= end; i++ )); do
+    __kh_sel[$i]=1
+  done
+done
+
+# 将保留的原始行写入临时文件（包括扩展历史元数据与多行内容）
+local __tmp
+__tmp=$(mktemp "${TMPDIR:-/tmp}/kh.XXXXXX") || { print -u2 -- "kh: 无法创建临时文件"; return 1; }
+
+local ln
+local __kh_count=0
+local idx=0
+while IFS='' read -r ln; do
+  (( idx++ ))
+  if [[ -z ${__kh_sel[$idx]} ]]; then
+    print -r -- "$ln" >>| "$__tmp"
+    (( __kh_count++ ))
+  fi
+done < "$histfile"
+
+# 可选备份后替换
+if [[ -f "$__tmp" ]]; then
+  if [[ "${KH_BACKUP:-1}" != "0" && -f "$histfile" ]]; then
+    local __bak="${histfile}.$(date +%Y%m%d%H%M%S).bak"
+    cp -p "$histfile" "$__bak" 2>/dev/null || cp "$histfile" "$__bak" 2>/dev/null || true
+  fi
+  mv -f "$__tmp" "$histfile"
+else
+  rm -f "$__tmp" 2>/dev/null || true
+  print -u2 -- "kh: 过滤失败"
+  return 1
+fi
+
+# 清空并重新加载当前会话的历史，避免重复
+local __orig_histsize=$HISTSIZE
+HISTSIZE=0
+HISTSIZE=$__orig_histsize
+builtin fc -R "$histfile" 2>/dev/null || true
+
+print -- "已删除 ${n} 条记录，并写回：$histfile（保留 ${__kh_count} 行）"
+return 0
+

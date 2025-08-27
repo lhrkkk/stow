@@ -63,7 +63,9 @@ export ALL_PROXY="$all_proxy"
 
 # Locale and history
 export LANG=en_US.UTF-8
-export LC_ALL=$LANG
+export LC_CTYPE=en_US.UTF-8
+# Avoid setting LC_ALL globally; it overrides all LC_* and can cause encoding issues
+# export LC_ALL=$LANG
 export HISTSIZE=100000
 export SAVEHIST=100000
 

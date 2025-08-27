@@ -70,7 +70,7 @@ config.colors.brights = {
 }
 
 config.font = wezterm.font_with_fallback({
-  "JetBrains Mono",
+  "JetBrainsMono Nerd Font",
   "MesloLGS Nerd Font Mono",
   "Symbols Nerd Font Mono"
 })
