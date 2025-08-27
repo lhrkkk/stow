@@ -114,7 +114,8 @@ brew "netcdf"
 # brew "exiftool"            # 图像元数据处理（可选）
 
 # === Emacs ===
-brew "d12frosted/emacs-plus/emacs-plus@30", args: ["with-no-frame-refocus", "with-savchenkovaleriy-big-sur-curvy-3d-icon"]
+# brew "d12frosted/emacs-plus/emacs-plus@30", args: ["with-no-frame-refocus", "with-savchenkovaleriy-big-sur-curvy-3d-icon"]
+cask "emacs"
 cask "android-platform-tools"
 
 # === 从已安装但未收录的条目（生成于 2025-08-15）===
@@ -144,3 +145,8 @@ brew "stow"
 brew "direnv"
 brew "gh"
 brew "restic"
+# brew "age"
+brew "git-crypt"
+# brew "openjdk"
+# brew "sops"
+brew "yq"

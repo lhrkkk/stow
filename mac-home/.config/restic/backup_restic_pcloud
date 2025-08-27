@@ -170,16 +170,7 @@ if [ "${DRY_RUN}" = "1" ]; then
     done <"$INCLUDE_FILE"
   else
     add() { [ -d "$1" ] && TARGETS+=("$1"); }
-    add "$HOME/.dotfiles"
-    add "$HOME/Repos"
-    add "$HOME/Work"
-    add "$HOME/Personal"
-    add "$HOME/Sync"
-    add "$HOME/Bin"
-    add "$HOME/.config/nvim"
-    add "$HOME/.config/wezterm"
-    add "$HOME/.config/git"
-    add "$HOME/.config/zsh"
+    add "$HOME/_env"
   fi
 
   if [ ${#TARGETS[@]} -eq 0 ]; then
