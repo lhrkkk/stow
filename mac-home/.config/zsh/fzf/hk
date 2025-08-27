@@ -1,0 +1,175 @@
+#compdef hk
+# hk — 交互式删除 zsh 历史（基于 fzf + zsh-hist 可选）
+# - 一行一个事件展示（最新在前）；支持多选删除
+# - 可选：HK_USE_ZHIST=1 时，内存范围索引用 zsh-hist 负偏移删除；否则统一按 HISTFILE 范围删除
+# 依赖: fzf, zsh 5+；可选: zsh-hist
+
+emulate -L zsh -o extendedglob -o noaliases
+setopt local_options no_errexit pipefail
+
+for _i in {1..5}; do fc -P 2>/dev/null || break; done
+
+if ! command -v fzf >/dev/null 2>&1; then
+  print -u2 -- "hk: 需要 fzf，请先安装"
+  return 1
+fi
+
+local has_hist=0 use_hist=0
+if whence -w hist >/dev/null 2>&1; then has_hist=1; fi
+if [[ "${HK_USE_ZHIST:-0}" == "1" ]]; then use_hist=1; fi
+
+local histfile limit
+histfile="${HISTFILE:-$HOME/.zsh_history}"
+limit="${HK_LIMIT:-0}"
+
+# 将内存历史写入文件，避免遗漏
+builtin fc -W "$histfile" 2>/dev/null || true
+
+# 构建事件文件（每行：start:end<TAB>merged_text），顺序：最新在前
+local __hk_events __hk_map __hk_prev
+__hk_events=$(mktemp "${TMPDIR:-/tmp}/hkevents.XXXXXX") || { print -u2 -- "hk: 无法创建临时文件"; return 1; }
+__hk_map=$(mktemp "${TMPDIR:-/tmp}/hkmap.XXXXXX") || { rm -f "$__hk_events"; print -u2 -- "hk: 无法创建临时文件"; return 1; }
+
+LC_ALL=C awk '
+  BEGIN { OFS="\t" }
+  function flush(){
+    if (inrec) {
+      merged=rec_text
+      gsub(/\r/, "", merged)
+      gsub(/\n/, " ⏎ ", merged)
+      print rec_start ":" rec_end, merged
+      inrec=0; rec_text=""
+    }
+  }
+  {
+    raw=$0
+    is_hdr = match(raw, /^: [0-9]+:[0-9]+;/)
+    if (is_hdr) has_ext=1
+    if (has_ext) {
+      if (is_hdr) {
+        flush()
+        rec_start=NR; rec_end=NR
+        rec_text=raw
+        sub(/^: [0-9]+:[0-9]+;/, "", rec_text)
+        inrec=1
+      } else {
+        if (!inrec) { rec_start=NR; rec_end=NR; rec_text=raw; inrec=1 }
+        else { rec_end=NR; rec_text = rec_text "\n" raw }
+      }
+    } else {
+      # 非扩展：启发式合并反斜杠续行
+      if (!inrec) { rec_start=NR; rec_end=NR; rec_text=raw; inrec=1 }
+      else { rec_end=NR; rec_text = rec_text "\n" raw }
+      if (raw !~ /\\[ \t]*$/) { flush() }
+    }
+  }
+  END { flush() }
+' "$histfile" | perl -pe 's/\x83(.)/chr(ord($1)^32)/eg' | tail -r >| "$__hk_events"
+
+# 生成显示列表（index+文本）与索引->范围映射
+awk -F '\t' '{printf "%d %s\n", NR, $1}' "$__hk_events" >| "$__hk_map"
+local list; list=$(awk -F '\t' '{printf "%d %s\n", NR, $2}' "$__hk_events")
+
+if [[ -z "$list" ]]; then
+  rm -f "$__hk_events" "$__hk_map" 2>/dev/null || true
+  print -- "无历史记录"
+  return 0
+fi
+if [[ -n "$list" && "$limit" != 0 ]]; then
+  list=$(printf "%s\n" "$list" | head -n "$limit")
+fi
+
+# 预览脚本：按 index 查映射，打印范围
+__hk_prev=$(mktemp "${TMPDIR:-/tmp}/hkprev.XXXXXX") || { rm -f "$__hk_events" "$__hk_map"; print -u2 -- "hk: 无法创建预览脚本"; return 1; }
+cat > "$__hk_prev" <<'EOF'
+#!/bin/zsh
+line="$*"
+# 提取第一段为索引（去掉可能的颜色/空格）
+idx=$(printf "%s" "$line" | sed -E 's/\x1b\[[0-9;]*m//g' | awk '{print $1}')
+if [[ -z "$idx" ]]; then exit 0; fi
+# 从事件文件读取第 idx 行并取首列范围
+rng=$(LC_ALL=C sed -n "${idx}p" "$HK_EVENTS" | awk -F '\t' '{print $1}')
+if [[ -z "$rng" ]]; then exit 0; fi
+s=${rng%%:*}; e=${rng##*:}
+# 优先按范围输出原始多行
+out=$(LC_ALL=C sed -n "${s},${e}p" "$HK_HIST" | perl -pe 's/\x83(.)/chr(ord($1)^32)/eg')
+if [[ -n "$out" ]]; then
+  printf "%s\n" "$out" | sed -n '1,80p'
+  exit 0
+fi
+# 兜底：输出合并文本并将分隔符“ ⏎ ”还原成换行
+merged=$(LC_ALL=C sed -n "${idx}p" "$HK_EVENTS" | awk -F '\t' '{print $2}')
+printf "%s\n" "$merged" | perl -pe 's/ \xE2\x8F\x8E /\n/g' | sed -n '1,80p'
+EOF
+chmod +x "$__hk_prev" 2>/dev/null || true
+
+# 运行 fzf
+local header sel
+header="选择要删除的历史（Tab 多选，Enter 确认；Ctrl-R 切换排序；Ctrl-C 取消）"
+sel=$(printf "%s\n" "$list" | \
+  FZF_DEFAULT_OPTS="" fzf --multi -n2..,.. --tiebreak=index \
+    --height=80% --layout=reverse --info=inline \
+    --prompt='删除历史> ' --header="$header" \
+    --bind='ctrl-r:toggle-sort,ctrl-a:toggle-all,tab:toggle+down,shift-tab:toggle+up' \
+    --preview "HK_EVENTS='$__hk_events' HK_HIST='$histfile' $__hk_prev {}" \
+    --preview-window=down,7,wrap) || { rm -f "$__hk_events" "$__hk_map" "$__hk_prev"; return 0; }
+
+# 选中索引
+local -a idxs
+idxs=(${(f)"$(printf "%s\n" "$sel" | awk '{print $1}')"})
+local n=${#idxs}
+if (( n == 0 )); then
+  rm -f "$__hk_events" "$__hk_map" "$__hk_prev"
+  print -- "未选择，已取消"
+  return 0
+fi
+
+# 统计内存历史大小
+local mem_count; mem_count=$(builtin fc -rl 1 2>/dev/null | wc -l | tr -d ' ')
+
+# 分流
+local -a idx_hist idx_file; local i
+for i in $idxs; do
+  if (( use_hist==1 && has_hist==1 && i <= mem_count )); then idx_hist+=$i; else idx_file+=$i; fi
+done
+
+# 如果需要文件删除，禁用本次的 zsh-hist（避免文件/内存不同步和映射失效）
+if (( ${#idx_file} > 0 )); then idx_hist=(); fi
+
+# 1) zsh-hist（可选，默认关闭）
+local did_hist=0
+if (( ${#idx_hist} > 0 )); then
+  local -a offs; for i in $idx_hist; do offs+=($(( -i ))); done
+  local -a offs_sorted; offs_sorted=(${(f)"$(printf "%s\n" $offs | LC_ALL=C sort -n)"})
+  local o; for o in $offs_sorted; do hist delete $o -f -q >/dev/null 2>&1 || hist d $o -f -q >/dev/null 2>&1 || hist delete $o -f >/dev/null 2>&1 || hist d $o -f >/dev/null 2>&1 || true; done
+  did_hist=1
+fi
+
+# 2) 文件回退删除（精确范围）
+local -A __sel; local rng s e ln idx=0 kept=0
+if (( ${#idx_file} > 0 )); then
+  for i in $idx_file; do rng=$(awk -v k="$i" 'NR==k{print $2; exit}' "$__hk_map"); s=${rng%%:*}; e=${rng##*:}; for ((ln=s; ln<=e; ln++)); do __sel[$ln]=1; done; done
+  # 若没有任何行被标记，直接跳过回退删除
+  if (( ${#__sel} > 0 )); then
+    local __tmp
+    __tmp=$(mktemp "${TMPDIR:-/tmp}/hk.XXXXXX") || { rm -f "$__hk_events" "$__hk_map" "$__hk_prev"; print -u2 -- "hk: 无法创建临时文件"; return 1; }
+    while IFS='' read -r ln; do (( idx++ )); if [[ -z ${__sel[$idx]} ]]; then print -r -- "$ln" >>| "$__tmp"; (( kept++ )); fi; done < "$histfile"
+    if [[ -f "$__tmp" ]]; then mv -f "$__tmp" "$histfile"; else rm -f "$__tmp" 2>/dev/null || true; rm -f "$__hk_events" "$__hk_map" "$__hk_prev"; print -u2 -- "hk: 过滤失败"; return 1; fi
+  fi
+fi
+
+# 收尾：
+if (( did_hist==1 )); then
+  # 仅 zsh-hist 模式需要持久化到文件
+  builtin fc -W "$histfile" 2>/dev/null || true
+else
+  # 仅文件删除：不再写回内存历史，以免把删除内容写回文件
+  :
+fi
+
+# 重载内存历史为文件状态
+local __orig_histsize=$HISTSIZE; HISTSIZE=0; HISTSIZE=$__orig_histsize; builtin fc -R "$histfile" 2>/dev/null || true
+rm -f "$__hk_events" "$__hk_map" "$__hk_prev" 2>/dev/null || true
+
+print -- "已删除 ${n} 条，并写回：$histfile"
+return 0

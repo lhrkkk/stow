@@ -119,5 +119,8 @@ config.keys = config.keys or {}
 table.insert(config.keys, { key = "Enter", mods = "CMD", action = wezterm.action.ToggleFullScreen })
 table.insert(config.keys, { key = "r", mods = "CMD|SHIFT", action = wezterm.action.ReloadConfiguration })
 
+-- 不关闭终端
+config.quit_when_all_windows_are_closed = false
+
 -- and finally, return the configuration to wezterm
 return config

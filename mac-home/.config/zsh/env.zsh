@@ -2,6 +2,8 @@
 # GNU Stow base directory
 export STOW_DIR="$HOME/_env/stow"
 
+# export HK_USE_ZHIST=1
+
 # ==== Paths (trimmed and deduplicated) ====
 export XDG_CONFIG_HOME="$HOME/.config"
 # export LOCALBIN="$XDG_CONFIG_HOME/bin"
@@ -44,7 +46,9 @@ export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
 export TERM=xterm-256color
 export TERM_ITALICS=true
 # export RANGER_LOAD_DEFAULT_RC="false"
-export EDITOR=nvim
+# export EDITOR=nvim
+export EDITOR=hx
+# export EDITOR='emacsclient -t'
 
 # Light theme colors
 export CLICOLOR=1
