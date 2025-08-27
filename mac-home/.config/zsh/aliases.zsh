@@ -1,7 +1,7 @@
 alias et="emacsclient -a false -e '(server-running-p)'"
 alias etq="emacsclient -t -e '(save-buffers-kill-emacs)'"  #提示
 alias eq="emacsclient  -e '(save-buffers-kill-emacs)'"  #提示
-alias ek="pkill -f 'Emacs.app/Contents/MacOS/Emacs --bg-daemon='"  #不保存
+alias ek="pkill -f 'Emacs.app/Contents/MacOS/Emacs-arm64-11 --bg-daemon='"  #不保存
 
 alias et='emacsclient -t -a ""'
 alias es='emacsclient -n '   # send to the latest acitive client
