@@ -33,12 +33,23 @@ ew() {
       command emacsclient -n "$@"
     fi
   else
-    # 无：用 -c 新建一个 GUI frame；无参就只建窗，有参则建窗并打开
+    # 无：用 -c 新建一个 GUI frame；无参就只建窗，有参则建窗并打开，并激活新 frame
     if [[ $# -eq 0 ]]; then
       command emacsclient -n -c
     else
       command emacsclient -n -c "$@"
     fi
+    # 等待 GUI frame 出现后激活
+    for _ in {1..20}; do
+      if command emacsclient -e \
+        '(cl-some (lambda (f) (and (frame-visible-p f) (display-graphic-p f))) (frame-list))' \
+        2>/dev/null | grep -q t; then
+        command emacsclient -e \
+          '(progn (select-frame-set-input-focus (selected-frame)) (raise-frame (selected-frame)))' >/dev/null 2>&1
+        break
+      fi
+      sleep 0.01
+    done
   fi
 }
 
