@@ -92,6 +92,12 @@ config.window_frame = {
 config.scrollback_lines = 20000
 config.audible_bell = "Disabled"
 
+-- 关闭非激活 pane 的变暗
+config.inactive_pane_hsb = {
+  saturation = 1.0,
+  brightness = 1.0,
+}
+
 -- Performance
 config.animation_fps = 120
 config.front_end = "WebGpu"
