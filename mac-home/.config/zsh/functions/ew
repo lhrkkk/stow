@@ -1,28 +1,45 @@
 ew() {
-	emulate -L zsh -o no_aliases
+  emulate -L zsh -o no_aliases
 
-	# 1) 确保 Emacs server 在 GUI 会话里可用：连不上就拉起 Emacs.app 并 (server-start)
-	if ! command emacsclient -e '(progn t)' >/dev/null 2>&1; then
-	  command open -ga Emacs --args --eval \
-		"(progn (require 'server) (unless (server-running-p) (server-start)))"
-	  for i in {1..25}; do
-		command emacsclient -e '(progn t)' >/dev/null 2>&1 && break
-		sleep 0.2
-	  done
-	fi
+  # 1) 确保 daemon/server 存在；若无则真正以 --daemon 方式启动
+  if ! command emacsclient -e '(progn t)' >/dev/null 2>&1; then
+    case "$OSTYPE" in
+      darwin*)
+        # 启动 Emacs.app 的 daemon（不抢焦点，不依赖 -a "" 自动创建）
+        echo "[ew] 启动 Emacs daemon: open -gna Emacs --args --daemon" >&2
+        command open -gna Emacs --args --daemon
+        ;;
+      *)
+        echo "[ew] 启动 Emacs daemon: emacs --daemon" >&2
+        command emacs --daemon
+        ;;
+    esac
+    # 等待 server 准备就绪
+    for _ in {1..50}; do
+      command emacsclient -e '(progn t)' >/dev/null 2>&1 && break
+      sleep 0.1
+    done
+  fi
 
-	# 2) 无可见 GUI frame 时，强制新建一个（-c）
-	if ! command emacsclient -e \
-	  '(catch :ok (dolist (fr (frame-list))
-		 (when (and (frame-visible-p fr) (display-graphic-p fr)) (throw :ok t))) nil)' \
-	  2>/dev/null | grep -q t; then
-	  command emacsclient -n -c >/dev/null 2>&1
-	fi
+  # 2) 是否已有“可见的 GUI frame”？
+  if command emacsclient -e \
+    '(cl-some (lambda (f) (and (frame-visible-p f) (display-graphic-p f))) (frame-list))' \
+    2>/dev/null | grep -q t; then
+    # 有：无参=只激活；有参=复用打开
+    if [[ $# -eq 0 ]]; then
+      command emacsclient -e \
+        '(progn (select-frame-set-input-focus (selected-frame)) (raise-frame (selected-frame)))' >/dev/null 2>&1
+    else
+      command emacsclient -n "$@"
+    fi
+  else
+    # 无：用 -c 新建一个 GUI frame；无参就只建窗，有参则建窗并打开
+    if [[ $# -eq 0 ]]; then
+      command emacsclient -n -c
+    else
+      command emacsclient -n -c "$@"
+    fi
+  fi
+}
 
-	# 3) 无参：只激活现有窗口；有参：在现有窗口里打开文件
-	if [[ $# -eq 0 ]]; then
-	  command emacsclient -e '(ignore-errors (select-frame-set-input-focus (selected-frame)))' >/dev/null 2>&1
-	else
-	  command emacsclient -n "$@"
-	fi
-  }
+

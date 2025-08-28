@@ -118,3 +118,12 @@
   (setq doom-modeline-icon t
         doom-modeline-modal-icon t))
 
+
+(defun my-no-menu-in-tty (frame)
+  (unless (display-graphic-p frame)
+    (set-frame-parameter frame 'menu-bar-lines 0)))
+(add-hook 'after-make-frame-functions #'my-no-menu-in-tty)
+
+;; 让当前已存在的 TTY frame 也生效
+(unless (display-graphic-p)
+  (set-frame-parameter nil 'menu-bar-lines 0))
