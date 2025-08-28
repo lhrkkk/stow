@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve real script directory (follow symlinks)
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+
+# mac-home directory (two levels up from mac-home/.local/bin)
+MAC_HOME_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# If STOW_DIR is provided in env, prefer it to locate mac-home
+if [[ -n "${STOW_DIR:-}" ]]; then
+  STOW_DIR="$(cd "$STOW_DIR" && pwd)"
+  MAC_HOME_DIR="$STOW_DIR/mac-home"
+fi
+
+CONF1="$MAC_HOME_DIR/.config/tmux/.tmux.conf"
+CONF2="$MAC_HOME_DIR/.config/tmux/.tmux2.conf"
+TARGET="$MAC_HOME_DIR/.tmux.conf"
+
+usage() { echo "Usage: $(basename "$0") [1|2]"; }
+
+case "${1:-}" in
+  1|main|conf1|tmux|tmux1) desired="$CONF1" ;;
+  2|alt|conf2|tmux2) desired="$CONF2" ;;
+  "") desired="" ;;
+  -h|--help) usage; exit 0 ;;
+  *) usage; exit 2 ;;
+esac
+
+if [[ -z "${desired:-}" ]]; then
+  if [[ -L "$TARGET" ]]; then
+    t="$(readlink "$TARGET")" || true
+    base="$(basename "$t")"
+    if [[ "$base" == ".tmux2.conf" ]]; then
+      desired="$CONF1"
+    else
+      desired="$CONF2"
+    fi
+  else
+    desired="$CONF1"
+  fi
+fi
+
+if [[ ! -f "$desired" ]]; then
+  echo "Error: desired target does not exist: $desired" >&2
+  exit 1
+fi
+
+if [[ -e "$TARGET" && ! -L "$TARGET" ]]; then
+  backup="$TARGET.bak.$(date +%Y%m%d%H%M%S)"
+  mv -f "$TARGET" "$backup"
+  echo "Backed up existing $TARGET to $backup"
+fi
+
+rm -f "$TARGET"
+
+# Create a relative symlink by linking from within mac-home
+rel_target="${desired#${MAC_HOME_DIR}/}"
+(
+  cd "$MAC_HOME_DIR"
+  ln -s "$rel_target" ".tmux.conf"
+)
+
+echo "Linked $TARGET -> $rel_target"
