@@ -30,7 +30,9 @@
 ;; wasn't installed correctly. Font issues are rarely Doom issues!
 
 ;; 对齐 WezTerm：JetBrains Mono 15pt（GUI 启动默认等宽字体）
-(setq doom-font (font-spec  :size 15))
+(setq doom-font (font-spec :family "Fira Code" :size 15))
+;; Symbol font for icons (Nerd Font recommended)
+(setq doom-symbol-font (font-spec :family "Symbols Nerd Font" :size 15))
 
 ;; There are two ways to load a theme. Both assume the theme is installed and
 ;; available. You can either set `doom-theme' or manually load a theme with the
@@ -110,4 +112,9 @@
         ranger-omit-regexp "^\\.")
   ;; Take over dired (optional but convenient)
   (ranger-override-dired-mode t))
+
+;; Ensure modeline icons are enabled and use a proper symbol font
+(after! doom-modeline
+  (setq doom-modeline-icon t
+        doom-modeline-modal-icon t))
 
