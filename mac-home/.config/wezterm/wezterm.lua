@@ -58,6 +58,12 @@ config.colors.foreground = "#53676d"
 config.colors.background = "#fbf3db"
 config.colors.cursor_bg = "#53676d"
 config.colors.cursor_fg = "#fbf3db"
+
+-- 光标设置
+config.default_cursor_style = "BlinkingBlock"
+config.cursor_blink_rate = 500
+config.cursor_thickness = 2
+config.force_reverse_video_cursor = true
 config.colors.selection_bg = "#ece3cc"
 config.colors.selection_fg = "#00978a"
 config.colors.ansi = {
