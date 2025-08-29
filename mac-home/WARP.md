@@ -102,7 +102,9 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 - 快速命令：
   -  stowx preview      （等价: stow -nvt "$HOME" -d "$HOME/_env/stow" -S mac-home）
   -  stowx apply        （等价: stow -vt  "$HOME" -d "$HOME/_env/stow" -S mac-home）
-  -  stowx adopt -y     （等价: stow -vt  "$HOME" -d "$HOME/_env/stow" -S --adopt mac-home）
+  -  仅收编（默认）：    ` stowx adopt -y`
+  -  覆盖式部署（谨慎）：` stowx adopt -y --restore`
+  -  预评估收编影响：    ` stowx preview -- --adopt`
   -  stowx grab -p mac-home <路径>（相对路径默认相对 $HOME；若需相对当前目录解析，使用 -C/--relative-to-cwd）
 - 代理注意：命令前加空格避免写入历史；adopt/覆盖操作须确认；优先先预览再 apply。
 

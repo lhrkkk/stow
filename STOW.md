@@ -17,9 +17,10 @@
   -  ` stowx preview`
 - 应用（执行链接）
   -  ` stowx apply`
-- 覆盖式部署（adopt，将未托管文件“收编”到包内后建立链接）
-  -  ` stowx adopt -y`
-  - 可禁用自动 `git restore .`：` stowx adopt -y --no-restore`
+- 收编与覆盖（adopt，将未托管文件“收编”到包内后建立链接）
+  -  仅收编（默认，不恢复工作区）：` stowx adopt -y`
+  -  覆盖式部署（收编后恢复到 HEAD，谨慎）：` stowx adopt -y -r`（或 `--restore`）
+  -  干跑评估收编影响：` stowx preview -- --adopt`
 - 取消/重链
   -  ` stowx unstow mac-home`
   -  ` stowx restow`
@@ -52,7 +53,9 @@
   - 运行命令时一律在前面加空格，避免写入 shell 历史。
 - 命令习惯
   - 小步修改、小步验证：先 ` stowx preview`，再 ` stowx apply`。
-  - 预计需要“收编”现有文件时，先 ` stowx preview -- --adopt` 评估影响，再 ` stowx adopt -y`。
+  - 预计需要“收编”现有文件时，先 ` stowx preview -- --adopt` 评估影响；
+    - 仅收编：` stowx adopt -y`
+    - 收编并覆盖到 HEAD：` stowx adopt -y -r`（或 `--restore`）
   - 需要把散落在 `$HOME` 下的单个文件/目录收编时，使用 ` stowx grab -p <包名> <路径>`。
 - 冲突与安全
   - 遇到目标路径非链接且同名存在的冲突：优先提示用户选择 adopt 或手动清理。
@@ -71,4 +74,5 @@
   - 预览：` stowx preview`
   - 应用：` stowx apply`
   - 收编：` stowx grab -p mac-home <路径>` 或 ` stowx adopt -y`
+  - 覆盖：` stowx adopt -y -r`（或 `--restore`）
 

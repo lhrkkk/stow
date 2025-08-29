@@ -94,6 +94,9 @@ export PATH="$HOME/.elan/bin:$PATH"
 # BAT theme
 export BAT_THEME="TwoDark"
 
+# Google Gemini API Key
+export GEMINI_API_KEY="AIzaSyCzZ-55AgAO2V_exRT8MhyNXK4lv4d5Kwc"
+
 # ==== Lazy-load Conda (keep) ====
 conda() {
   unset -f conda

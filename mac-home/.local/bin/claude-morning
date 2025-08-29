@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 日志
+LOG_DIR="$HOME/Library/Logs"
+LOG_FILE="$LOG_DIR/claude-morning.log"
+mkdir -p "$LOG_DIR"
+
+# 小工具
+timestamp() { date -Iseconds; }
+log() { printf '[%s] %s\n' "$(timestamp)" "$*" >> "$LOG_FILE"; }
+
+# 可配：模型与消息（默认“早安”）
+MODEL="${CLAUDE_MODEL:-claude-3-5-sonnet-latest}"
+MESSAGE="${CLAUDE_MESSAGE:-早安}"
+
+# 读取 API Key：优先环境变量，回落到 macOS 钥匙串（登录钥匙串项名：ANTHROPIC_API_KEY）
+API_KEY="${ANTHROPIC_API_KEY:-}"
+if [ -z "$API_KEY" ]; then
+  API_KEY="$(/usr/bin/security find-generic-password -a "$USER" -s "ANTHROPIC_API_KEY" -w 2>/dev/null || true)"
+fi
+
+if [ -z "$API_KEY" ]; then
+  log "ERROR: 未找到 ANTHROPIC_API_KEY（环境变量或钥匙串）。已跳过发送。"
+  exit 1
+fi
+
+# 发送请求（仅为唤醒/起首会话用途）
+HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' 'https://api.anthropic.com/v1/messages' \
+  -H "x-api-key: $API_KEY" \
+  -H 'content-type: application/json' \
+  -H 'anthropic-version: 2023-06-01' \
+  --max-time 20 \
+  --data "$(printf '{"model":"%s","max_tokens":64,"messages":[{"role":"user","content":"%s"}],"metadata":{"purpose":"morning_warmup"}}' "$MODEL" "$MESSAGE")")"
+
+if [ "$HTTP_CODE" = "200" ]; then
+  log "OK: 已向 Claude 发送「$MESSAGE」 (model=$MODEL)."
+  exit 0
+else
+  log "ERROR: HTTP $HTTP_CODE，发送失败。"
+  exit 2
+fi
+

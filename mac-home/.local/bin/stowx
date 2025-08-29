@@ -15,7 +15,7 @@ Usage:
 Commands:
   preview       预览变更（等价: stow -nvt "$TARGET" -d "$STOW_DIR" -S <pkgs>）
   apply         应用链接（等价: stow -vt  "$TARGET" -d "$STOW_DIR" -S <pkgs>）
-  adopt         覆盖式部署：stow -S --adopt，然后可选 git restore . 还原仓库（谨慎）
+  adopt         收编部署：默认仅 stow -S --adopt；如需覆盖式部署请加 --restore（谨慎）
   grab          抓取文件/文件夹到指定包内并建立链接（stow 化单个路径）
   unstow        取消链接（stow -D）
   restow        重新链接（stow -R）
@@ -30,13 +30,14 @@ Options:
   -v, --verbose          增强调试输出（为 stow 添加 -v）
   -p, --package <name>   指定包，可重复；也可直接作为位置参数（grab 推荐仅一个包）
   -y, --yes              非交互确认危险操作（adopt/覆盖同名目标时）
-      --no-restore       adopt 后不要执行 git restore .
+  -r, --restore          adopt 后执行 git -C <包> restore .（覆盖本地改动）
+      --no-restore       兼容保留；默认已不恢复（无效果）
 
 缺省包: mac-home
 示例：
   预览:   stowx preview
   应用:   stowx apply
-  覆盖:   stowx adopt -y
+  覆盖:   stowx adopt -y -r    # 等价 --restore
   抓取:   stowx grab -p mac-home ~/.config/wezterm/wezterm.lua
   取消:   stowx unstow mac-home
 EOF
@@ -51,7 +52,7 @@ STOW_DIR=${STOW_DIR:-"$HOME/_env/stow"}
 TARGET=${TARGET:-"$HOME"}
 VERBOSE=0
 DRY_RUN=0
-DO_RESTORE=1
+DO_RESTORE=0
 YES=0
 USE_CWD=0
 CMD=""
@@ -105,7 +106,10 @@ parse_args() {
         [[ $# -ge 2 ]] || die "--package 需要参数"; PACKAGES+=("$2"); shift 2 ;;
       -y|--yes)
         YES=1; shift ;;
+      -r|--restore)
+        DO_RESTORE=1; shift ;;
       --no-restore)
+        # 兼容参数：默认已不恢复
         DO_RESTORE=0; shift ;;
       --)
         shift; break ;;
@@ -269,7 +273,13 @@ cmd_adopt() {
     run_stow -S --adopt
     return 0
   fi
-  confirm "将以覆盖方式部署（--adopt），并可能以 git restore . 还原仓库修改。确认继续吗？" || die "已取消"
+  local prompt
+  if [[ $DO_RESTORE -eq 1 ]]; then
+    prompt="将以覆盖式部署（--adopt + git restore .）覆盖工作区改动。确认继续吗？"
+  else
+    prompt="将以收编部署（--adopt，仅收编不恢复），不会自动覆盖仓库改动。确认继续吗？"
+  fi
+  confirm "$prompt" || die "已取消"
   run_stow -S --adopt
   if [[ $DO_RESTORE -eq 1 ]]; then
     for pkg in "${PACKAGES[@]}"; do

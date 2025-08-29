@@ -14,7 +14,7 @@ zmodule magicmace
 # Additional utility modules
 zmodule supercrabtree/k
 zmodule hlissner/zsh-autopair
-zmodule pabloariasal/zfm
+#zmodule pabloariasal/zfm
 # zmodule agkozak/zsh-z  # disabled: using zoxide instead
 
 # Completion modules (order matters!)

@@ -4,6 +4,8 @@
 .cursor/rules/derived-cursor-rules.mdc
 .clj-kondo/
 .lsp/
+.specstory/
+.cursorindexingignore
 
 # macOS / OS artifacts
 .DS_Store
@@ -36,3 +38,6 @@ vendor/
 # Misc backups（按需取舍）
 *.bak*
 *~
+.aider*
+.claude*
+

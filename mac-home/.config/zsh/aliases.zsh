@@ -7,6 +7,8 @@ alias et='emacsclient -t -a ""'
 alias es='emacsclient -n '   # send to the latest acitive client
 alias e=ew
 
+alias f='fuck'
+alias fk='fuck'
 alias av='source venv/bin/activate'
 alias c='clear'
 alias cdiff='colordiff'
