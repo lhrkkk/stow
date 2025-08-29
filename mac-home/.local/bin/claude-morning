@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 # 日志
 LOG_DIR="$HOME/Library/Logs"
@@ -10,34 +10,41 @@ mkdir -p "$LOG_DIR"
 timestamp() { date -Iseconds; }
 log() { printf '[%s] %s\n' "$(timestamp)" "$*" >> "$LOG_FILE"; }
 
-# 可配：模型与消息（默认“早安”）
-MODEL="${CLAUDE_MODEL:-claude-3-5-sonnet-latest}"
-MESSAGE="${CLAUDE_MESSAGE:-早安}"
+# 配置：消息与模型（CLAUDE_MODEL 可选），默认消息“你好”。
+MESSAGE="${CLAUDE_MESSAGE:-你好}"
+MODEL="${CLAUDE_MODEL:-}"
 
-# 读取 API Key：优先环境变量，回落到 macOS 钥匙串（登录钥匙串项名：ANTHROPIC_API_KEY）
-API_KEY="${ANTHROPIC_API_KEY:-}"
-if [ -z "$API_KEY" ]; then
-  API_KEY="$(/usr/bin/security find-generic-password -a "$USER" -s "ANTHROPIC_API_KEY" -w 2>/dev/null || true)"
+# 通过 Claude Code CLI 非交互发送，避免 TTY 依赖；优先使用 PATH 中的 claude。
+if ! command -v claude >/dev/null 2>&1; then
+  # 尝试 Homebrew 默认路径
+  if [ -x "/opt/homebrew/bin/claude" ]; then
+    export PATH="/opt/homebrew/bin:$PATH"
+  else
+    log "ERROR: 未找到 claude CLI，请先安装并登录（claude install / claude setup-token）。"
+    exit 1
+  fi
 fi
 
-if [ -z "$API_KEY" ]; then
-  log "ERROR: 未找到 ANTHROPIC_API_KEY（环境变量或钥匙串）。已跳过发送。"
-  exit 1
+# 组装可选参数
+CLAUDE_ARGS=(--dangerously-skip-permissions)
+if [ -n "$MODEL" ]; then
+  CLAUDE_ARGS+=(--model "$MODEL")
+fi
+# 如需固定会话，可提前导出 CLAUDE_SESSION_ID（必须是有效 UUID）
+if [ -n "${CLAUDE_SESSION_ID:-}" ]; then
+  CLAUDE_ARGS+=(--session-id "$CLAUDE_SESSION_ID")
 fi
 
-# 发送请求（仅为唤醒/起首会话用途）
-HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' 'https://api.anthropic.com/v1/messages' \
-  -H "x-api-key: $API_KEY" \
-  -H 'content-type: application/json' \
-  -H 'anthropic-version: 2023-06-01' \
-  --max-time 20 \
-  --data "$(printf '{"model":"%s","max_tokens":64,"messages":[{"role":"user","content":"%s"}],"metadata":{"purpose":"morning_warmup"}}' "$MODEL" "$MESSAGE")")"
-
-if [ "$HTTP_CODE" = "200" ]; then
-  log "OK: 已向 Claude 发送「$MESSAGE」 (model=$MODEL)."
+# 发送并记录结果（--print 为非交互模式）
+set +e
+output=$(claude --print --output-format text "${CLAUDE_ARGS[@]}" "$MESSAGE" 2>&1)
+rc=$?
+set -e
+if [ "$rc" -eq 0 ]; then
+  log "OK: 已用 Claude Code 发送「$MESSAGE"${MODEL:+ (model=$MODEL)}"."
   exit 0
 else
-  log "ERROR: HTTP $HTTP_CODE，发送失败。"
-  exit 2
+  log "ERROR: claude CLI 返回码 $rc，发送失败：$output"
+  exit "$rc"
 fi
 
