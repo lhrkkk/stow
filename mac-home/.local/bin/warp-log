@@ -1,7 +1,207 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Open Warp logs directory (~/@log/warp)
+
+# warp-log: Manage Warp session logs
+# Subcommands:
+#   open          Open the logs directory
+#   latest        Open the latest log file
+#   session       Manage Session-ID (new, show)
+#   append        Append to log with title and body
+#   current       Show current bound file and ID
+#   unbind        Unbind current tab (generate new Session-ID)
+#   help          Show usage
+
 DIR="$HOME/@log/warp"
-mkdir -p "$DIR"
-open "$DIR"
+INDEX="$DIR/.index.tsv"
+
+usage() {
+  cat <<'USAGE'
+warp-log <subcommand> [options]
+
+Subcommands:
+  open                   Open ~/@log/warp directory
+  latest                 Open latest .md log
+  session [--new]        Manage Session-ID (per tab, inheritable)
+  append -t <title> [-m <message>|-f <file>|-] [--print] [--show-id] [--new-session] [--sid <id>]
+  current                Show bound file path and ID
+  unbind                 Unbind by generating new Session-ID
+  help                   This help
+
+For append:
+  - Generates slug for new files: YYYY-MM-DD-<slug>.md
+  - Appends in format: ## <title>\\n <ISO timestamp>\\n <body>\\n ---
+USAGE
+}
+
+# Simple slug function (basic: lowercase, replace spaces/specials with hyphens)
+to_slug() {
+  local text="$1"
+  echo "$text" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//'
+}
+
+# Best approach: Use WARP_SESSION_ID if available, fallback to shell-based ID
+resolve_session_file() {
+  # Warp provides WARP_SESSION_ID - use it if available for true tab identity
+  if [ -n "${WARP_SESSION_ID:-}" ]; then
+    echo "$HOME/.config/warp/sessions/warp-$WARP_SESSION_ID.id"
+  else
+    # Fallback: shell-based (inheritable via subshells)
+    local ppid=${PPID:-$$}
+    echo "$HOME/.config/warp/sessions/shell-$ppid.id"
+  fi
+}
+
+generate_sid() {
+  local ts=$(date -u +%Y%m%d-%H%M%S)
+  local host=$(hostname | cut -d. -f1)
+  local rand=$(uuidgen | tr -d '-' | tr 'A-Z' 'a-z' | cut -c1-8)
+  echo "$ts-$host-$rand"
+}
+
+# Function to find file by SID
+find_file_by_sid() {
+  local sid="$1"
+  local file=""
+  # Index lookup
+  if [ -f "$INDEX" ]; then
+    file=$(awk -F'\t' -v s="$sid" '($3==s){print $4}' "$INDEX" | tail -1)
+  fi
+  # Fallback grep
+  if [ -z "$file" ]; then
+    local matches=$(grep -l "^Session-ID: $sid$" "$DIR"/*.md 2>/dev/null | sort -r | head -1)
+    file="$matches"
+  fi
+  echo "$file"
+}
+
+sub_open() {
+  mkdir -p "$DIR"
+  open "$DIR"
+}
+
+sub_latest() {
+  local latest=$(ls -t "$DIR"/*.md 2>/dev/null | head -1)
+  if [ -n "$latest" ]; then
+    open "$latest"
+  else
+    echo "No log files found." >&2
+    exit 1
+  fi
+}
+
+sub_session() {
+  local cmd="show"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --new) cmd="new"; shift ;;
+      *) shift ;;
+    esac
+  done
+  local sf=$(resolve_session_file)
+  mkdir -p "$(dirname "$sf")"
+  if [ "$cmd" = "new" ]; then
+    local sid=$(generate_sid)
+    echo "$sid" > "$sf"
+    echo "$sid"
+  else
+    if [ -s "$sf" ]; then
+      cat "$sf"
+    else
+      sub_session --new
+    fi
+  fi
+}
+
+sub_append() {
+  local title="" body="" body_file="" sid_override="" new_session=0 print=0 show_id=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -t|--title) title="$2"; shift 2 ;;
+      -m|--message) body="$2"; shift 2 ;;
+      -f|--file) body_file="$2"; shift 2 ;;
+      --sid) sid_override="$2"; shift 2 ;;
+      --new-session) new_session=1; shift ;;
+      --print) print=1; shift ;;
+      --show-id) show_id=1; shift ;;
+      *) shift ;;
+    esac
+  done
+
+  if [ -n "$body_file" ]; then body=$(cat "$body_file"); fi
+  if [ "$body" = "-" ]; then body=$(cat); fi
+
+  local sf=$(resolve_session_file)
+  local sid
+  if [ -n "$sid_override" ]; then
+    sid="$sid_override"
+  else
+    if [ $new_session -eq 1 ]; then sub_session --new; fi
+    sid=$(sub_session)
+  fi
+
+  local date=$(date -u +%Y-%m-%d)
+  local now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  local file=$(find_file_by_sid "$sid")
+
+  if [ -z "$file" ]; then
+    [ -n "$title" ] || { echo "No file found and no title provided." >&2; exit 1; }
+    local slug=$(to_slug "$title")
+    file="$DIR/$date-$slug.md"
+    # Create with header
+    echo "# $title" > "$file"
+    echo "" >> "$file"
+    echo "Session-ID: $sid" >> "$file"
+    echo "" >> "$file"
+    # Index
+    echo "$date\t$title\t$sid\t$file" >> "$INDEX"
+  fi
+
+  # Append format as per rules
+  {
+    echo "## $title"
+    echo "$now"
+    echo ""
+    echo "$body"
+    echo "---"
+  } >> "$file"
+
+  if [ $print -eq 1 ]; then echo "$file"; fi
+  if [ $show_id -eq 1 ]; then echo "$sid" >&2; fi
+
+  # Reply format (for AI use, print to stdout)
+  echo "✅ 已追加：$(realpath "$file") (ID: $(basename "$file" .md))"
+  tail -n 6 "$file"  # Approximate last append
+}
+
+sub_current() {
+  local sid=$(sub_session)
+  local file=$(find_file_by_sid "$sid")
+  if [ -n "$file" ]; then
+    echo "ℹ️ 当前绑定：$(realpath "$file") (ID: $(basename "$file" .md))"
+  else
+    echo "尚未绑定，下一次'总结'将自动创建并绑定。"
+  fi
+}
+
+sub_unbind() {
+  sub_session --new >/dev/null
+  echo "🗑️ 已解绑。下次"总结"将创建新文件。"
+}
+
+main() {
+  if [ $# -eq 0 ]; then usage; exit 0; fi
+  local sub="$1"; shift
+  case "$sub" in
+    open) sub_open "$@";;
+    latest) sub_latest "$@";;
+    session) sub_session "$@";;
+    append) sub_append "$@";;
+    current) sub_current "$@";;
+    unbind) sub_unbind "$@";;
+    help) usage ;;
+    *) usage; exit 1 ;;
+  esac
+}
+
+main "$@"
 
