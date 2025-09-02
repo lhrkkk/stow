@@ -10,9 +10,13 @@ alias e=ew
 alias f='fuck'
 alias fk='fuck'
 alias av='source venv/bin/activate'
-alias c='clear'
+# alias c='clear'
+alias c='specstory run'
+alias cl='claude-code-log --tui'
+alias clf='claude-code-log --clear-html && claude-code-log --open-browser'
+alias cs='bunx ccusage'
 alias cdiff='colordiff'
-alias cs='calcurse'
+# alias cs='calcurse'
 alias dv='deactivate'
 alias gc='git config credential.helper store'
 alias gg='git clone'
@@ -46,14 +50,14 @@ alias ta='tmux a'
 alias t='tmux'
 alias lo='lsof -p $(fps) +w'
 alias py="python"
-alias cl="claude --dangerously-skip-permissions"
+# alias cl="claude --dangerously-skip-permissions"
 alias co="codex --sandbox danger-full-access"
 
 # ---- Migrated from Bash ----
 # Mosh shortcuts
-alias s0="mosh root@s0"
-alias s1="mosh root@s1"
-alias s2="mosh root@s2"
+alias s0="ssh root@s0"
+alias s1="ssh root@s1"
+alias s2="ssh root@s2"
 
 # EZA (better ls)
 alias ls="eza --color=always --group-directories-first"

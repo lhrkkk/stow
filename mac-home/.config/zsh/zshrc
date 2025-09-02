@@ -147,3 +147,24 @@ _mise_maybe_hook  # 启动时在当前目录跑一次
 # 3) 删掉/注释掉原来的：
 # eval "$(mise activate zsh)"
 # eval "$(mise hook-env)"
+
+# x-cmd 懒加载：首次调用 x/xc 时再加载，避免启动开销
+__x_cmd_lazy_boot() {
+  # 已加载则跳过
+  if [[ -n ${__X_CMD_LOADED:-} ]]; then
+    return 0
+  fi
+  local xrc="$HOME/.x-cmd.root/X"
+  if [[ -r "$xrc" ]]; then
+    . "$xrc"
+    __X_CMD_LOADED=1
+  else
+    print -u2 "x-cmd 未安装或缺少 $xrc"
+  fi
+  # 自身只需存在一次
+  unfunction __x_cmd_lazy_boot 2>/dev/null || true
+}
+
+# 包装 x 与 xc：第一次调用触发加载
+x()  { __x_cmd_lazy_boot; command x  "$@"; }
+xc() { __x_cmd_lazy_boot; command xc "$@"; }

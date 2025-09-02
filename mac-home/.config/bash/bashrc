@@ -36,10 +36,10 @@ export LC_ALL=$LANG
 export LANG=en_US.UTF-8
 export LC_ALL=$LANG
 # --- Mosh shortcuts ----------------------------------------
-alias s="mosh root@s0"
-alias s0="mosh root@s0"
-alias s1="mosh root@s1"
-alias s2="mosh root@s2"
+alias s="ssh root@s0"
+alias s0="ssh root@s0"
+alias s1="ssh root@s1"
+alias s2="ssh root@s2"
 
 export HISTSIZE=100000
 
@@ -186,3 +186,23 @@ fi
 alias lg="lazygit"
 
 
+
+# x-cmd 懒加载：首次调用 x/xc 时再加载，避免启动开销
+__x_cmd_lazy_boot() {
+  if [ -n "${__X_CMD_LOADED:-}" ]; then
+    return 0
+  fi
+  local xrc="$HOME/.x-cmd.root/X"
+  if [ -r "$xrc" ]; then
+    . "$xrc"
+    __X_CMD_LOADED=1
+  else
+    printf >&2 "x-cmd 未安装或缺少 %s\n" "$xrc"
+  fi
+  # 自身只需存在一次
+  unset -f __x_cmd_lazy_boot 2>/dev/null || true
+}
+
+# 包装 x 与 xc：第一次调用触发加载
+x()  { __x_cmd_lazy_boot; command x  "$@"; }
+xc() { __x_cmd_lazy_boot; command xc "$@"; }
