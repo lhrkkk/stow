@@ -93,22 +93,50 @@ proxy-off() {
 }
 
 proxy-on() {
-  # proxy-on [URL] [--git] [--npm] [--all] [-l|--launchctl]
-  do_l=0; do_git=0; do_npm=0; url=""
-  for a in "$@"; do
-    case "$a" in
+  # proxy-on [--http URL] [--socks URL] [--url URL] [--git] [--npm] [--all] [-l|--launchctl]
+  do_l=0; do_git=0; do_npm=0; http_url=""; socks_url=""; url_both=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
       -l|--launchctl) do_l=1 ;;
       --git) do_git=1 ;;
       --npm) do_npm=1 ;;
       --all) do_git=1; do_npm=1 ;;
-      *) url="$a" ;;
+      --http)
+        shift
+        if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then http_url="$1"; fi
+        ;;
+      --socks)
+        shift
+        if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then socks_url="$1"; fi
+        ;;
+      --url)
+        shift
+        if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then url_both="$1"; fi
+        ;;
+      --) shift; break ;;
+      *)
+        # 兼容旧用法：单个位置参数作为 url_both
+        if [ -z "$url_both" ]; then url_both="$1"; fi
+        ;;
     esac
+    [ $# -gt 0 ] && shift
   done
-  [ -n "$url" ] || url="${PROXY_URL:-http://localhost:53373}"
-  launchflag=""; [ "$do_l" -eq 1 ] && launchflag="--launchctl" || :
-  gitflag="";    [ "$do_git" -eq 1 ] && gitflag="--git" || :
-  npmflag="";    [ "$do_npm" -eq 1 ] && npmflag="--npm" || :
-  . "$HOME/.local/bin/set-proxy" --url "$url" ${launchflag:+$launchflag} ${gitflag:+$gitflag} ${npmflag:+$npmflag}
+  # --url/位置参数作为 http 与 socks 的共同缺省；--http/--socks 明确指定时不受影响
+  if [ -z "$http_url" ] && [ -n "$url_both" ]; then http_url="$url_both"; fi
+  if [ -z "$socks_url" ] && [ -n "$url_both" ]; then socks_url="$url_both"; fi
+
+  # 逐段构造参数字符串
+  cmd=". \"$HOME/.local/bin/set-proxy\""
+  [ -n "$http_url" ] && cmd="$cmd --http \"$http_url\""
+  [ -n "$socks_url" ] && cmd="$cmd --socks \"$socks_url\""
+  [ "$do_l" -eq 1 ] && cmd="$cmd --launchctl"
+  [ "$do_git" -eq 1 ] && cmd="$cmd --git"
+  [ "$do_npm" -eq 1 ] && cmd="$cmd --npm"
+  eval "$cmd"
+}
+
+proxy-status() {
+  . "$HOME/.local/bin/set-proxy" status
 }
 
 # 开机默认仅在 macOS 设置一次（可通过 proxy-off 撤销；避免重复 source 覆盖）
@@ -117,6 +145,14 @@ case "$(uname -s)" in
     if [ -z "${PROXY_AUTO_APPLIED:-}" ]; then
       : "${PROXY_URL:=${HTTP_PROXY:-${HTTPS_PROXY:-${ALL_PROXY:-http://localhost:53373}}}}"
       proxy-on "$PROXY_URL"
+      export PROXY_AUTO_APPLIED=1
+    fi
+    ;;
+  Linux)
+    if [ -z "${PROXY_AUTO_APPLIED:-}" ]; then
+      : "${PROXY_URL:=http://localhost:10808}"
+      : "${PROXY_SOCKS_URL:=socks5://localhost:10809}"
+      proxy-on --http "$PROXY_URL" --socks "$PROXY_SOCKS_URL"
       export PROXY_AUTO_APPLIED=1
     fi
     ;;

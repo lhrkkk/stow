@@ -9,7 +9,7 @@
 #
 # 说明：
 # - 本脚本被 source 时会直接作用当前 shell；若以子进程执行，则仅影响子进程（推荐在 rc 中以 . 或 source 调用）。
-# - 默认不设代理：不提供 --http/--url 或 PROXY_URL，且不提供 --socks 或 PROXY_SOCKS_URL 时，不做任何修改。
+# - 默认不设代理：未显式提供 --http/--socks/--url 时，不做任何修改。
 # - NO_PROXY 建议：localhost,127.0.0.1,::1,.local,.home,.lan,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 
 # 默认静默成功；--verbose 时输出提示
@@ -58,19 +58,14 @@ set-proxy - 设置/清除系统代理
   set-proxy status
 
 说明:
-  - --url 等价于 --http（兼容旧用法）。
+  - --url 等价于 --http，同时若未指定 --socks 将镜像到 --socks（兼容旧用法）。
   - 仅提供 --http 会设置 HTTP_PROXY/HTTPS_PROXY；仅提供 --socks 会设置 ALL_PROXY。
   - 同时提供则分别设置；未提供的类型保持不变。
-  - URL 缺省：--http 缺省使用 $PROXY_URL；--socks 缺省使用 $PROXY_SOCKS_URL。
   - 默认仅作用当前 shell；如需让 GUI/子进程继承，在 macOS 下加 --launchctl。
   - --all 等价于同时作用 --git 与 --npm（npm 仅支持 http/https）。
   - 默认静默成功（--quiet）；若需提示，请使用 --verbose
 EOF
 }
-
-# 分别解析 http/socks 的缺省 URL（仅环境变量，不再探测现有 *_PROXY）
-resolve_http_url(){ printf '%s' "${PROXY_URL:-}"; }
-resolve_socks_url(){ printf '%s' "${PROXY_SOCKS_URL:-}"; }
 
 url_scheme(){ printf '%s' "$1" | awk -F:// '{print tolower($1)}'; }
 
@@ -126,7 +121,7 @@ unset_launchctl(){
 }
 
 status(){
-  _info "默认 URL（环境变量）"
+  _info "默认 URL（环境变量，仅显示不作为默认）"
   [ -n "${PROXY_URL-}" ] && echo "PROXY_URL=$PROXY_URL" || echo "PROXY_URL（未设置）"
   [ -n "${PROXY_SOCKS_URL-}" ] && echo "PROXY_SOCKS_URL=$PROXY_SOCKS_URL" || echo "PROXY_SOCKS_URL（未设置）"
   echo
@@ -233,14 +228,11 @@ cmd_set(){
     esac
     [ $# -gt 0 ] && shift
   done
-  # 兼容：未提供 --http 且提供了 --url，则将其作为 http_url，并镜像到 ALL_PROXY 以保持旧行为
+  # 兼容：未提供 --http 且提供了 --url，则将其作为 http_url，并在未指定 --socks 时镜像到 socks_url
   if [ -z "$http_url" ] && [ -n "$legacy_url" ]; then
     http_url="$legacy_url"
     [ -z "$socks_url" ] && socks_url="$legacy_url"
   fi
-  # 缺省解析环境变量
-  [ -n "$http_url" ] || http_url=$(resolve_http_url)
-  [ -n "$socks_url" ] || socks_url=$(resolve_socks_url)
 
   if [ -z "$http_url$socks_url" ]; then
     # 无任何 URL 即不做修改
