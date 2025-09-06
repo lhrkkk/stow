@@ -57,13 +57,63 @@ export ZSH_AUTOSUGGEST_USE_ASYNC=1
 export ZSH_AUTOSUGGEST_MANUAL_REBIND=1
 export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#93a1a1'
 
-# Proxy settings
-export http_proxy="http://127.0.0.1:53373"
-export https_proxy="http://127.0.0.1:53373"
-export all_proxy="socks5://127.0.0.1:53373"
-export HTTP_PROXY="$http_proxy"
-export HTTPS_PROXY="$https_proxy"
-export ALL_PROXY="$all_proxy"
+# 安全兜底：确保常见变量存在，防止偶发的 nounset 影响第三方脚本
+: "${NO_COLOR:=}"
+: "${RANGER_LEVEL:=}"
+: "${VIRTUAL_ENV:=}"
+export NO_COLOR RANGER_LEVEL VIRTUAL_ENV
+
+# Proxy 设置与便捷函数（bash/zsh 通用）
+PROXY_VARS="HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy ALL_PROXY all_proxy HOMEBREW_HTTP_PROXY HOMEBREW_HTTPS_PROXY HOMEBREW_NO_PROXY"
+
+proxy-off() {
+  # 清除当前 shell 的代理；支持 --git/--npm/--all；传入 -l/--launchctl 同步清除 launchctl
+  do_l=0; do_git=0; do_npm=0
+  for a in "$@"; do
+    case "$a" in
+      -l|--launchctl) do_l=1 ;;
+      --git) do_git=1 ;;
+      --npm) do_npm=1 ;;
+      --all) do_git=1; do_npm=1 ;;
+      *) : ;;
+    esac
+  done
+  launchflag=""; [ "$do_l" -eq 1 ] && launchflag="--launchctl" || :
+  gitflag="";    [ "$do_git" -eq 1 ] && gitflag="--git" || :
+  npmflag="";    [ "$do_npm" -eq 1 ] && npmflag="--npm" || :
+  . "$HOME/.local/bin/set-proxy" unset ${launchflag:+$launchflag} ${gitflag:+$gitflag} ${npmflag:+$npmflag}
+}
+
+proxy-on() {
+  # proxy-on [URL] [--git] [--npm] [--all] [-l|--launchctl]
+  do_l=0; do_git=0; do_npm=0; url=""
+  for a in "$@"; do
+    case "$a" in
+      -l|--launchctl) do_l=1 ;;
+      --git) do_git=1 ;;
+      --npm) do_npm=1 ;;
+      --all) do_git=1; do_npm=1 ;;
+      *) url="$a" ;;
+    esac
+  done
+  [ -n "$url" ] || url="${PROXY_URL:-http://localhost:53373}"
+  launchflag=""; [ "$do_l" -eq 1 ] && launchflag="--launchctl" || :
+  gitflag="";    [ "$do_git" -eq 1 ] && gitflag="--git" || :
+  npmflag="";    [ "$do_npm" -eq 1 ] && npmflag="--npm" || :
+  . "$HOME/.local/bin/set-proxy" --url "$url" ${launchflag:+$launchflag} ${gitflag:+$gitflag} ${npmflag:+$npmflag}
+}
+
+# 开机默认仅在 macOS 设置一次（可通过 proxy-off 撤销；避免重复 source 覆盖）
+case "$(uname -s)" in
+  Darwin)
+    if [ -z "${PROXY_AUTO_APPLIED:-}" ]; then
+      : "${PROXY_URL:=${HTTP_PROXY:-${HTTPS_PROXY:-${ALL_PROXY:-http://localhost:53373}}}}"
+      proxy-on "$PROXY_URL"
+      export PROXY_AUTO_APPLIED=1
+    fi
+    ;;
+  *) : ;;
+esac
 
 # Locale and history
 export LANG=en_US.UTF-8
@@ -78,7 +128,7 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 # Cargo env for scripts and interactive shells
-[ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 # Homebrew bottles mirror: Aliyun (keep others as comments)
 export HOMEBREW_BOTTLE_DOMAIN=https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles
@@ -97,18 +147,30 @@ export BAT_THEME="TwoDark"
 # Google Gemini API Key
 export GEMINI_API_KEY="AIzaSyCzZ-55AgAO2V_exRT8MhyNXK4lv4d5Kwc"
 
-# ==== Lazy-load Conda (keep) ====
+# ==== Lazy-load Conda (bash/zsh 通用，POSIX 语法) ====
 conda() {
-  unset -f conda
-  __conda_setup="\"$HOME/miniconda3/bin/conda\" shell.zsh hook 2>/dev/null"
-  __conda_eval=$(eval ${=__conda_setup})
-  if [ $? -eq 0 ]; then
-    eval "$__conda_eval"
-  elif [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-    . "$HOME/miniconda3/etc/profile.d/conda.sh"
+  # 移除自身定义，准备真正初始化
+  unset -f conda 2>/dev/null || true
+
+  CONDA_BIN="$HOME/miniconda3/bin/conda"
+  if [ -x "$CONDA_BIN" ]; then
+    local_shell="sh"
+    [ -n "${ZSH_VERSION-}" ] && local_shell="zsh"
+    [ -n "${BASH_VERSION-}" ] && local_shell="bash"
+
+    __conda_eval="$($CONDA_BIN "shell.$local_shell" hook 2>/dev/null || true)"
+    if [ -n "$__conda_eval" ]; then
+      eval "$__conda_eval"
+    elif [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+      . "$HOME/miniconda3/etc/profile.d/conda.sh"
+    else
+      PATH="$HOME/miniconda3/bin:$PATH"; export PATH
+    fi
+    unset __conda_eval local_shell CONDA_BIN
+    command conda "$@"
+    return $?
   else
-    export PATH="$HOME/miniconda3/bin:$PATH"
+    printf '%s\n' "conda 未找到：$CONDA_BIN" >&2
+    return 127
   fi
-  unset __conda_setup __conda_eval
-  conda "$@"
 }

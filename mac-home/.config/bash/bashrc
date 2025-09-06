@@ -4,6 +4,12 @@
 #  • Early return for non-interactive shells
 #  • Lazy-loaded heavy plugins
 ############################################
+
+# Load shared env (POSIX; bash/zsh 共用)
+if [ -r "$HOME/.config/zsh/env.zsh" ]; then
+  . "$HOME/.config/zsh/env.zsh"
+fi
+
 # https://www.josean.com/posts/7-amazing-cli-tools
 #
 # === PERFORMANCE OPTIMIZATION RESULTS ===
@@ -44,9 +50,7 @@ alias s2="ssh root@s2"
 export HISTSIZE=100000
 
 # --- Proxy --------------------------------------------------
-export https_proxy="http://127.0.0.1:53373"
-export http_proxy="$https_proxy"
-export all_proxy="socks5://127.0.0.1:53373"
+# 由 ~/.config/zsh/env.zsh + set-proxy 统一管理（已在本文件顶部加载）
 
 # -------- Runtime-wide variables (scripts + interactive) --------
 # Bun JavaScript runtime

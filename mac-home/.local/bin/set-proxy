@@ -1,0 +1,288 @@
+#!/usr/bin/env sh
+# set-proxy — 设置/清除系统代理（支持 env + 可选 launchctl + 可选 git/npm），默认执行“设置”
+#
+# 用法：
+#   set-proxy [--url URL] [--git] [--npm] [--all] [--launchctl] [--quiet|--verbose]
+#   set-proxy unset [--launchctl] [--quiet|--verbose]
+#   set-proxy status
+#   set-proxy --help
+#
+# 说明：
+# - 本脚本被 source 时会直接作用当前 shell；若以子进程执行，则仅影响子进程（推荐在 rc 中以 . 或 source 调用）。
+# - 默认不设代理：不提供 --url 或 PROXY_URL 时，不做任何修改；由调用方（如 env.zsh）决定是否传入默认 URL。
+# - NO_PROXY 建议：localhost,127.0.0.1,::1,.local,.home,.lan,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+
+# 默认静默成功；--verbose 时输出提示
+QUIET=1
+
+# set -eu
+
+_info(){ printf "\033[0;34mℹ️  %s\033[0m\n" "$*"; }
+_ok(){ [ "${QUIET:-1}" -eq 0 ] && printf "\033[0;32m✅ %s\033[0m\n" "$*" || :; }
+_warn(){ printf "\033[1;33m⚠️  %s\033[0m\n" "$*"; }
+_err(){ printf "\033[0;31m❌ %s\033[0m\n" "$*"; }
+
+has_cmd(){ command -v "$1" >/dev/null 2>&1; }
+is_macos(){ [ "$(uname -s)" = "Darwin" ]; }
+
+# 新增：在函数上下文中优先 return，否则 exit，便于被 source 使用
+ret(){ return "$1" 2>/dev/null || exit "$1"; }
+
+# 新增：尽力判断是否被 source（zsh/bash 下可靠，其他 shell 回退为“可能非 source”）
+is_sourced(){
+  if [ -n "${ZSH_EVAL_CONTEXT-}" ]; then
+    case "$ZSH_EVAL_CONTEXT" in *:file) return 0;; esac
+  fi
+  if [ -n "${BASH_SOURCE-}" ] && [ "${BASH_SOURCE:-$0}" != "$0" ]; then
+    return 0
+  fi
+  return 1
+}
+
+# 新增：未被 source 时提醒（仅 verbose 模式提示）
+maybe_warn_not_sourced(){
+  if [ "${QUIET:-1}" -eq 0 ] && ! is_sourced; then
+    _warn "检测到未以 source 执行；环境变量仅对当前进程有效。如需影响当前 shell，请用 'source set-proxy ...' 或在 rc 中以 . 调用。"
+  fi
+}
+
+PROXY_VARS="HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy ALL_PROXY all_proxy FTP_PROXY ftp_proxy RSYNC_PROXY rsync_proxy HOMEBREW_HTTP_PROXY HOMEBREW_HTTPS_PROXY HOMEBREW_NO_PROXY"
+DEFAULT_NO_PROXY="localhost,127.0.0.1,::1,.local,.home,.lan,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+show_help(){ cat <<'EOF'
+set-proxy - 设置/清除系统代理
+
+用法:
+  set-proxy [--url URL] [--git] [--npm] [--all] [--launchctl] [--quiet|--verbose]
+  set-proxy unset [--git] [--npm] [--all] [--launchctl] [--quiet|--verbose]
+  set-proxy status
+
+说明:
+  - 默认仅作用当前 shell；如需让 GUI/子进程继承，在 macOS 下加 --launchctl。
+  - URL 缺省：仅使用显式 --url 或环境变量 PROXY_URL；未提供则不修改
+  - --all 等价于同时作用 --git 与 --npm
+  - 默认静默成功（--quiet）；若需提示，请使用 --verbose
+EOF
+}
+
+resolve_url(){
+  # 仅使用显式传入的 URL 或 PROXY_URL；否则返回空字符串（默认不设代理）
+  printf '%s' "${PROXY_URL:-}"
+}
+
+url_scheme(){ printf '%s' "$1" | awk -F:// '{print tolower($1)}'; }
+
+export_shell_vars(){
+  url="$1"
+  no_proxy_val=${PROXY_NO_PROXY:-${NO_PROXY:-$DEFAULT_NO_PROXY}}
+  # 大小写同时导出
+  export HTTP_PROXY="$url" HTTPS_PROXY="$url" ALL_PROXY="$url"
+  export http_proxy="$url" https_proxy="$url" all_proxy="$url"
+  export NO_PROXY="$no_proxy_val" no_proxy="$no_proxy_val"
+  # Homebrew 兼容变量
+  export HOMEBREW_HTTP_PROXY="$url" HOMEBREW_HTTPS_PROXY="$url" HOMEBREW_NO_PROXY="$no_proxy_val"
+}
+
+set_launchctl(){
+  url="$1"; no_proxy_val=${PROXY_NO_PROXY:-${NO_PROXY:-$DEFAULT_NO_PROXY}}
+  is_macos || return 0
+  has_cmd launchctl || return 0
+  launchctl setenv HTTP_PROXY  "$url" || true
+  launchctl setenv HTTPS_PROXY "$url" || true
+  launchctl setenv ALL_PROXY   "$url" || true
+  launchctl setenv NO_PROXY    "$no_proxy_val" || true
+  launchctl setenv HOMEBREW_HTTP_PROXY  "$url" || true
+  launchctl setenv HOMEBREW_HTTPS_PROXY "$url" || true
+  launchctl setenv HOMEBREW_NO_PROXY    "$no_proxy_val" || true
+}
+
+unset_shell(){
+  for v in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy ALL_PROXY all_proxy FTP_PROXY ftp_proxy RSYNC_PROXY rsync_proxy HOMEBREW_HTTP_PROXY HOMEBREW_HTTPS_PROXY HOMEBREW_NO_PROXY; do
+    unset "$v" 2>/dev/null || true
+  done
+  # 也清理可能影响默认行为的辅助变量
+  unset PROXY_URL PROXY_NO_PROXY 2>/dev/null || true
+  if [ "${QUIET:-1}" -eq 0 ] && [ "$had_any" -eq 0 ]; then
+    _info "未发现需要清理的代理环境变量"
+  fi
+}
+
+unset_launchctl(){
+  is_macos || return 0
+  has_cmd launchctl || return 0
+  for v in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy ALL_PROXY all_proxy FTP_PROXY ftp_proxy RSYNC_PROXY rsync_proxy HOMEBREW_HTTP_PROXY HOMEBREW_HTTPS_PROXY HOMEBREW_NO_PROXY; do
+    launchctl unsetenv "$v" >/dev/null 2>&1 || true
+  done
+}
+
+status(){
+  _info "PROXY_URL（默认 URL）"
+  if [ -n "${PROXY_URL-}" ]; then
+    echo "PROXY_URL=$PROXY_URL"
+  else
+    echo "（未设置）"
+  fi
+  echo
+  _info "环境变量（env）"
+  env | grep -iE '(^|_)proxy=' || printf '（无代理环境变量）\n'
+  if is_macos && has_cmd launchctl; then
+    echo
+    _info "launchctl 用户环境"
+    shown=0
+    for v in HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy ALL_PROXY all_proxy FTP_PROXY ftp_proxy RSYNC_PROXY rsync_proxy HOMEBREW_HTTP_PROXY HOMEBREW_HTTPS_PROXY HOMEBREW_NO_PROXY; do
+      val=$(launchctl getenv "$v" 2>/dev/null || true)
+      [ -n "${val:-}" ] && { printf '%s=%s\n' "$v" "$val"; shown=1; }
+    done
+    [ "$shown" -eq 0 ] && printf '（无代理相关变量）\n'
+  fi
+  if has_cmd git; then
+    echo
+    _info "Git 全局代理"
+    gp=$(git --no-pager config --global --get http.proxy 2>/dev/null || true)
+    gsp=$(git --no-pager config --global --get https.proxy 2>/dev/null || true)
+    [ -n "${gp}${gsp}" ] && { [ -n "$gp" ] && echo "http.proxy:  $gp"; [ -n "$gsp" ] && echo "https.proxy: $gsp"; } || echo "（未设置）"
+  fi
+  if has_cmd npm; then
+    echo
+    _info "NPM 代理"
+    np=$(npm config get proxy 2>/dev/null || true); [ "$np" = "null" ] && np=""
+    nsp=$(npm config get https-proxy 2>/dev/null || true); [ "$nsp" = "null" ] && nsp=""
+    [ -n "${np}${nsp}" ] && { [ -n "$np" ] && echo "proxy:       $np"; [ -n "$nsp" ] && echo "https-proxy: $nsp"; } || echo "（未设置）"
+  fi
+}
+
+apply_git(){ url="$1"; has_cmd git || { _warn "未检测到 git，跳过"; return 0; }
+  git config --global http.proxy  "$url" >/dev/null 2>&1 || true
+  git config --global https.proxy "$url" >/dev/null 2>&1 || true
+  _ok "已设置 git 全局代理"
+}
+
+apply_npm(){ url="$1"; has_cmd npm || { _warn "未检测到 npm，跳过"; return 0; }
+  scheme=$(url_scheme "$url")
+  case "$scheme" in http|https) :;; *) _warn "npm 仅支持 http/https 代理（当前: $scheme），已跳过"; return 0;; esac
+  npm config set proxy        "$url" >/dev/null 2>&1 || true
+  npm config set https-proxy  "$url" >/dev/null 2>&1 || true
+  _ok "已设置 npm 代理"
+}
+
+# 新增：清除 git 与 npm 代理
+clear_git(){ has_cmd git || { _warn "未检测到 git，跳过"; return 0; }
+  git config --global --unset-all http.proxy >/dev/null 2>&1 || true
+  git config --global --unset-all https.proxy >/dev/null 2>&1 || true
+  _ok "已清除 git 全局代理"
+}
+
+clear_npm(){ has_cmd npm || { _warn "未检测到 npm，跳过"; return 0; }
+  npm config delete proxy >/dev/null 2>&1 || true
+  npm config delete https-proxy >/dev/null 2>&1 || true
+  _ok "已清除 npm 代理"
+}
+
+cmd_set(){
+  url=""; do_git=0; do_npm=0; do_launchctl=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --url)
+        shift
+        if [ $# -eq 0 ] || [ "${1#-}" != "$1" ]; then
+          _err "无效的 --url 参数"
+          ret 1
+        fi
+        url="$1"
+        ;;
+      --git) do_git=1 ;;
+      --npm) do_npm=1 ;;
+      --all) do_git=1; do_npm=1 ;;
+      --launchctl) do_launchctl=1 ;;
+      --quiet) QUIET=1 ;;
+      --verbose) QUIET=0 ;;
+      --) shift; break ;;
+      --help|-h) show_help; ret 0 ;;
+      *) : ;;
+    esac
+    [ $# -gt 0 ] && shift
+  done
+  [ -n "$url" ] || url=$(resolve_url)
+
+  if [ -z "$url" ]; then
+    # 默认不设代理：无 URL 即不做任何修改
+    [ "${QUIET:-1}" -eq 0 ] && _info "未提供 URL，未修改代理" || :
+    return 0
+  fi
+
+  export_shell_vars "$url"
+  _ok "已设置当前 shell 代理"
+  if [ "$do_launchctl" -eq 1 ]; then
+    if is_macos && has_cmd launchctl; then
+      if set_launchctl "$url"; then
+        _ok "已同步到 launchctl（GUI/子进程继承）"
+      else
+        _warn "设置 launchctl 失败"
+      fi
+    else
+      _warn "当前环境不支持 launchctl，已跳过"
+    fi
+  fi
+
+  [ "$do_git" -eq 1 ] && apply_git "$url"
+  [ "$do_npm" -eq 1 ] && apply_npm "$url"
+
+  # 若未同步到 launchctl 且脚本未被 source，提示作用域
+  if [ "$do_launchctl" -ne 1 ]; then
+    maybe_warn_not_sourced
+  fi
+}
+
+cmd_unset(){
+  do_launchctl=0; do_git=0; do_npm=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --launchctl) do_launchctl=1 ;;
+      --git) do_git=1 ;;
+      --npm) do_npm=1 ;;
+      --all) do_git=1; do_npm=1 ;;
+      --quiet) QUIET=1 ;;
+      --verbose) QUIET=0 ;;
+      --help|-h) show_help; ret 0 ;;
+      --) shift; break ;;
+      *) : ;;
+    esac
+    shift
+  done
+  unset_shell
+  _ok "已清除当前 shell 代理"
+  if [ "$do_launchctl" -eq 1 ]; then
+    if is_macos && has_cmd launchctl; then
+      if unset_launchctl; then
+        _ok "已同步清除 launchctl 代理"
+      else
+        _warn "清除 launchctl 失败"
+      fi
+    else
+      _warn "当前环境不支持 launchctl，已跳过"
+    fi
+  fi
+  [ "$do_git" -eq 1 ] && clear_git
+  [ "$do_npm" -eq 1 ] && clear_npm
+  if [ "$do_launchctl" -ne 1 ]; then
+    maybe_warn_not_sourced
+  fi
+}
+
+main(){
+  sub="set"
+  case "${1-}" in
+    unset|clean) sub="unset"; shift || true ;;
+    status) sub="status"; shift || true ;;
+    --help|-h) show_help; ret 0 ;;
+    *) : ;;
+  esac
+
+  case "$sub" in
+    set)    cmd_set "$@" ;;
+    unset)  cmd_unset "$@" ;;
+    status) status ;;
+  esac
+}
+
+main "$@"
