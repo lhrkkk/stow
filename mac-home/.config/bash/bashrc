@@ -61,3 +61,4 @@
 
 . ~/.config/env/common/all.zsh
 . ~/.config/bash/fzf.sh
+PS1="[\u@\h \W]\$ "
