@@ -8,40 +8,30 @@ setopt extended_glob
 
 # Support a clean option: remove generated .zwc caches
 if [[ ${1:-} == clean || ${1:-} == --clean || ${1:-} == -c ]]; then
-  autoload -Uz zrecompile
-  typeset -a files
-  files=(
-    "$HOME/.zshrc"
-    "$HOME/.config/zsh/zshrc"
-    "$HOME/.config/zsh"/*.zsh(N)
-    "$HOME/.config/zsh/functions"/*(.N)
-    "$HOME/.config/env"/**/*.zsh(N)
-    "$HOME/.config/env"/**/*.sh(N)
+  typeset -a targets
+  targets=(
+    # env and zsh configs
+    "$HOME/.config/env"/**/*.zwc(.N)
+    "$HOME/.config/env"/**/*.zwc.old(.N)
+    "$HOME/.config/zsh"/**/*.zwc(.N)
+    "$HOME/.config/zsh"/**/*.zwc.old(.N)
+    # zim caches
+    "$HOME/.zim"/**/*.zwc(.N)
+    "$HOME/.zim"/**/*.zwc.old(.N)
+    # top-level common caches
+    "$HOME/.zshrc.zwc"(N)
+    "$HOME/.zshrc.zwc.old"(N)
+    "${ZDOTDIR:-$HOME}"/.zcompdump*.zwc(.N)
+    "${ZDOTDIR:-$HOME}"/.zcompdump*.zwc.old(.N)
   )
 
   typeset -i removed=0 skipped=0
-  # Remove per-file .zwc and .zwc.old
-  for f in "${files[@]}"; do
-    [[ -e $f ]] || continue
-    for suf in ".zwc" ".zwc.old"; do
-      if [[ -e $f$suf ]]; then
-        rm -f -- $f$suf && removed+=1 || skipped+=1
-      else
-        skipped+=1
-      fi
-    done
-  done
-
-  # Remove compiled Zim init and completion dump
-  dump="${ZDOTDIR:-$HOME}/.zcompdump"
-  for g in "$HOME/.zim/init.zsh" "$dump"; do
-    for suf in ".zwc" ".zwc.old"; do
-      if [[ -e $g$suf ]]; then
-        rm -f -- $g$suf && removed+=1 || skipped+=1
-      else
-        skipped+=1
-      fi
-    done
+  for t in "${targets[@]}"; do
+    if [[ -e $t ]]; then
+      rm -f -- "$t" && removed+=1 || skipped+=1
+    else
+      skipped+=1
+    fi
   done
 
   # If available, ask zimfw to clean its compiled files (ignore failures)
