@@ -33,5 +33,5 @@ export BAT_THEME="TwoDark"
 export PATH="$PATH:$HOME/.cargo/bin"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
-export PATH="$PATH:/home/linuxbrew/.linuxbrew/bin"
-export PATH="$PATH:/home/linuxbrew/.linuxbrew/sbin"
+export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+export PATH="/home/linuxbrew/.linuxbrew/sbin:$PATH"
