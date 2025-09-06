@@ -322,3 +322,34 @@
 > - 所有命令示例均在前加空格，避免写入 shell 历史。
 > - 更详细的 stow 说明与行为差异，请见本仓库根目录 `STOW.md` 与 `mac-home/WARP.md` 中“Stow 规则引用”章节。
 
+---
+
+## 11. Zim（zimfw）安装与初始化
+
+本仓库使用 Zim（zimfw）作为 zsh 框架；已在 `mac-home/.config/zsh/plugins.zsh` 中内置“首次自动安装”逻辑：首次启动 zsh 时若未检测到 `~/.zim`，会自动下载安装，并把 `~/.zimrc` 链接到仓库内的 `~/.config/zsh/zimrc`。
+
+- 你也可以手动提前安装（效果等同）：
+  
+  ```sh
+   curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
+   rm -f ~/.zimrc
+   ln -s ~/.config/zsh/zimrc ~/.zimrc
+   zimfw install
+  ```
+
+- 常用命令：
+  
+  ```sh
+   zimfw update      # 拉取并更新模块
+   zimfw compile -q  # 预编译以加速启动
+   recompile-zsh     # 本仓库提供的小工具，统一预编译 zsh/补全缓存
+  ```
+
+- 验证：
+  - 新开一个 zsh，确认提示符与补全可用；
+  - 如遇问题，可执行：
+    
+    ```sh
+     zimfw doctor
+    ```
+
