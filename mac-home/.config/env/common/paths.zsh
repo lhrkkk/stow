@@ -16,13 +16,11 @@ export PATH="$HOME/.config/emacs/bin:$PATH"
 export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
 # export PATH="/usr/local/opt/grep/libexec/gnubin:$PATH"
 
+
+
 # Bun runtime
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
-
-# Visual Studio Code
-export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"
-
 # Elan (Rust toolchains)
 export PATH="$HOME/.elan/bin:$PATH"
 
@@ -33,5 +31,3 @@ export BAT_THEME="TwoDark"
 export PATH="$PATH:$HOME/.cargo/bin"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
-export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-export PATH="/home/linuxbrew/.linuxbrew/sbin:$PATH"

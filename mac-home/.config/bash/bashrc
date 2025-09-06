@@ -60,5 +60,6 @@
 
 
 . ~/.config/env/common/all.zsh
+. ~/.config/env/local/$(uname -s).sh
 . ~/.config/bash/fzf.sh
 PS1="[\u@\h \W]\$ "

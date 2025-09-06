@@ -16,6 +16,7 @@ export ZIM_HOME=${HOME}/.zim
 
 # common
 source ~/.config/env/common/all.zsh
+source ~/.config/env/local/$(uname -s).sh
 
 # zsh
 source ~/.config/zsh/plugins.zsh

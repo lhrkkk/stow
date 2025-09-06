@@ -39,7 +39,24 @@ if [[ ${1:-} == clean || ${1:-} == --clean || ${1:-} == -c ]]; then
     zimfw clean -q >/dev/null 2>&1 || true
   fi
 
-  print -r -- "Clean done: removed=$removed skipped=$skipped"
+  # After cleaning, proactively regenerate completion dump so compsys works (incl. fzf)
+  dump="${ZDOTDIR:-$HOME}/.zcompdump"
+  typeset -a _extra_fpath
+  if (( $+commands[brew] )); then
+    local _bp
+    _bp=$(brew --prefix 2>/dev/null) || _bp=""
+    [[ -n $_bp && -d $_bp/share/zsh/site-functions ]] && _extra_fpath+=("$_bp/share/zsh/site-functions")
+    [[ -f "$_bp/opt/fzf/shell/completion.zsh" ]] && source "$_bp/opt/fzf/shell/completion.zsh"
+  fi
+  [[ -d /opt/homebrew/share/zsh/site-functions ]] && _extra_fpath+=(/opt/homebrew/share/zsh/site-functions)
+  [[ -d /usr/local/share/zsh/site-functions ]] && _extra_fpath+=(/usr/local/share/zsh/site-functions)
+  [[ -d /usr/share/zsh/site-functions ]] && _extra_fpath+=(/usr/share/zsh/site-functions)
+  fpath=( ${_extra_fpath[@]} $fpath )
+  autoload -Uz compinit
+  compinit -d "$dump" -i >/dev/null 2>&1 || compinit -i >/dev/null 2>&1
+  [[ -f "$dump" ]] && zcompile "$dump" || true
+
+  print -r -- "Clean done: removed=$removed skipped=$skipped; regenerated .zcompdump"
   return 0
 fi
 
@@ -79,8 +96,31 @@ for f in "${files[@]}"; do
   fi
 done
 
-# 4) Compile completion dump (after compinit has run at least once)
+# 4) Ensure and compile completion dump
 dump="${ZDOTDIR:-$HOME}/.zcompdump"
+# If dump is missing, generate it, ensuring common site-functions are in fpath
+if [[ ! -f "$dump" ]]; then
+  # Make sure common Homebrew and system site-functions are available
+  typeset -a _extra_fpath
+  if (( $+commands[brew] )); then
+    local _bp
+    _bp=$(brew --prefix 2>/dev/null) || _bp=""
+    [[ -n $_bp && -d $_bp/share/zsh/site-functions ]] && _extra_fpath+=("$_bp/share/zsh/site-functions")
+    # Also try fzf completion script if installed via Homebrew
+    if [[ -f "$_bp/opt/fzf/shell/completion.zsh" ]]; then
+      source "$_bp/opt/fzf/shell/completion.zsh"
+    fi
+  fi
+  [[ -d /opt/homebrew/share/zsh/site-functions ]] && _extra_fpath+=(/opt/homebrew/share/zsh/site-functions)
+  [[ -d /usr/local/share/zsh/site-functions ]] && _extra_fpath+=(/usr/local/share/zsh/site-functions)
+  [[ -d /usr/share/zsh/site-functions ]] && _extra_fpath+=(/usr/share/zsh/site-functions)
+  fpath=( ${_extra_fpath[@]} $fpath )
+
+  autoload -Uz compinit
+  # Use -d to write to our desired dump path; -i to skip insecure dirs prompts
+  compinit -d "$dump" -i >/dev/null 2>&1 || compinit -i >/dev/null 2>&1
+fi
+# Once present, (re)compile if stale or missing .zwc
 if [[ -f "$dump" ]]; then
   if [[ ! -f "$dump.zwc" || "$dump" -nt "$dump.zwc" ]]; then
     zcompile "$dump"

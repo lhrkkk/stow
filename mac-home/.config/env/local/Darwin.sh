@@ -6,3 +6,10 @@
 # Added by OrbStack: command-line tools and integration
 # This won't be added again if you remove it.
 # [ ! -f "~/.orbstack/shell/init.zsh" ] || source ~/.orbstack/shell/init.zsh 2>/dev/null || :
+
+# Homebrew
+export PATH="/opt/homebrew/bin:$PATH"
+export PATH="/opt/homebrew/sbin:$PATH"
+
+# Visual Studio Code
+export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"
