@@ -1,0 +1,123 @@
+export HOMEBREW_BOTTLE_DOMAIN=https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles  # use Aliyun instead
+# export HOMEBREW_BOTTLE_DOMAIN=https://mirrors.ustc.edu.cn/homebrew-bottles  # use Aliyun instead
+# Add Visual Studio Code (code)
+export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"
+
+export PATH="$HOME/.cargo/bin:$PATH"
+# export HOMEBREW_BOTTLE_DOMAIN=https://mirrors.aliyun.com/homebrew/homebrew-bottles
+# export PATH="/usr/local/opt/ruby/bin:$PATH"
+
+
+export BASH_SILENCE_DEPRECATION_WARNING=1
+
+
+# --- Locale -------------------------------------------------
+export LANG=en_US.UTF-8
+export LC_ALL=$LANG
+
+# --- Mosh shortcuts ----------------------------------------
+alias s="ssh root@s0"
+alias s0="ssh root@s0"
+alias s1="ssh root@s1"
+alias s2="ssh root@s2"
+
+export HISTSIZE=100000
+
+# --- Proxy --------------------------------------------------
+# 由 ~/.config/zsh/env.zsh + set-proxy 统一管理（已在本文件顶部加载）
+
+# -------- Runtime-wide variables (scripts + interactive) --------
+# Bun JavaScript runtime
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$HOME/.local/bin:$BUN_INSTALL/bin:$PATH"
+
+# Cargo (Rust) environment for scripts and interactive shells
+[ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+
+# Return early for non-interactive shells
+[[ $- == *i* ]] || return
+
+
+
+# ----- Lazy-load Conda: initialize on first use -----
+# Saves ~1487ms on startup (biggest optimization!)
+conda() {
+  unset -f conda
+  __conda_setup="$("$HOME/miniconda3/bin/conda" shell.bash hook 2>/dev/null)"
+  if [ $? -eq 0 ]; then
+      eval "$__conda_setup"
+  elif [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+      . "$HOME/miniconda3/etc/profile.d/conda.sh"
+  else
+      export PATH="$HOME/miniconda3/bin:$PATH"
+  fi
+  unset __conda_setup
+  conda "$@"
+}
+
+# ---- BAT (Better cat) -----
+export BAT_THEME="TwoDark"
+
+# ---- EZA (Better ls) -----
+# Replace ls with eza
+alias ls="eza --color=always --group-directories-first"  # 简洁多列显示，目录优先
+alias ll="eza --color=always --long --git --icons=always --group-directories-first"  # 详细信息，目录优先
+alias la="eza --color=always --long --git --icons=always --all --group-directories-first"  # 显示隐藏文件，目录优先
+alias lt="eza --color=always --tree --git --icons=always"  # 树状显示
+alias l=ls
+
+# ---- ZOXIDE (Smart cd) - Standard init (no cd override) -----
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init bash)"
+fi
+
+# ---- THEFUCK (Already configured above) -----
+# Command correction - already set up
+
+# ---- LAZYGIT -----
+# Git TUI - use 'lazygit' command
+alias lg="lazygit"
+
+
+
+# x-cmd 懒加载：首次调用 x/xc 时再加载，避免启动开销
+__x_cmd_lazy_boot() {
+  if [ -n "${__X_CMD_LOADED:-}" ]; then
+    return 0
+  fi
+  local xrc="$HOME/.x-cmd.root/X"
+  if [ -r "$xrc" ]; then
+    . "$xrc"
+    __X_CMD_LOADED=1
+  else
+    printf >&2 "x-cmd 未安装或缺少 %s\n" "$xrc"
+  fi
+  # 自身只需存在一次
+  unset -f __x_cmd_lazy_boot 2>/dev/null || true
+}
+
+# 包装 x 与 xc：第一次调用触发加载
+x()  { __x_cmd_lazy_boot; command x  "$@"; }
+xc() { __x_cmd_lazy_boot; command xc "$@"; }
+
+
+
+
+# ==== Lazy-load Homebrew environment ====
+# Saves ~27ms on startup by deferring PATH/env setup
+if [[ -x /opt/homebrew/bin/brew ]]; then
+  brew() {
+    # Initialize Homebrew variables once, on first use
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+    unset -f brew
+    brew "$@"
+  }
+fi
+
+if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+  brew() {
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    unset -f brew
+    brew "$@"
+  }
+fi

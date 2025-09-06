@@ -4,6 +4,54 @@
 
 emulate -L zsh
 setopt err_return
+setopt extended_glob
+
+# Support a clean option: remove generated .zwc caches
+if [[ ${1:-} == clean || ${1:-} == --clean || ${1:-} == -c ]]; then
+  autoload -Uz zrecompile
+  typeset -a files
+  files=(
+    "$HOME/.zshrc"
+    "$HOME/.config/zsh/zshrc"
+    "$HOME/.config/zsh"/*.zsh(N)
+    "$HOME/.config/zsh/functions"/*(.N)
+    "$HOME/.config/env"/**/*.zsh(N)
+    "$HOME/.config/env"/**/*.sh(N)
+  )
+
+  typeset -i removed=0 skipped=0
+  # Remove per-file .zwc and .zwc.old
+  for f in "${files[@]}"; do
+    [[ -e $f ]] || continue
+    for suf in ".zwc" ".zwc.old"; do
+      if [[ -e $f$suf ]]; then
+        rm -f -- $f$suf && removed+=1 || skipped+=1
+      else
+        skipped+=1
+      fi
+    done
+  done
+
+  # Remove compiled Zim init and completion dump
+  dump="${ZDOTDIR:-$HOME}/.zcompdump"
+  for g in "$HOME/.zim/init.zsh" "$dump"; do
+    for suf in ".zwc" ".zwc.old"; do
+      if [[ -e $g$suf ]]; then
+        rm -f -- $g$suf && removed+=1 || skipped+=1
+      else
+        skipped+=1
+      fi
+    done
+  done
+
+  # If available, ask zimfw to clean its compiled files (ignore failures)
+  if (( $+commands[zimfw] )); then
+    zimfw clean -q >/dev/null 2>&1 || true
+  fi
+
+  print -r -- "Clean done: removed=$removed skipped=$skipped"
+  return 0
+fi
 
 # 1) Compile Zim modules (if zimfw is available)
 if (( $+commands[zimfw] )); then
@@ -26,6 +74,9 @@ files=(
   "$HOME/.config/zsh"/*.zsh(N)
   # 编译 functions 目录下的所有普通文件（包含无扩展名的函数文件）
   "$HOME/.config/zsh/functions"/*(.N)
+  # 递归编译 env 目录下的所有 .sh 和 .zsh 文件（包含子目录）
+  "$HOME/.config/env"/**/*.zsh(N)
+  "$HOME/.config/env"/**/*.sh(N)
 )
 
 typeset -i compiled=0 skipped=0
@@ -47,4 +98,3 @@ if [[ -f "$dump" ]]; then
 fi
 
 print -r -- "Recompile done: compiled=$compiled skipped=$skipped"
-

@@ -5,167 +5,33 @@ unset LC_ALL
 
 export ZIM_HOME=${HOME}/.zim
 
-# 异步（事件循环延后）初始化补全系统：提示符先出来，随后在本 shell 完成 compinit
-if [[ $- == *i* ]]; then
-  # 捕获启动期对 compdef 的调用，避免模块在 compinit 前报错
-  typeset -ga __compdef_queue
-  compdef() { __compdef_queue+=("$*"); }
-
-  _lazy_compinit_run() {
-    # 释放 compdef 名字，恢复为真正的 compdef
-    unfunction compdef 2>/dev/null || true
-
-    autoload -Uz compinit
-    local dump=${ZDOTDIR:-$HOME}/.zcompdump
-    compinit -C -d "$dump"
-
-    # 回放启动期间累计的 compdef 定义
-    local def
-    for def in "${__compdef_queue[@]}"; do eval "compdef $def"; done
-    unset __compdef_queue
-
-    # 后台预编译缓存（仅文件 I/O）
-    { [[ -f $dump ]] && { [[ ! -f $dump.zwc || $dump -nt $dump.zwc ]] && zcompile "$dump"; } } &!
-
-    # 执行一次后移除自己，防止被 Tab 兜底再次调用
-    unfunction _lazy_compinit_run 2>/dev/null || true
-  }
-
-  # 如果支持 sched，则在提示符显示后的下一轮事件循环执行
-  if zmodload zsh/sched 2>/dev/null; then
-    sched +0 _lazy_compinit_run
-  fi
-
-  # 首次 Tab 兜底：若尚未初始化，则先运行再补全
-  zle -N _ami_expand_or_complete
-  _ami_expand_or_complete() {
-    if typeset -f _lazy_compinit_run >/dev/null; then
-      _lazy_compinit_run
-    fi
-    zle expand-or-complete
-  }
-  bindkey '^I' _ami_expand_or_complete
-fi
-
-# # Initialize completion early so fzf-tab (loaded by Zim) sees a ready system
-# if [[ $- == *i* ]]; then
-#   autoload -Uz compinit
-#   local dump=${ZDOTDIR:-$HOME}/.zcompdump
-#   compinit -C -d $dump
-#   { [[ -f $dump ]] && { [[ ! -f $dump.zwc || $dump -nt $dump.zwc ]] && zcompile $dump; } } &!
+# # local
+# if uname -s | grep -q "Darwin"; then
+#   source ~/.config/env/local/mac.sh
+# elif uname -s | grep -q "Linux"; then
+#   source ~/.config/env/local/linux.sh
 # fi
 
-# 延后加载 Zim：提示符先显示，随后加载模块并应用 prompt/autopair
-_lazy_zim_init_run() {
-  typeset -g _zim_inited
-  [[ $_zim_inited == 1 ]] && return
-  _zim_inited=1
 
-  source "${ZIM_HOME}/init.zsh"
 
-  # 依赖 Zim 的初始化
-  autopair-init
-  source ~/.config/zsh/prompt.zsh
+# common
+source ~/.config/env/common/all.zsh
 
-  unfunction _lazy_zim_init_run 2>/dev/null || true
-}
-if zmodload zsh/sched 2>/dev/null; then
-  sched +0 _lazy_zim_init_run
-else
-  _lazy_zim_init_run
-fi
-
-source ~/.config/zsh/env.zsh
-
-# 使用 fpath + autoload 自动注册 functions 目录中的所有函数（文件名=函数名，无扩展名）
-fpath+="$HOME/.config/zsh/functions"
-typeset -Ua _ami_funcs
-_ami_funcs=("$HOME/.config/zsh/functions"/*(N:t))
-(( $#_ami_funcs )) && autoload -Uz ${_ami_funcs}
-unset _ami_funcs
-
-# direnv 懒加载（方案 B：第一次 cd 触发，附首个提示符兜底）
-if [[ $- == *i* ]] && (( $+commands[direnv] )); then
-  autoload -Uz add-zsh-hook
-  _lazy_direnv_init() {
-    unfunction _lazy_direnv_init 2>/dev/null || true
-    eval "$(direnv hook zsh)"
-    # 立刻同步当前目录环境，避免错过初始目录的 .envrc
-    typeset -f _direnv_hook >/dev/null && _direnv_hook
-    # 移除临时钩子（已完成初始化）
-    add-zsh-hook -d chpwd  _lazy_direnv_chpwd   2>/dev/null
-    add-zsh-hook -d precmd _lazy_direnv_precmd  2>/dev/null
-  }
-  _lazy_direnv_chpwd()  { _lazy_direnv_init; }
-  _lazy_direnv_precmd() { _lazy_direnv_init; }
-  add-zsh-hook chpwd  _lazy_direnv_chpwd
-  add-zsh-hook precmd _lazy_direnv_precmd
-fi
-source ~/.config/zsh/aliases.zsh
+# zsh
 source ~/.config/zsh/plugins.zsh
 # source ~/.config/zsh/vi.zsh
 source ~/.config/zsh/emacs.zsh
 source ~/.config/zsh/fzf.zsh
 source ~/.config/zsh/mappings.zsh
-
-if [ -f ~/.sconfig/zsh/zshrc ]; then
-	source ~/.sconfig/zsh/zshrc
-fi
-
-
-# 同步 tmux 环境变量
 source ~/.config/zsh/tmux.zsh
+source ~/.config/zsh/lazyload.zsh
 
-# Homebrew: loaded at login from ~/.zprofile; no lazy wrapper needed
-# zoxide: standard init (no cd override)
-if (( $+commands[zoxide] )); then
-  eval "$(zoxide init zsh)"
-fi
-# ===== End optimizations =====
+# if [ -f ~/.sconfig/zsh/zshrc ]; then
+# 	source ~/.sconfig/zsh/zshrc
+# fi
 
 # fzf-tab theme colors (Selenized Light - Gogh)
 zstyle ':fzf-tab:*' fzf-flags '--ansi' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
 
 # source /Users/lhr/.config/zsh/plugins/zsh-hist/zsh-hist.plugin.zsh
 
-
-# ~/.zshrc
-# 1) 只加载 shims（快速）
-export PATH="$HOME/.local/share/mise/shims:$PATH"
-export PATH="$HOME/.local/bin:$PATH"   # 确保能找到 mise
-
-# 2) 懒加载：进入含配置的目录才执行 hook-env
-autoload -Uz add-zsh-hook
-_mise_maybe_hook() {
-  if [[ -f .mise.toml || -f .tool-versions || -f .python-version || -f .node-version || -f .nvmrc ]]; then
-    eval "$(mise hook-env -q)"
-  fi
-}
-add-zsh-hook chpwd _mise_maybe_hook
-_mise_maybe_hook  # 启动时在当前目录跑一次
-
-# 3) 删掉/注释掉原来的：
-# eval "$(mise activate zsh)"
-# eval "$(mise hook-env)"
-
-# x-cmd 懒加载：首次调用 x/xc 时再加载，避免启动开销
-# [ ! -f "$HOME/.x-cmd.root/X" ] || . "$HOME/.x-cmd.root/X" # boot up x-cmd.
-__x_cmd_lazy_boot() {
-  # 已加载则跳过
-  if [[ -n ${__X_CMD_LOADED:-} ]]; then
-    return 0
-  fi
-  local xrc="$HOME/.x-cmd.root/X"
-  if [[ -r "$xrc" ]]; then
-    . "$xrc"
-    __X_CMD_LOADED=1
-  else
-    print -u2 "x-cmd 未安装或缺少 $xrc"
-  fi
-  # 自身只需存在一次
-  unfunction __x_cmd_lazy_boot 2>/dev/null || true
-}
-
-# 包装 x 与 xc：第一次调用触发加载
-x()  { __x_cmd_lazy_boot; command x  "$@"; }
-xc() { __x_cmd_lazy_boot; command xc "$@"; }

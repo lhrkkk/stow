@@ -36,6 +36,7 @@ dist/
 build/
 vendor/
 *.zwc
+*.old
 
 # Misc backups（按需取舍）
 *.bak*

@@ -71,20 +71,6 @@ alias la="eza --color=always --long --git --icons=always --all --group-directori
 alias lt="eza --color=always --tree --git --icons=always"
 
 
-# ~/.zshrc
-if command -v thefuck >/dev/null 2>&1 && ! (( $+functions[fuck] )); then
-  _tf_boot() {
-    emulate -L zsh -o no_aliases
-    unalias fuck 2>/dev/null     # 防止回到 alias
-    unset -f _tf_boot            # 只运行一次
-    eval "$(thefuck --alias fuck)"
-    fuck "$@"                    # 转交给正式实现
-  }
-  alias fuck='_tf_boot'
-fi
-
-
-
 # # Lazy-load thefuck (safe; avoids alias recursion)
 # if (( $+commands[thefuck] )); then
 #   fuck() {
