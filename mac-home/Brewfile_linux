@@ -1,17 +1,10 @@
 # === Homebrew 源配置 ===
-tap "borkdude/brew"
-tap "d12frosted/emacs-plus"
-# tap "homebrew/cask-fonts", "https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask-fonts.git"
-# tap "homebrew/cask-versions", "https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask-versions.git"
-# tap "homebrew/services"
-# tap "railwaycat/emacsmacport"
 
 # === CLI 基础工具 ===
 brew "bat"                 # 高亮 cat 替代
 brew "btop"                # 进程监视
 brew "curl"
 brew "fzf"                 # 模糊搜索
-brew "gemini-cli"
 brew "git"                 # Git 版本控制
 brew "ncdu"                # 磁盘分析
 brew "ripgrep"             # 快速查找
@@ -23,19 +16,19 @@ brew "wget"
 # === 网络工具 ===
 brew "httpie"              # HTTP 调试工具
 # brew "openvpn"
-brew "rclone"              # 云盘同步工具
+# brew "rclone"              # 云盘同步工具
 # brew "nghttp2"             # HTTP/2 工具
-brew "nginx"
+# brew "nginx"
 brew "sshpass"             # SSH 密码自动化工具
 
 # === Shell 和效率工具 ===
 # brew "autojump"
-brew "z.lua"               # 快速路径跳转
-brew "lua"               # 快速路径跳转
+# brew "z.lua"               # 快速路径跳转
+# brew "lua"               # 快速路径跳转
 brew "thefuck"             # 命令更正工具
-brew "lazygit"
+# brew "lazygit"
 brew "mosh"
-brew "gnu-tar"
+# brew "gnu-tar"
 brew "fd"
 brew "git-delta"
 brew "eza"
@@ -51,18 +44,18 @@ brew "zoxide"
 # brew "shc"
 
 # === 编程语言环境 ===
-brew "node"
-brew "python@3.10"
-brew "pyenv"
-brew "pyenv-virtualenv"
-brew "ruby"
+# brew "node"
+# brew "python@3.10"
+# brew "pyenv"
+# brew "pyenv-virtualenv"
+# brew "ruby"
 brew "rustup"
-brew "php"
-brew "elixir"
+# brew "php"
+# brew "elixir"
 # brew "elm"
-cask "warp"
-cask "wezterm"
-cask "ghostty"
+# cask "warp"
+# cask "wezterm"
+# cask "ghostty"
 
 
 
@@ -70,42 +63,42 @@ cask "ghostty"
 brew "jq"                  # JSON 处理
 brew "icdiff"              # 彩色 diff
 brew "git-town"            # Git 团队协作
-brew "leiningen"           # Clojure 管理工具
+# brew "leiningen"           # Clojure 管理工具
 # brew "loc"                 # 代码行数统计
 brew "cloc"                # 更通用的代码统计
-brew "gist"
-brew "glances"             # 系统监控
+# brew "gist"
+# brew "glances"             # 系统监控
 
 # === 文档/文本处理 ===
-brew "pandoc"              # 文档转换器
-brew "percol"
+# brew "pandoc"              # 文档转换器
+# brew "percol"
 # , link: false
 brew "neovim"
-brew "vim"
+# brew "vim"
 
 # === 媒体与界面工具 ===
-cask "iina"                # 现代视频播放器
+# cask "iina"                # 现代视频播放器
 # cask "vlc"                 # 多格式播放器
 # cask "alacritty"           # GPU 加速终端
-cask "marta"
+# cask "marta"
 
 # === 可选图形/系统小工具 ===
 # cask "cheatsheet"          # 快捷键提示（可选）
-cask "keepingyouawake"     # 阻止休眠
-cask "basictex"            # 轻量 LaTeX 环境
+# cask "keepingyouawake"     # 阻止休眠
+# cask "basictex"            # 轻量 LaTeX 环境
 # cask "xld"                 # 音频转换
 # cask "v2rayu"
 # cask "v2rayx"
 
 # === 数据处理 / 科学计算 ===
-brew "gettext"
-brew "libunistring"
-brew "libtiff"
-brew "zstd"
-brew "brotli"
-brew "icu4c@76"
-brew "dav1d"
-brew "netcdf"
+# brew "gettext"
+# brew "libunistring"
+# brew "libtiff"
+# brew "zstd"
+# brew "brotli"
+# brew "icu4c@76"
+# brew "dav1d"
+# brew "netcdf"
 
 # === 个人偏好或专业工具 ===
 # brew "cmus"                # 命令行音乐播放器
@@ -115,28 +108,28 @@ brew "netcdf"
 
 # === Emacs ===
 # brew "d12frosted/emacs-plus/emacs-plus@30", args: ["with-no-frame-refocus", "with-savchenkovaleriy-big-sur-curvy-3d-icon"]
-cask "emacs"
-cask "android-platform-tools"
+# cask "emacs"
+# cask "android-platform-tools"
 
 # === 从已安装但未收录的条目（生成于 2025-08-15）===
 # brew "htop"
 # cask "librewolf"
-brew "borkdude/brew/babashka"
+# brew "borkdude/brew/babashka"
 # brew "elm"
 # brew "imagemagick"
 # brew "poppler"
 
-brew "yarn"
+# brew "yarn"
 brew "go"
 
-brew "neofetch"
-brew "rainbarf"
+# brew "neofetch"
+# brew "rainbarf"
 brew "yazi"
 brew "zsh"
-cask "font-fira-code-nerd-font"
-cask "font-jetbrains-mono-nerd-font"
-cask "font-meslo-lg-nerd-font"
-cask "orbstack"
+# cask "font-fira-code-nerd-font"
+# cask "font-jetbrains-mono-nerd-font"
+# cask "font-meslo-lg-nerd-font"
+# cask "orbstack"
 brew "helix"
 brew "coreutils"
 brew "mise"
@@ -152,15 +145,16 @@ brew "git-crypt"
 brew "yq"
 brew "cmake"
 # brew "openjdk"
-cask "emacs-app"
-cask "stolendata-mpv"
-brew "openjdk"
-cask "font-fira-code"
-cask "font-symbols-only-nerd-font"
+# cask "emacs-app"
+# cask "stolendata-mpv"
+# brew "openjdk"
+# cask "font-fira-code"
+# cask "font-symbols-only-nerd-font"
 brew "gitui"
 brew "jj"
 brew "lazyjj"
 brew "less"
-brew "poppler"
-brew "rdkit"
-brew "specstoryai/tap/specstory"
+
+# brew "poppler"
+# brew "rdkit"
+# brew "specstoryai/tap/specstory"
