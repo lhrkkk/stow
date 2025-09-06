@@ -2,14 +2,14 @@
 # set-proxy — 设置/清除系统代理（支持 env + 可选 launchctl + 可选 git/npm），默认执行“设置”
 #
 # 用法：
-#   set-proxy [--url URL] [--git] [--npm] [--all] [--launchctl] [--quiet|--verbose]
-#   set-proxy unset [--launchctl] [--quiet|--verbose]
+#   set-proxy [--url URL] [--http URL] [--socks URL] [--git] [--npm] [--all] [--launchctl] [--quiet|--verbose]
+#   set-proxy unset [--git] [--npm] [--all] [--launchctl] [--quiet|--verbose]
 #   set-proxy status
 #   set-proxy --help
 #
 # 说明：
 # - 本脚本被 source 时会直接作用当前 shell；若以子进程执行，则仅影响子进程（推荐在 rc 中以 . 或 source 调用）。
-# - 默认不设代理：不提供 --url 或 PROXY_URL 时，不做任何修改；由调用方（如 env.zsh）决定是否传入默认 URL。
+# - 默认不设代理：不提供 --http/--url 或 PROXY_URL，且不提供 --socks 或 PROXY_SOCKS_URL 时，不做任何修改。
 # - NO_PROXY 建议：localhost,127.0.0.1,::1,.local,.home,.lan,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 
 # 默认静默成功；--verbose 时输出提示
@@ -53,46 +53,59 @@ show_help(){ cat <<'EOF'
 set-proxy - 设置/清除系统代理
 
 用法:
-  set-proxy [--url URL] [--git] [--npm] [--all] [--launchctl] [--quiet|--verbose]
+  set-proxy [--url URL] [--http URL] [--socks URL] [--git] [--npm] [--all] [--launchctl] [--quiet|--verbose]
   set-proxy unset [--git] [--npm] [--all] [--launchctl] [--quiet|--verbose]
   set-proxy status
 
 说明:
+  - --url 等价于 --http（兼容旧用法）。
+  - 仅提供 --http 会设置 HTTP_PROXY/HTTPS_PROXY；仅提供 --socks 会设置 ALL_PROXY。
+  - 同时提供则分别设置；未提供的类型保持不变。
+  - URL 缺省：--http 缺省使用 $PROXY_URL；--socks 缺省使用 $PROXY_SOCKS_URL。
   - 默认仅作用当前 shell；如需让 GUI/子进程继承，在 macOS 下加 --launchctl。
-  - URL 缺省：仅使用显式 --url 或环境变量 PROXY_URL；未提供则不修改
-  - --all 等价于同时作用 --git 与 --npm
+  - --all 等价于同时作用 --git 与 --npm（npm 仅支持 http/https）。
   - 默认静默成功（--quiet）；若需提示，请使用 --verbose
 EOF
 }
 
-resolve_url(){
-  # 仅使用显式传入的 URL 或 PROXY_URL；否则返回空字符串（默认不设代理）
-  printf '%s' "${PROXY_URL:-}"
-}
+# 分别解析 http/socks 的缺省 URL（仅环境变量，不再探测现有 *_PROXY）
+resolve_http_url(){ printf '%s' "${PROXY_URL:-}"; }
+resolve_socks_url(){ printf '%s' "${PROXY_SOCKS_URL:-}"; }
 
 url_scheme(){ printf '%s' "$1" | awk -F:// '{print tolower($1)}'; }
 
 export_shell_vars(){
-  url="$1"
+  http_url="$1"; socks_url="$2"
   no_proxy_val=${PROXY_NO_PROXY:-${NO_PROXY:-$DEFAULT_NO_PROXY}}
-  # 大小写同时导出
-  export HTTP_PROXY="$url" HTTPS_PROXY="$url" ALL_PROXY="$url"
-  export http_proxy="$url" https_proxy="$url" all_proxy="$url"
+  # HTTP/HTTPS
+  if [ -n "$http_url" ]; then
+    export HTTP_PROXY="$http_url" HTTPS_PROXY="$http_url"
+    export http_proxy="$http_url" https_proxy="$http_url"
+    export HOMEBREW_HTTP_PROXY="$http_url" HOMEBREW_HTTPS_PROXY="$http_url"
+  fi
+  # SOCKS（ALL_PROXY）
+  if [ -n "$socks_url" ]; then
+    export ALL_PROXY="$socks_url" all_proxy="$socks_url"
+  fi
+  # NO_PROXY 始终更新（与旧版一致）
   export NO_PROXY="$no_proxy_val" no_proxy="$no_proxy_val"
-  # Homebrew 兼容变量
-  export HOMEBREW_HTTP_PROXY="$url" HOMEBREW_HTTPS_PROXY="$url" HOMEBREW_NO_PROXY="$no_proxy_val"
+  export HOMEBREW_NO_PROXY="$no_proxy_val"
 }
 
 set_launchctl(){
-  url="$1"; no_proxy_val=${PROXY_NO_PROXY:-${NO_PROXY:-$DEFAULT_NO_PROXY}}
+  http_url="$1"; socks_url="$2"; no_proxy_val=${PROXY_NO_PROXY:-${NO_PROXY:-$DEFAULT_NO_PROXY}}
   is_macos || return 0
   has_cmd launchctl || return 0
-  launchctl setenv HTTP_PROXY  "$url" || true
-  launchctl setenv HTTPS_PROXY "$url" || true
-  launchctl setenv ALL_PROXY   "$url" || true
+  if [ -n "$http_url" ]; then
+    launchctl setenv HTTP_PROXY  "$http_url" || true
+    launchctl setenv HTTPS_PROXY "$http_url" || true
+    launchctl setenv HOMEBREW_HTTP_PROXY  "$http_url" || true
+    launchctl setenv HOMEBREW_HTTPS_PROXY "$http_url" || true
+  fi
+  if [ -n "$socks_url" ]; then
+    launchctl setenv ALL_PROXY   "$socks_url" || true
+  fi
   launchctl setenv NO_PROXY    "$no_proxy_val" || true
-  launchctl setenv HOMEBREW_HTTP_PROXY  "$url" || true
-  launchctl setenv HOMEBREW_HTTPS_PROXY "$url" || true
   launchctl setenv HOMEBREW_NO_PROXY    "$no_proxy_val" || true
 }
 
@@ -102,9 +115,6 @@ unset_shell(){
   done
   # 也清理可能影响默认行为的辅助变量
   unset PROXY_URL PROXY_NO_PROXY 2>/dev/null || true
-  if [ "${QUIET:-1}" -eq 0 ] && [ "$had_any" -eq 0 ]; then
-    _info "未发现需要清理的代理环境变量"
-  fi
 }
 
 unset_launchctl(){
@@ -116,12 +126,9 @@ unset_launchctl(){
 }
 
 status(){
-  _info "PROXY_URL（默认 URL）"
-  if [ -n "${PROXY_URL-}" ]; then
-    echo "PROXY_URL=$PROXY_URL"
-  else
-    echo "（未设置）"
-  fi
+  _info "默认 URL（环境变量）"
+  [ -n "${PROXY_URL-}" ] && echo "PROXY_URL=$PROXY_URL" || echo "PROXY_URL（未设置）"
+  [ -n "${PROXY_SOCKS_URL-}" ] && echo "PROXY_SOCKS_URL=$PROXY_SOCKS_URL" || echo "PROXY_SOCKS_URL（未设置）"
   echo
   _info "环境变量（env）"
   env | grep -iE '(^|_)proxy=' || printf '（无代理环境变量）\n'
@@ -151,17 +158,25 @@ status(){
   fi
 }
 
-apply_git(){ url="$1"; has_cmd git || { _warn "未检测到 git，跳过"; return 0; }
-  git config --global http.proxy  "$url" >/dev/null 2>&1 || true
-  git config --global https.proxy "$url" >/dev/null 2>&1 || true
+apply_git(){ http_url="$1"; socks_url="$2"; has_cmd git || { _warn "未检测到 git，跳过"; return 0; }
+  url_to_use=""
+  if [ -n "$http_url" ]; then
+    url_to_use="$http_url"
+  elif [ -n "$socks_url" ]; then
+    url_to_use="$socks_url"
+  fi
+  [ -n "$url_to_use" ] || { _warn "未提供可用于 git 的代理 URL，已跳过"; return 0; }
+  git config --global http.proxy  "$url_to_use" >/dev/null 2>&1 || true
+  git config --global https.proxy "$url_to_use" >/dev/null 2>&1 || true
   _ok "已设置 git 全局代理"
 }
 
-apply_npm(){ url="$1"; has_cmd npm || { _warn "未检测到 npm，跳过"; return 0; }
-  scheme=$(url_scheme "$url")
+apply_npm(){ http_url="$1"; has_cmd npm || { _warn "未检测到 npm，跳过"; return 0; }
+  [ -n "$http_url" ] || { _warn "未提供 http/https 代理，已跳过 npm"; return 0; }
+  scheme=$(url_scheme "$http_url")
   case "$scheme" in http|https) :;; *) _warn "npm 仅支持 http/https 代理（当前: $scheme），已跳过"; return 0;; esac
-  npm config set proxy        "$url" >/dev/null 2>&1 || true
-  npm config set https-proxy  "$url" >/dev/null 2>&1 || true
+  npm config set proxy        "$http_url" >/dev/null 2>&1 || true
+  npm config set https-proxy  "$http_url" >/dev/null 2>&1 || true
   _ok "已设置 npm 代理"
 }
 
@@ -179,7 +194,7 @@ clear_npm(){ has_cmd npm || { _warn "未检测到 npm，跳过"; return 0; }
 }
 
 cmd_set(){
-  url=""; do_git=0; do_npm=0; do_launchctl=0
+  http_url=""; socks_url=""; do_git=0; do_npm=0; do_launchctl=0; legacy_url=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --url)
@@ -188,7 +203,23 @@ cmd_set(){
           _err "无效的 --url 参数"
           ret 1
         fi
-        url="$1"
+        legacy_url="$1"
+        ;;
+      --http)
+        shift
+        if [ $# -eq 0 ] || [ "${1#-}" != "$1" ]; then
+          _err "无效的 --http 参数"
+          ret 1
+        fi
+        http_url="$1"
+        ;;
+      --socks)
+        shift
+        if [ $# -eq 0 ] || [ "${1#-}" != "$1" ]; then
+          _err "无效的 --socks 参数"
+          ret 1
+        fi
+        socks_url="$1"
         ;;
       --git) do_git=1 ;;
       --npm) do_npm=1 ;;
@@ -202,19 +233,26 @@ cmd_set(){
     esac
     [ $# -gt 0 ] && shift
   done
-  [ -n "$url" ] || url=$(resolve_url)
+  # 兼容：未提供 --http 且提供了 --url，则将其作为 http_url，并镜像到 ALL_PROXY 以保持旧行为
+  if [ -z "$http_url" ] && [ -n "$legacy_url" ]; then
+    http_url="$legacy_url"
+    [ -z "$socks_url" ] && socks_url="$legacy_url"
+  fi
+  # 缺省解析环境变量
+  [ -n "$http_url" ] || http_url=$(resolve_http_url)
+  [ -n "$socks_url" ] || socks_url=$(resolve_socks_url)
 
-  if [ -z "$url" ]; then
-    # 默认不设代理：无 URL 即不做任何修改
+  if [ -z "$http_url$socks_url" ]; then
+    # 无任何 URL 即不做修改
     [ "${QUIET:-1}" -eq 0 ] && _info "未提供 URL，未修改代理" || :
     return 0
   fi
 
-  export_shell_vars "$url"
+  export_shell_vars "$http_url" "$socks_url"
   _ok "已设置当前 shell 代理"
   if [ "$do_launchctl" -eq 1 ]; then
     if is_macos && has_cmd launchctl; then
-      if set_launchctl "$url"; then
+      if set_launchctl "$http_url" "$socks_url"; then
         _ok "已同步到 launchctl（GUI/子进程继承）"
       else
         _warn "设置 launchctl 失败"
@@ -224,8 +262,8 @@ cmd_set(){
     fi
   fi
 
-  [ "$do_git" -eq 1 ] && apply_git "$url"
-  [ "$do_npm" -eq 1 ] && apply_npm "$url"
+  [ "$do_git" -eq 1 ] && apply_git "$http_url" "$socks_url"
+  [ "$do_npm" -eq 1 ] && apply_npm "$http_url"
 
   # 若未同步到 launchctl 且脚本未被 source，提示作用域
   if [ "$do_launchctl" -ne 1 ]; then

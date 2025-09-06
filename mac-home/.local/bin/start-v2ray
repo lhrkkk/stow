@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# v2ray control script
+# Actions: start | stop | restart | status | log | check
+
+CONFIG="$HOME/.config/v2ray/v2ray_config.json"
+PID_DIR="$HOME/.local/run"
+PID_FILE="$PID_DIR/v2ray.pid"
+LOG_DIR="$HOME/.local/var/log"
+LOG_FILE="$LOG_DIR/v2ray.log"
+BIN="v2ray"
+
+usage() {
+  echo "Usage: $(basename "$0") {start|stop|restart|status|log|check}"
+}
+
+ensure_dirs() {
+  mkdir -p "$PID_DIR" "$LOG_DIR"
+}
+
+is_running() {
+  if [[ -f "$PID_FILE" ]]; then
+    local pid
+    pid=$(cat "$PID_FILE" 2>/dev/null || true)
+    if [[ -n "${pid:-}" ]] && ps -p "$pid" >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+start() {
+  ensure_dirs
+  if is_running; then
+    echo "v2ray already running (pid $(cat "$PID_FILE"))"
+    return 0
+  fi
+  if ! command -v "$BIN" >/dev/null 2>&1; then
+    echo "Error: v2ray binary not found in PATH" >&2
+    exit 1
+  fi
+  if [[ ! -f "$CONFIG" ]]; then
+    echo "Error: config not found: $CONFIG" >&2
+    exit 1
+  fi
+  # Validate config (v2ray v5+ uses subcommands)
+  "$BIN" test -config "$CONFIG" >/dev/null || { echo "Config test failed" >&2; exit 1; }
+  # Start daemon
+  nohup "$BIN" run -config "$CONFIG" >>"$LOG_FILE" 2>&1 &
+  echo $! >"$PID_FILE"
+  sleep 0.3
+  if is_running; then
+    echo "v2ray started (pid $(cat "$PID_FILE"))"
+  else
+    echo "Failed to start v2ray; see $LOG_FILE" >&2
+    exit 1
+  fi
+}
+
+stop() {
+  if ! is_running; then
+    echo "v2ray not running"
+    rm -f "$PID_FILE"
+    return 0
+  fi
+  local pid
+  pid=$(cat "$PID_FILE")
+  kill "$pid" 2>/dev/null || true
+  # wait up to 3s
+  for _ in {1..30}; do
+    if ! ps -p "$pid" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.1
+  done
+  if ps -p "$pid" >/dev/null 2>&1; then
+    echo "Process did not exit; sending SIGKILL"
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+  rm -f "$PID_FILE"
+  echo "v2ray stopped"
+}
+
+status() {
+  if is_running; then
+    echo "v2ray is running (pid $(cat "$PID_FILE"))"
+    exit 0
+  else
+    echo "v2ray is not running"
+    exit 1
+  fi
+}
+
+restart() {
+  stop || true
+  start
+}
+
+log_follow() {
+  ensure_dirs
+  touch "$LOG_FILE"
+  exec tail -n 200 -F "$LOG_FILE"
+}
+
+check() {
+  if ! command -v "$BIN" >/dev/null 2>&1; then
+    echo "v2ray not found in PATH" >&2
+    exit 1
+  fi
+  if [[ ! -f "$CONFIG" ]]; then
+    echo "Config missing: $CONFIG" >&2
+    exit 1
+  fi
+  "$BIN" test -config "$CONFIG"
+}
+
+case "${1:-}" in
+  start) start ;;
+  stop) stop ;;
+  restart) restart ;;
+  status) status ;;
+  log) log_follow ;;
+  check) check ;;
+  *) usage; exit 2 ;;
+
+esac

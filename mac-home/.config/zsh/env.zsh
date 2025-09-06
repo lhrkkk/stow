@@ -152,9 +152,6 @@ export PATH="$HOME/.elan/bin:$PATH"
 # BAT theme
 export BAT_THEME="TwoDark"
 
-# Google Gemini API Key
-export GEMINI_API_KEY="AIzaSyCzZ-55AgAO2V_exRT8MhyNXK4lv4d5Kwc"
-
 # ==== Lazy-load Conda (bash/zsh 通用，POSIX 语法) ====
 conda() {
   # 移除自身定义，准备真正初始化
