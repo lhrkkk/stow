@@ -14,9 +14,17 @@ export GOPATH="$HOME/go"
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.config/emacs/bin:$PATH"
 
+### linuxbrew
+if [ -d "/home/linuxbrew/.linuxbrew/bin" ]; then
+export PATH="$PATH:/home/linuxbrew/.linuxbrew/bin"
+fi
+if [ -d "/home/linuxbrew/.linuxbrew/sbin" ]; then
+  export PATH="$PATH:/home/linuxbrew/.linuxbrew/sbin"
+fi
+
 # export PATH="$PATH:$LOCALBIN"
 # export PATH="$PATH:/usr/local/bin"
-# export PATH="$PATH:/opt/homebrew/bin:/opt/homebrew/sbin"
+export PATH="$PATH:/opt/homebrew/bin:/opt/homebrew/sbin"
 export PATH="$PATH:$HOME/.cargo/bin"
 export PATH="$PATH:$HOME/go/bin"
 # export PATH="$PATH:/Applications/Xcode.app/Contents/Developer/usr/bin/"
