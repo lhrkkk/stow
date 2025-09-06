@@ -149,6 +149,7 @@ _mise_maybe_hook  # 启动时在当前目录跑一次
 # eval "$(mise hook-env)"
 
 # x-cmd 懒加载：首次调用 x/xc 时再加载，避免启动开销
+# [ ! -f "$HOME/.x-cmd.root/X" ] || . "$HOME/.x-cmd.root/X" # boot up x-cmd.
 __x_cmd_lazy_boot() {
   # 已加载则跳过
   if [[ -n ${__X_CMD_LOADED:-} ]]; then

@@ -7,11 +7,13 @@ local config = wezterm.config_builder()
 -- This is where you actually apply your config choices
 
 config.color_scheme = "Selenized Light (Gogh)"
+-- config.color_scheme = "Catppuccin Latte"
 
 config.max_fps = 120
 -- 动态读取当前主题的背景色，用于标签栏与标题栏配色（方案B）
 local schemes = wezterm.get_builtin_color_schemes()
-local scheme = schemes["Selenized Light (Gogh)"]
+-- local scheme = schemes["Selenized Light (Gogh)"]
+local scheme = schemes[config.color_scheme]
 local bg = (scheme and scheme.background) or "#fbf3db"
 
 -- 让标签栏更浅色且跟随主题渲染
@@ -54,8 +56,8 @@ config.colors = {
 
 -- Theme consistency with Ghostty's Selenized Light custom palette
 config.colors = config.colors or {}
-config.colors.foreground = "#53676d"
-config.colors.background = "#fbf3db"
+-- config.colors.foreground = "#53676d"
+-- config.colors.background = "#fbf3db"
 config.colors.cursor_bg = "#53676d"
 config.colors.cursor_fg = "#fbf3db"
 
@@ -64,6 +66,8 @@ config.default_cursor_style = "BlinkingBlock"
 config.cursor_blink_rate = 500
 config.cursor_thickness = 2
 config.force_reverse_video_cursor = true
+
+
 config.colors.selection_bg = "#ece3cc"
 config.colors.selection_fg = "#00978a"
 config.colors.ansi = {
@@ -100,8 +104,8 @@ config.audible_bell = "Disabled"
 
 -- 关闭非激活 pane 的变暗
 config.inactive_pane_hsb = {
-  saturation = 1.0,
-  brightness = 1.0,
+  saturation = 0.95,
+  brightness = 0.95,
 }
 
 -- Performance

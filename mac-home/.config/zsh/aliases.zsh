@@ -7,6 +7,11 @@ alias et='emacsclient -t -a ""'
 alias es='emacsclient -n '   # send to the latest acitive client
 alias e=ew
 
+alias gtc='gitui -t catppuccin-macchiato.ron'
+alias lj='lazyjj'
+alias g='gitui -t latte.ron'
+alias j='lazyjj'
+
 alias f='fuck'
 alias fk='fuck'
 alias av='source venv/bin/activate'
@@ -36,8 +41,8 @@ alias ra='yazi'
 		#exit
 	#fi
 #}
-alias s='neofetch'
-alias g='onefetch'
+# alias s='neofetch'
+# alias g='onefetch'
 alias sra='sudo -E yazi'
 # alias sudo='sudo -E'
 alias vim='nvim'
