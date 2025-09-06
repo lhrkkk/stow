@@ -29,5 +29,14 @@ if [[ -x /opt/homebrew/bin/brew ]]; then
     brew "$@"
   }
 fi
+
+if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+  brew() {
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    unset -f brew
+    brew "$@"
+  }
+fi
+
 export BASH_SILENCE_DEPRECATION_WARNING=1
 
