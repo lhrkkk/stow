@@ -1,0 +1,119 @@
+[core]
+        excludesfile = /Users/lhr/.gitignore_global
+        quotepath = false
+        editor = hx
+        pager = delta
+
+[difftool "sourcetree"]
+        cmd = opendiff "$LOCAL" "$REMOTE"
+        path =
+
+[mergetool "sourcetree"]
+        cmd = /Users/lhr/Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh "$LOCAL" "$REMOTE" -ancestor "$BASE" -merge "$MERGED"
+        trustExitCode = true
+
+[user]
+        name = lu haorui
+        email = airhenry@gmail.com
+
+[commit]
+        template = /Users/lhr/.stCommitMsg
+
+[filter "lfs"]
+        required = true
+        clean = git-lfs clean -- %f
+        smudge = git-lfs smudge -- %f
+        process = git-lfs filter-process
+
+[color]
+        ui = auto
+
+[init]
+        defaultBranch = main
+
+[diff]
+        colorMoved = default
+        algorithm = patience
+
+[merge]
+        conflictStyle = zdiff3
+
+[rebase]
+        autosquash = true
+        updateRefs = true
+
+[fetch]
+        prune = true
+        pruneTags = true
+
+[push]
+        default = current
+        autoSetupRemote = true
+
+[interactive]
+        diffFilter = delta --color-only
+
+[delta]
+        navigate = true
+        line-numbers = true
+        # 可按需添加: side-by-side = true, syntax-theme = OneHalfDark 等
+
+[pretty]
+        jj = format:%C(yellow)%h%Creset %C(auto)%d%Creset %s %C(blue)<%an>%Creset %C(cyan)%cr%Creset
+
+[alias]
+        # ---- 你原有：Git Town ----
+        append = town append
+        hack = town hack
+        kill = town kill
+        new-pull-request = town new-pull-request
+        prepend = town prepend
+        prune-branches = town prune-branches
+        rename-branch = town rename-branch
+        repo = town repo
+        ship = town ship
+        sync = town sync
+
+        # ---- 增强：状态/日志/默认视图 ----
+        s  = status
+        sf = "!f(){ git status --short --branch; echo; git diff --stat; }; f"
+        l  = log
+        lg = log --graph --decorate --abbrev-commit --date=relative --pretty=jj --all
+        default = "!f(){ echo; git sf; echo; git -c pager.log=false lg -n 20; }; f"
+
+        # ---- 初始化/克隆 ----
+        init = "!git init && git symbolic-ref HEAD refs/heads/main"
+        cl   = clone
+        clg  = "!f(){ git clone https://github.com/$1; }; f"
+        clgp = "!f(){ git clone git@github.com:$1; }; f"
+        clgu = "!f(){ u=$(git config user.username); git clone git@github.com:${u}/$1; }; f"
+
+        # ---- diff/show ----
+        d  = diff
+        dr = "!f(){ git diff ${1:-HEAD}; }; f"
+        w  = show
+        ws = show --stat
+
+        # ---- rebase / fetch / pull-like ----
+        rb  = rebase --rebase-merges --autostash
+        rbt = rebase --rebase-merges --autostash origin/main
+        rbr = rebase -i --rebase-merges --autostash
+        fo  = fetch --all --prune
+        f   = "!git fo && git rbt"
+
+        # ---- push / PR ----
+        ps   = push
+        psa  = push --all
+        psd  = "!f(){ git push origin :$1; }; f"
+        psb  = "!f(){ git push -u origin ${1:-$(git branch --show-current)}; }; f"
+        pscb = "!f(){ b=${1:-$(git rev-parse --abbrev-ref HEAD)}; git push -u origin \"$b\"; }; f"
+        pro  = "!gh pr create --head $(git rev-parse --abbrev-ref HEAD)"
+        pr   = "!f(){ b=${1:-$(git rev-parse --abbrev-ref HEAD)}; git pscb \"$b\"; gh pr create --head \"$b\"; }; f"
+
+        # ---- “op 日志”、文件注释、worktree ----
+        ol  = reflog
+        fn  = blame
+        fnr = "!f(){ git blame -L ${2:?line-range} -- $1; }; f"
+        wl  = worktree list
+        wa  = "!f(){ b=${1:?branch}; p=${2:-../$b}; git branch -f \"$b\" HEAD; git worktree add \"$p\" \"$b\"; }; f"
+        wf  = "!f(){ git worktree remove \"$1\"; }; f"
