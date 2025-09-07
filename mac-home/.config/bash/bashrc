@@ -1,65 +1,17 @@
-############################################
-#  ~/.bashrc – optimized interactive config #
-#  • Environment vars (scripts + interactive)
-#  • Early return for non-interactive shells
-#  • Lazy-loaded heavy plugins
-############################################
-
-# # Load shared env (POSIX; bash/zsh 共用)
-# if [ -r "$HOME/.config/zsh/env.zsh" ]; then
-#   . "$HOME/.config/zsh/env.zsh"
-# fi
-
-# https://www.josean.com/posts/7-amazing-cli-tools
-#
-# === PERFORMANCE OPTIMIZATION RESULTS ===
-# Startup time: 1300ms → 25ms (52x faster, 98% reduction)
-#
-# Component load times & savings:
-# • Conda:     1487ms → lazy (saved 1487ms) - 86% of total savings
-# • TheFuck:    186ms → lazy (saved 186ms)  - 11% of total savings
-# • Homebrew:    27ms → lazy (saved 27ms)
-# • FZF:         22ms → 3ms  (saved 19ms)   - using static scripts
-# • Zoxide:      10ms → lazy (saved 10ms)
-# • Cargo:        3ms → kept (needed by scripts)
-# Total saved: 1729ms
-#
-# Optimization techniques used:
-# 1. Lazy loading: Heavy tools only initialize on first use
-# 2. Early return: Non-interactive shells skip interactive configs
-# 3. Static scripts: FZF uses pre-generated scripts vs runtime eval
-# =========================================
-
-# --- Legacy SSH shortcuts (kept for reference) ---
-# alias s="ssh root@s0"
-# alias s0="ssh root@s0"
-# alias s1="ssh root@s1"
-# alias s2="ssh root@s2"
-
-
-# export PATH="$(pyenv prefix)/bin:~/.pyenv/bin:$PATH"
-# eval "$(pyenv init -)"
-# eval "$(pyenv virtualenv-init -)"
-
-
-# [ -f ~/.fzf.bash ] && source ~/.fzf.bash  # 注释掉，使用下面的新配置
-# export PATH="$(brew --prefix)/opt/gnu-tar/libexec/gnubin:$PATH"
-# source /usr/local/bin/virtualenvwrapper.sh
-
-
-# ----- Lazy-load TheFuck (command correction) -----
-# Saves ~186ms on startup
-# alias fuck="_tf_lazy"
-# _tf_lazy() {
-#   unalias fuck
-#   eval "$(thefuck --alias)"
-#   fuck "$@"
-# }
-# [ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
-# eval "$(lua /opt/homebrew/Cellar/z.lua/1.8.24/share/z.lua/z.lua --init bash)"
-
-
-. ~/.config/env/common/all.zsh
-. ~/.config/env/local/$(uname -s).sh
-. ~/.config/bash/fzf.sh
 PS1="[\u@\h \W]\$ "
+
+# common
+. ~/.config/env/common/all.zsh
+
+# local
+export PLATFORM=$(uname -s)
+. ~/.config/env/local/${PLATFORM}.sh
+
+# bash
+
+
+# Return early for non-interactive shells
+[[ $- == *i* ]] || return
+
+# fzf
+. ~/.config/bash/fzf.sh

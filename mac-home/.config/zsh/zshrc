@@ -5,17 +5,11 @@ unset LC_ALL
 
 export ZIM_HOME=${HOME}/.zim
 
-# # local
-# if uname -s | grep -q "Darwin"; then
-#   source ~/.config/env/local/mac.sh
-# elif uname -s | grep -q "Linux"; then
-#   source ~/.config/env/local/linux.sh
-# fi
-
-
-export PLATFORM=$(uname -s)
 # common
 source ~/.config/env/common/all.zsh
+
+# local
+export PLATFORM=$(uname -s)
 source ~/.config/env/local/${PLATFORM}.sh
 
 # zsh
@@ -27,13 +21,5 @@ source ~/.config/zsh/mappings.zsh
 source ~/.config/zsh/tmux.zsh
 source ~/.config/zsh/lazyload.zsh
 
-# if [ -f ~/.sconfig/zsh/zshrc ]; then
-# 	source ~/.sconfig/zsh/zshrc
-# fi
-
 # fzf-tab theme colors (Selenized Light - Gogh)
 zstyle ':fzf-tab:*' fzf-flags '--ansi' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
-
-# source /Users/lhr/.config/zsh/plugins/zsh-hist/zsh-hist.plugin.zsh
-
-# eval "$(zoxide init "zsh")"

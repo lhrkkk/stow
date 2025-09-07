@@ -7,6 +7,9 @@
 # This won't be added again if you remove it.
 # [ ! -f "~/.orbstack/shell/init.zsh" ] || source ~/.orbstack/shell/init.zsh 2>/dev/null || :
 
+# typeset -U fpath
+fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
+
 # Homebrew
 export PATH="/opt/homebrew/bin:$PATH"
 export PATH="/opt/homebrew/sbin:$PATH"
