@@ -321,7 +321,7 @@ ui =  ['util', 'exec', '--', 'bash', '-c', 'jjui -r "all()"']
 
 [lazyjj]
 # Solarized Light theme configuration
-highlight-color = "#93b9b1"
+highlight-color = "#cbcfd4"
 diff-format = "color-words"     # Better for light themes
 layout = "horizontal"           # Classic horizontal layout
 layout-percent = 50             # Balanced split
