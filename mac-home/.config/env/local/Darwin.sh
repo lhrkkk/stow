@@ -16,5 +16,7 @@ export PATH="/opt/homebrew/sbin:$PATH"
 
 # Visual Studio Code
 export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"
+export PATH="$PATH:/Applications/Sublime Merge.app/Contents/SharedSupport/bin"
+export PATH="$PATH:/Applications/Araxis Merge.app/Contents/Utilities"
 
 proxy-on http://127.0.0.1:53373

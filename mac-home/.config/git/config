@@ -4,14 +4,6 @@
         editor = hx
         pager = delta
 
-[difftool "sourcetree"]
-        cmd = opendiff "$LOCAL" "$REMOTE"
-        path =
-
-[mergetool "sourcetree"]
-        cmd = /Users/lhr/Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh "$LOCAL" "$REMOTE" -ancestor "$BASE" -merge "$MERGED"
-        trustExitCode = true
-
 [user]
         name = lu haorui
         email = airhenry@gmail.com
@@ -34,9 +26,19 @@
 [diff]
         colorMoved = default
         algorithm = patience
+        tool = araxis
+[alias]
+    ad  = difftool --tool=araxis --dir-diff
+    ads = difftool --tool=araxis --dir-diff --staged
 
 [merge]
         conflictStyle = zdiff3
+        tool = smerge
+
+[mergetool "smerge"]
+        cmd = smerge mergetool "$BASE" "$LOCAL" "$REMOTE" -o "$MERGED"
+        trustExitCode = true
+        keepBackup = false
 
 [rebase]
         autosquash = true
