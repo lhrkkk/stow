@@ -1,5 +1,5 @@
 serverAddr: 43.137.38.19
-serverPort: 80
+serverPort: 8081
 auth:
   method: token
   token: 6f0d5a7b3c8e9f1a2b4c6d7e8f0a1b2c
