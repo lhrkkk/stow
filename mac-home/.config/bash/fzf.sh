@@ -3,20 +3,89 @@
 # Key bindings loaded immediately (3ms) for Ctrl+T/R to work
 # Completion scripts lazy-loaded to save startup time
 # Using static scripts saves ~19ms vs eval "$(fzf --bash)"
-if command -v brew >/dev/null 2>&1; then
-  FZF_BASE="$(brew --prefix)/opt/fzf/shell"
-  [ -f "$FZF_BASE/key-bindings.bash" ] && source "$FZF_BASE/key-bindings.bash"
+# Lazy-load fzf key-bindings and completion on first use
+__fzf_bash_loaded=0
+__fzf_bash_lazy_load() {
+  if [ "$__fzf_bash_loaded" -eq 0 ]; then
+    # Detect FZF_BASE cheaply; only call brew if necessary
+    if [ -z "${FZF_BASE:-}" ]; then
+      if [ -d "/opt/homebrew/opt/fzf/shell" ]; then
+        FZF_BASE="/opt/homebrew/opt/fzf/shell"
+      elif [ -d "/usr/local/opt/fzf/shell" ]; then
+        FZF_BASE="/usr/local/opt/fzf/shell"
+      elif command -v brew >/dev/null 2>&1; then
+        FZF_BASE="$(brew --prefix)/opt/fzf/shell"
+      else
+        FZF_BASE=""
+      fi
+    fi
+    [ -n "$FZF_BASE" ] && [ -f "$FZF_BASE/key-bindings.bash" ] && source "$FZF_BASE/key-bindings.bash"
+    [ -n "$FZF_BASE" ] && [ -f "$FZF_BASE/completion.bash" ] && source "$FZF_BASE/completion.bash"
+    __fzf_bash_loaded=1
+  fi
+}
 
-  # Lazy-load completion only
+# Only set up bindings/completions in interactive shells
+if [[ $- == *i* ]]; then
+  # Lazy completion loader: load real scripts, then delegate to the actual function
   _fzf_lazy_completion() {
-    if [ -z "$FZF_COMPLETION_LOADED" ]; then
-      [ -f "$FZF_BASE/completion.bash" ] && source "$FZF_BASE/completion.bash"
-      export FZF_COMPLETION_LOADED=1
+    __fzf_bash_lazy_load
+    local cmd="${COMP_WORDS[0]}" spec func
+    spec=$(complete -p -- "$cmd" 2>/dev/null || true)
+    func=$(echo "$spec" | awk '{for(i=1;i<=NF;i++){ if($i=="-F"){print $(i+1); exit}}}')
+    if [ -n "$func" ] && [ "$func" != "_fzf_lazy_completion" ] && declare -F "$func" >/dev/null; then
+      "$func"
+      return
+    fi
+    # Fallback to generic fzf completion if available
+    if declare -F _fzf_complete >/dev/null; then
+      _fzf_complete
+      return
     fi
   }
-
-  # Hook into the completion system
   complete -F _fzf_lazy_completion -o default -o bashdefault fzf
+  # Also hook common fzf-enhanced commands to trigger lazy load on first Tab
+  complete -F _fzf_lazy_completion -o default -o bashdefault cd
+  complete -F _fzf_lazy_completion -o default -o bashdefault export
+  complete -F _fzf_lazy_completion -o default -o bashdefault unset
+  complete -F _fzf_lazy_completion -o default -o bashdefault ssh
+
+  # Minimal lazy key bindings: load real bindings on first press, then delegate
+  __fzf_bash_ctrl_t() {
+    __fzf_bash_lazy_load
+    if declare -F __fzf_select__ >/dev/null; then
+      __fzf_select__
+    else
+      local sel
+      sel=$( eval "${FZF_CTRL_T_COMMAND:-\"fd --hidden --strip-cwd-prefix --exclude .git\"}" | fzf ${FZF_CTRL_T_OPTS:+$FZF_CTRL_T_OPTS} ) || return
+      READLINE_LINE="${READLINE_LINE:0:READLINE_POINT}${sel}${READLINE_LINE:READLINE_POINT}"
+      READLINE_POINT=$(( READLINE_POINT + ${#sel} ))
+    fi
+  }
+  __fzf_bash_ctrl_r() {
+    __fzf_bash_lazy_load
+    if declare -F __fzf_history__ >/dev/null; then
+      __fzf_history__
+    else
+      local cmd
+      cmd=$(HISTTIMEFORMAT= builtin history | fzf | sed 's/ *[0-9]\+ *//') || return
+      READLINE_LINE="$cmd"
+      READLINE_POINT=${#READLINE_LINE}
+    fi
+  }
+  __fzf_bash_alt_c() {
+    __fzf_bash_lazy_load
+    if declare -F __fzf_cd__ >/dev/null; then
+      __fzf_cd__
+    else
+      local dir
+      dir=$(fd --type=d --hidden --strip-cwd-prefix --exclude .git | fzf) || return
+      builtin cd -- "$dir"
+    fi
+  }
+  bind -x '"\C-t":"__fzf_bash_ctrl_t"'
+  bind -x '"\C-r":"__fzf_bash_ctrl_r"'
+  bind -x '"\ec":"__fzf_bash_alt_c"'
 fi
 
 # -- Use fd instead of fzf --
