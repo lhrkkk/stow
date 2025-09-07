@@ -1,0 +1,32 @@
+#!/bin/sh
+# 用法: freeport <端口号>
+# 例子: freeport 1455
+
+if [ -z "$1" ]; then
+    echo "请提供端口号，例如: freeport 1455"
+    exit 1
+fi
+
+PORT=$1
+
+# 优先用 lsof
+if command -v lsof >/dev/null 2>&1; then
+    PID=$(lsof -ti :$PORT)
+# 否则用 ss
+elif command -v ss >/dev/null 2>&1; then
+    PID=$(ss -tlnp 2>/dev/null | grep ":$PORT " | awk '{print $NF}' | cut -d, -f2)
+# 否则用 netstat
+elif command -v netstat >/dev/null 2>&1; then
+    PID=$(netstat -tlnp 2>/dev/null | grep ":$PORT " | awk '{print $7}' | cut -d/ -f1)
+else
+    echo "没有找到可用的端口查询工具 (需要 lsof/ss/netstat)"
+    exit 1
+fi
+
+if [ -z "$PID" ]; then
+    echo "端口 $PORT 没有被占用"
+    exit 0
+fi
+
+echo "端口 $PORT 被进程 PID=$PID 占用，准备杀掉..."
+kill -9 $PID && echo "已释放端口 $PORT"

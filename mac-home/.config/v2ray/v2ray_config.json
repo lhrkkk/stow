@@ -1,17 +1,21 @@
 {
-  "log": { "loglevel": "warning" },
+  "log": {
+    "loglevel": "warning"
+  },
   "inbounds": [
     {
       "tag": "socks-in",
       "listen": "127.0.0.1",
-      "port": 10808,
+      "port": 10809,
       "protocol": "socks",
-      "settings": { "udp": true }
+      "settings": {
+        "udp": true
+      }
     },
     {
       "tag": "http-in",
       "listen": "127.0.0.1",
-      "port": 10809,
+      "port": 10808,
       "protocol": "http",
       "settings": {}
     }
@@ -40,8 +44,16 @@
         "security": "none"
       }
     },
-    { "tag": "direct", "protocol": "freedom", "settings": {} },
-    { "tag": "blocked", "protocol": "blackhole", "settings": {} }
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {}
+    },
+    {
+      "tag": "blocked",
+      "protocol": "blackhole",
+      "settings": {}
+    }
   ],
   "routing": {
     "domainStrategy": "AsIs",
