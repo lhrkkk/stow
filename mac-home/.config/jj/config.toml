@@ -318,3 +318,10 @@ wr = ['workspace', 'rename']
 # [NOTE] muscle memory of jj + space
 # [NOTE] show all revisions, same as my `jj`
 ui =  ['util', 'exec', '--', 'bash', '-c', 'jjui -r "all()"']
+
+[lazyjj]
+# Solarized Light theme configuration
+highlight-color = "#93b9b1"
+diff-format = "color-words"     # Better for light themes
+layout = "horizontal"           # Classic horizontal layout
+layout-percent = 50             # Balanced split

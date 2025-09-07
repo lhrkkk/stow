@@ -6,6 +6,9 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export GOPATH="$HOME/go"
 export PATH="$PATH:$HOME/go/bin"
 
+# local
+export PLATFORM=$(uname -s)
+. ~/.config/env/local/${PLATFORM}.sh
 
 # Base PATH
 export PATH="$HOME/.local/bin:$PATH"

@@ -8,8 +8,8 @@ unset LC_ALL
 source ~/.config/env/common/all.zsh
 
 # local
-export PLATFORM=$(uname -s)
-source ~/.config/env/local/${PLATFORM}.sh
+# export PLATFORM=$(uname -s)
+# source ~/.config/env/local/${PLATFORM}.sh
 
 # zim
 source ~/.config/zsh/plugins.zsh

@@ -1,11 +1,11 @@
 PS1="[\u@\h \W]\$ "
 
+# local
+# export PLATFORM=$(uname -s)
+# . ~/.config/env/local/${PLATFORM}.sh
+
 # common
 . ~/.config/env/common/all.zsh
-
-# local
-export PLATFORM=$(uname -s)
-. ~/.config/env/local/${PLATFORM}.sh
 
 # bash
 
