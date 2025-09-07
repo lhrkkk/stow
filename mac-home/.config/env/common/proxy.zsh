@@ -81,22 +81,22 @@ proxy-status() {
   . "$HOME/.local/bin/set-proxy" status
 }
 
-# 开机默认仅在 macOS 设置一次（可通过 proxy-off 撤销；避免重复 source 覆盖）
-case "$(uname -s)" in
-  Darwin)
-    if [ -z "${PROXY_AUTO_APPLIED:-}" ]; then
-      : "${PROXY_URL:=${HTTP_PROXY:-${HTTPS_PROXY:-${ALL_PROXY:-http://localhost:53373}}}}"
-      proxy-on "$PROXY_URL"
-      export PROXY_AUTO_APPLIED=1
-    fi
-    ;;
-  Linux)
-    if [ -z "${PROXY_AUTO_APPLIED:-}" ]; then
-      : "${PROXY_URL:=http://localhost:10808}"
-      : "${PROXY_SOCKS_URL:=socks5://localhost:10809}"
-      proxy-on --http "$PROXY_URL" --socks "$PROXY_SOCKS_URL"
-      export PROXY_AUTO_APPLIED=1
-    fi
-    ;;
-  *) : ;;
-esac
+# # 开机默认仅在 macOS 设置一次（可通过 proxy-off 撤销；避免重复 source 覆盖）
+# case "$(uname -s)" in
+#   Darwin)
+#     if [ -z "${PROXY_AUTO_APPLIED:-}" ]; then
+#       : "${PROXY_URL:=${HTTP_PROXY:-${HTTPS_PROXY:-${ALL_PROXY:-http://localhost:53373}}}}"
+#       proxy-on "$PROXY_URL"
+#       export PROXY_AUTO_APPLIED=1
+#     fi
+#     ;;
+#   Linux)
+#     if [ -z "${PROXY_AUTO_APPLIED:-}" ]; then
+#       : "${PROXY_URL:=http://localhost:10808}"
+#       : "${PROXY_SOCKS_URL:=socks5://localhost:10809}"
+#       proxy-on --http "$PROXY_URL" --socks "$PROXY_SOCKS_URL"
+#       export PROXY_AUTO_APPLIED=1
+#     fi
+#     ;;
+#   *) : ;;
+# esac

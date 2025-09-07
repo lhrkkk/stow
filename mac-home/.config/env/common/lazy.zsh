@@ -88,16 +88,47 @@ fuck() {
   esac
 }
 
-# zoxide: portable init (optional cd override via ZOXIDE_USE_CD=1)
+# # zoxide: portable init (optional cd override via ZOXIDE_USE_CD=1)
+# if command -v zoxide >/dev/null 2>&1; then
+#   _zx_shell="zsh"
+#   [ -n "${BASH_VERSION-}" ] && _zx_shell="bash"
+#   if [ "${ZOXIDE_USE_CD:-0}" = "1" ]; then
+#     eval "$(zoxide init "$_zx_shell" --cmd cd)"
+#   else
+#     eval "$(zoxide init "$_zx_shell")"
+#   fi
+# fi
+
+
+# 懒加载 zoxide：第一次调用 z/zi 时才真正 init
 if command -v zoxide >/dev/null 2>&1; then
-  _zx_shell="zsh"
-  [ -n "${BASH_VERSION-}" ] && _zx_shell="bash"
-  if [ "${ZOXIDE_USE_CD:-0}" = "1" ]; then
-    eval "$(zoxide init "$_zx_shell" --cmd cd)"
-  else
-    eval "$(zoxide init "$_zx_shell")"
-  fi
+  _load_zoxide() {
+    unset -f z zi        # 先移除占位函数
+    _zx_shell="zsh"
+    [ -n "${BASH_VERSION-}" ] && _zx_shell="bash"
+    if [ "${ZOXIDE_USE_CD:-0}" = "1" ]; then
+      eval "$(zoxide init "$_zx_shell" --cmd cd)"
+    else
+      eval "$(zoxide init "$_zx_shell")"
+    fi
+  }
+  z()  { _load_zoxide; z  "$@"; }   # 复用本次调用的参数
+  zi() { _load_zoxide; zi "$@"; }
 fi
+
+
+# # 懒加载 zoxide：第一次调用 z/zi 时才真正 init
+# if command -v zoxide >/dev/null 2>&1; then
+#   _load_zoxide() {
+#     unset -f z zi        # 先移除占位函数
+#     eval "$(zoxide init zsh)"   # 真正初始化 zoxide
+#   }
+#   z()  { _load_zoxide; z  "$@"; }   # 复用本次调用的参数
+#   zi() { _load_zoxide; zi "$@"; }
+# fi
+
+# eval "$(zoxide init "zsh")"
+
 
 # ==== Lazy-load Homebrew environment (bash/zsh 通用) ====
 # 延迟执行 brew shellenv，避免启动额外 ~20-30ms

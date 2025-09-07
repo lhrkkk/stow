@@ -13,3 +13,5 @@ export PATH="/opt/homebrew/sbin:$PATH"
 
 # Visual Studio Code
 export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"
+
+proxy-on http://127.0.0.1:53373

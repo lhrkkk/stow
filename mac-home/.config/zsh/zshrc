@@ -13,10 +13,10 @@ export ZIM_HOME=${HOME}/.zim
 # fi
 
 
-
+export PLATFORM=$(uname -s)
 # common
 source ~/.config/env/common/all.zsh
-source ~/.config/env/local/$(uname -s).sh
+source ~/.config/env/local/${PLATFORM}.sh
 
 # zsh
 source ~/.config/zsh/plugins.zsh
@@ -36,3 +36,4 @@ zstyle ':fzf-tab:*' fzf-flags '--ansi' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#
 
 # source /Users/lhr/.config/zsh/plugins/zsh-hist/zsh-hist.plugin.zsh
 
+# eval "$(zoxide init "zsh")"
