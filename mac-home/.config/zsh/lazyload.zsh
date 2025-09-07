@@ -1,3 +1,5 @@
+export ZIM_HOME=${HOME}/.zim
+
 # 异步（事件循环延后）初始化补全系统：提示符先出来，随后在本 shell 完成 compinit
 if [[ $- == *i* ]]; then
   # 捕获启动期对 compdef 的调用，避免模块在 compinit 前报错
@@ -62,8 +64,14 @@ _lazy_zim_init_run() {
 
   unfunction _lazy_zim_init_run 2>/dev/null || true
 }
-if zmodload zsh/sched 2>/dev/null; then
-  sched +0 _lazy_zim_init_run
+
+if [[ $- == *i* ]]; then
+  autoload -Uz add-zsh-hook
+  _zim_precmd_once() {
+    add-zsh-hook -d precmd _zim_precmd_once 2>/dev/null || true
+    _lazy_zim_init_run
+  }
+  add-zsh-hook precmd _zim_precmd_once
 else
   _lazy_zim_init_run
 fi

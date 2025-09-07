@@ -164,3 +164,6 @@ brew "less"
 brew "poppler"
 brew "rdkit"
 brew "specstoryai/tap/specstory"
+
+brew "frpc"
+brew "v2ray"
