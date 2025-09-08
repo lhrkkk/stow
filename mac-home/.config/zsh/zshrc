@@ -24,3 +24,9 @@ source ~/.config/zsh/tmux.zsh
 
 # fzf-tab theme colors (Selenized Light - Gogh)
 zstyle ':fzf-tab:*' fzf-flags '--ansi' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
+
+# Git alias descriptions for better completion
+source ~/.config/zsh/git-alias-descriptions.zsh
+
+# JJ enhanced completion with alias support
+source ~/.config/zsh/jj-completion-enhanced.zsh

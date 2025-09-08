@@ -1,12 +1,12 @@
-[core]
-        excludesfile = /Users/lhr/.gitignore_global
-        quotepath = false
-        editor = hx
-        pager = delta
-
 [user]
         name = lu haorui
         email = airhenry@gmail.com
+
+[core]
+        editor = hx
+        pager = delta
+        quotepath = false
+        autocrlf = false
 
 [commit]
         template = /Users/lhr/.stCommitMsg
@@ -19,6 +19,15 @@
 
 [color]
         ui = auto
+[color "branch"]
+        current = yellow reverse
+        local = yellow
+        remote = green
+[color "diff"]
+        meta = yellow bold
+        frag = magenta bold
+        old = red
+        new = green
 
 [init]
         defaultBranch = main
@@ -26,19 +35,30 @@
 [diff]
         colorMoved = default
         algorithm = patience
+        mnemonicprefix = true
         tool = araxis
 [alias]
     ad  = difftool --tool=araxis --dir-diff
     ads = difftool --tool=araxis --dir-diff --staged
+[difftool]
+    prompt = false
 
 [merge]
+        summary = true
+        verbosity = 1
         conflictStyle = zdiff3
         tool = smerge
 
+[mergetool]
+        prompt = false
 [mergetool "smerge"]
         cmd = smerge mergetool "$BASE" "$LOCAL" "$REMOTE" -o "$MERGED"
         trustExitCode = true
         keepBackup = false
+# 仅保留配置，不设为默认；如需切换到 mvimdiff：把 [merge].tool 改成 mvimdiff
+[mergetool "mvimdiff"]
+        cmd = "mvim -c 'Gdiff' $MERGED"
+        keepbackup = false
 
 [rebase]
         autosquash = true
@@ -63,8 +83,26 @@
 [pretty]
         jj = format:%C(yellow)%h%Creset %C(auto)%d%Creset %s %C(blue)<%an>%Creset %C(cyan)%cr%Creset
 
+[format]
+        pretty = format:%C(blue)%ad%Creset %C(yellow)%h%C(green)%d%Creset %C(blue)%s %C(magenta) [%an]%Creset
+
+[rerere]
+        enabled = true
+
+[advice]
+        statusHints = false
+
+[apply]
+        whitespace = nowarn
+
+[branch]
+        autosetupmerge = true
+
+[include]
+        path = .gitconfig.user
+
 [alias]
-        # ---- 你原有：Git Town ----
+        # ---- Git Town（保留） ----
         append = town append
         hack = town hack
         kill = town kill
@@ -76,12 +114,6 @@
         ship = town ship
         sync = town sync
 
-        # ---- 增强：状态/日志/默认视图 ----
-        s  = status
-        sf = "!f(){ git status --short --branch; echo; git diff --stat; }; f"
-        l  = log
-        lg = log --graph --decorate --abbrev-commit --date=relative --pretty=jj --all
-        default = "!f(){ echo; git sf; echo; git -c pager.log=false lg -n 20; }; f"
 
         # ---- 初始化/克隆 ----
         init = "!git init && git symbolic-ref HEAD refs/heads/main"
@@ -90,32 +122,91 @@
         clgp = "!f(){ git clone git@github.com:$1; }; f"
         clgu = "!f(){ u=$(git config user.username); git clone git@github.com:${u}/$1; }; f"
 
-        # ---- diff/show ----
+        # ---- 常用增强 ----
+        s  = status
+        st = status
+        stat = status
+        sf = "!f(){ git status --short --branch; echo; git diff --stat; }; f"
+
+        # log
+        l  = log --graph --date=short
+        lg = log --graph --decorate --abbrev-commit --date=relative --pretty=jj --all
+        changes = log --pretty=format:\"%h %cr %cn %Cgreen%s%Creset\" --name-status
+        short = log --pretty=format:\"%h %cr %cn %Cgreen%s%Creset\"
+        simple = log --pretty=format:\" * %s\"
+        shortnocolor = log --pretty=format:\"%h %cr %cn %s\"
+        filelog = log -u
+        default = "!f(){ echo; git sf; echo; git -c pager.log=false lg -n 20; }; f"
+
+        # add / stash
+        a = add
+        chunkyadd = add --patch
+        ss = stash
+        sl = stash list
+        sa = stash apply
+        sd = stash drop
+        snapshot = !git stash save "snapshot: $(date)" && git stash apply "stash@{0}"
+        snapshots = !git stash list --grep snapshot
+
+        # branch / checkout
+        b = branch -v
+        co = checkout
+        nb = checkout -b
+        recent-branches = !git for-each-ref --count=15 --sort=-committerdate refs/heads/ --format='%(refname:short)'
+
+        # commit
+        c = commit -m
+        ca = commit -am
+        ci = commit
+        amend = commit --amend
+        ammend = commit --amend
+
+        # cherry-pick
+        cp = cherry-pick -x
+
+        # diff / show
         d  = diff
+        dc = diff --cached
+        last = diff HEAD^
         dr = "!f(){ git diff ${1:-HEAD}; }; f"
         w  = show
         ws = show --stat
 
-        # ---- rebase / fetch / pull-like ----
+        # remote / push / pull
+        r = remote -v
+        ps = push
+        psa = push --all
+        psd = "!f(){ git push origin :$1; }; f"
+        psb = "!f(){ git push -u origin ${1:-$(git branch --show-current)}; }; f"
+        pscb = "!f(){ b=${1:-$(git rev-parse --abbrev-ref HEAD)}; git push -u origin \"$b\"; }; f"
+        pl = pull
+        fo = fetch --all --prune
+        f  = "!git fo && git rbt"
+
+        # rebase
         rb  = rebase --rebase-merges --autostash
         rbt = rebase --rebase-merges --autostash origin/main
         rbr = rebase -i --rebase-merges --autostash
-        fo  = fetch --all --prune
-        f   = "!git fo && git rbt"
+        rc = rebase --continue
+        rs = rebase --skip
 
-        # ---- push / PR ----
-        ps   = push
-        psa  = push --all
-        psd  = "!f(){ git push origin :$1; }; f"
-        psb  = "!f(){ git push -u origin ${1:-$(git branch --show-current)}; }; f"
-        pscb = "!f(){ b=${1:-$(git rev-parse --abbrev-ref HEAD)}; git push -u origin \"$b\"; }; f"
-        pro  = "!gh pr create --head $(git rev-parse --abbrev-ref HEAD)"
-        pr   = "!f(){ b=${1:-$(git rev-parse --abbrev-ref HEAD)}; git pscb \"$b\"; gh pr create --head \"$b\"; }; f"
+        # PR（GitHub CLI）
+        pro = "!gh pr create --head $(git rev-parse --abbrev-ref HEAD)"
+        pr  = "!f(){ b=${1:-$(git rev-parse --abbrev-ref HEAD)}; git pscb \"$b\"; gh pr create --head \"$b\"; }; f"
 
-        # ---- “op 日志”、文件注释、worktree ----
-        ol  = reflog
-        fn  = blame
+        # worktree / reflog / blame
+        wl = worktree list
+        wa = "!f(){ b=${1:?branch}; p=${2:-../$b}; git branch -f \"$b\" HEAD; git worktree add \"$p\" \"$b\"; }; f"
+        wf = "!f(){ git worktree remove \"$1\"; }; f"
+        ol = reflog
+        fn = blame
         fnr = "!f(){ git blame -L ${2:?line-range} -- $1; }; f"
-        wl  = worktree list
-        wa  = "!f(){ b=${1:?branch}; p=${2:-../$b}; git branch -f \"$b\" HEAD; git worktree add \"$p\" \"$b\"; }; f"
-        wf  = "!f(){ git worktree remove \"$1\"; }; f"
+
+        # svn（如无需要可删）
+        svnr = svn rebase
+        svnd = svn dcommit
+        svnl = svn log --oneline --show-commit
+
+        # 其他
+        contributors = shortlog --summary --numbered --email
+        mt = mergetool
