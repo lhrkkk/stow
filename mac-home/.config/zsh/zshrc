@@ -41,7 +41,10 @@ fpath=(/usr/share/zsh/5.9/functions $fpath)
 source ~/.config/zsh/git-alias-descriptions.zsh
 
 # Git enhanced completion tweaks — remove native alias duplicates and integrate with lazy loading
-source ~/.config/zsh/git-completion-enhanced.zsh
+# source ~/.config/zsh/git-completion-enhanced.zsh
 
 # JJ enhanced completion with alias support
 source ~/.config/zsh/jj-completion-enhanced.zsh
+
+# fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
+#
