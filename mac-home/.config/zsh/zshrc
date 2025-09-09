@@ -13,7 +13,8 @@ source ~/.config/env/common/all.zsh
 
 # zim
 source ~/.config/zsh/plugins.zsh
-source ~/.config/zsh/lazyload.zsh
+# source ~/.config/zsh/lazyload.zsh
+source ~/.config/zsh/load.sh
 
 # zsh
 # source ~/.config/zsh/vi.zsh
@@ -27,6 +28,9 @@ zstyle ':fzf-tab:*' fzf-flags '--ansi' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#
 zstyle ':fzf-tab:*' show-group yes
 # Show descriptions for git completion and put description first for our user-commands
 zstyle ':fzf-tab:complete:git:*' descriptions yes
+
+# JJ group order for fzf-tab (commands last)
+zstyle ':fzf-tab:complete:jj:*' group-order 'essential-aliases' 'status-aliases' 'commit-aliases' 'rebase-aliases' 'bookmark-aliases' 'other-aliases' 'commands'
 
 # Git alias descriptions (user-commands) — baseline method that already works
 source ~/.config/zsh/git-alias-descriptions.zsh

@@ -290,7 +290,15 @@ zstyle ':completion:*:*:jj:*' verbose yes
 zstyle ':completion:*:*:jj:*' group-name ''
 zstyle ':completion:*:descriptions' format '%B%d%b'
 
-# Define command group order for jj
+# Define tag and group order for jj (commands last)
+zstyle ':completion:*:*:jj:*' tag-order \
+  'essential-aliases' \
+  'status-aliases' \
+  'commit-aliases' \
+  'rebase-aliases' \
+  'bookmark-aliases' \
+  'other-aliases' \
+  'commands'
 zstyle ':completion:*:*:jj:*' group-order \
   'essential-aliases' \
   'status-aliases' \

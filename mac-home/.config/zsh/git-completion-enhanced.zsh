@@ -181,12 +181,12 @@ if (( $+commands[git] )); then
       # Remove all straight double quotes just for description readability
       val=${val//\"/}
 
-      # Build description with category label and friendly text
+      # Build description with category label + friendly text + expansion
       local base_desc=${desc_map[$name]}
-      [[ -z $base_desc ]] && base_desc="别名 -> ${val}"
+      [[ -z $base_desc ]] && base_desc="别名"
       local c=${cat_map[$name]:-other}
       local label=${cat_label[$c]:-其他}
-      local desc="${label} — ${base_desc}"
+      local desc="${label} — ${base_desc}：${val}"
       # Append into its bucket without nameref (compat with older zsh)
       case $c in
         repo)      bucket_repo+=("${name}:${desc}") ;;
@@ -225,16 +225,32 @@ if (( $+commands[git] )); then
     done
 
     # Export globally for our alias provider
-    typeset -g -a __git_uc_list
+    typeset -g -a __git_uc_list \
+      __git_bucket_repo __git_bucket_status __git_bucket_stash __git_bucket_branch \
+      __git_bucket_commit __git_bucket_diff __git_bucket_remote __git_bucket_rebase \
+      __git_bucket_pr __git_bucket_worktree __git_bucket_town __git_bucket_other
     __git_uc_list=("${ordered[@]}")
+    __git_bucket_repo=("${bucket_repo[@]}")
+    __git_bucket_status=("${bucket_status[@]}")
+    __git_bucket_stash=("${bucket_stash[@]}")
+    __git_bucket_branch=("${bucket_branch[@]}")
+    __git_bucket_commit=("${bucket_commit[@]}")
+    __git_bucket_diff=("${bucket_diff[@]}")
+    __git_bucket_remote=("${bucket_remote[@]}")
+    __git_bucket_rebase=("${bucket_rebase[@]}")
+    __git_bucket_pr=("${bucket_pr[@]}")
+    __git_bucket_worktree=("${bucket_worktree[@]}")
+    __git_bucket_town=("${bucket_town[@]}")
+    __git_bucket_other=("${bucket_other[@]}")
   }
 
   __git_build_user_commands
 fi
 
 __git_apply_styles() {
-  zstyle ':completion:*:*:git:*' tag-order 'user-commands' 'common-commands' 'all-commands'
-  zstyle ':completion:*:*:git:*' group-order 'user-commands' 'common-commands' 'all-commands'
+  # Use single alias tag (required by system _git), but put it first
+  zstyle ':completion:*:*:git:*' tag-order 'alias-commands' 'common-commands' 'all-commands'
+  zstyle ':completion:*:*:git:*' group-order 'alias-commands' 'common-commands' 'all-commands'
   zstyle ':completion:*:*:git:*' group-name ''
   zstyle ':completion:*:*:git:*' verbose yes
   zstyle ':completion:*:descriptions' format '%B%d%b'
@@ -270,8 +286,27 @@ __git_load_and_override() {
       break
     done
   fi
-  # Override alias provider to NO-OP so we don't duplicate system aliases.
-  __git_zsh_cmd_alias() { return 0 }
+  # Override alias provider to emit our ordered alias list within the expected tag
+  __git_zsh_cmd_alias() {
+    emulate -L zsh
+    __git_build_user_commands
+    local -a __ordered
+    __ordered=( \
+      "${__git_bucket_repo[@]}" \
+      "${__git_bucket_status[@]}" \
+      "${__git_bucket_stash[@]}" \
+      "${__git_bucket_branch[@]}" \
+      "${__git_bucket_commit[@]}" \
+      "${__git_bucket_diff[@]}" \
+      "${__git_bucket_remote[@]}" \
+      "${__git_bucket_rebase[@]}" \
+      "${__git_bucket_pr[@]}" \
+      "${__git_bucket_worktree[@]}" \
+      "${__git_bucket_town[@]}" \
+      "${__git_bucket_other[@]}" \
+    )
+    (( ${#__ordered[@]} )) && _describe -t alias-commands '用户命令' __ordered && _ret=0
+  }
   __git_apply_styles
 }
 

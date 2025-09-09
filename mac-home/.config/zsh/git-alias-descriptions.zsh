@@ -91,12 +91,41 @@ _git_user_cmd_pairs=(
 )
 
 _git_user_cmd_built=()
+
+# 分组映射：alias 名 -> 分组中文标签
+typeset -A _git_uc_cat
+_git_uc_cat=()
+# 初始化/克隆
+for _n in init cl clg clgp clgu; do _git_uc_cat[$_n]='初始化/克隆'; done
+# 状态/日志
+for _n in s st stat sf l lg changes short simple shortnocolor filelog default recent-branches; do _git_uc_cat[$_n]='状态/日志'; done
+# 暂存/快照
+for _n in a chunkyadd ss sl sa sd snapshot snapshots; do _git_uc_cat[$_n]='暂存/快照'; done
+# 分支/切换
+for _n in b co nb; do _git_uc_cat[$_n]='分支/切换'; done
+# 提交
+for _n in c ca ci amend ammend; do _git_uc_cat[$_n]='提交'; done
+# 差异/查看
+for _n in d dc last dr w ws; do _git_uc_cat[$_n]='差异/查看'; done
+# 远程/推送/拉取
+for _n in r ps psa psd psb pscb pl fo f; do _git_uc_cat[$_n]='远程/推送/拉取'; done
+# Rebase
+for _n in rb rbt rbr rc rs; do _git_uc_cat[$_n]='Rebase'; done
+# PR
+for _n in pro pr; do _git_uc_cat[$_n]='PR'; done
+# 工作树/日志/责备
+for _n in wl wa wf ol fn fnr; do _git_uc_cat[$_n]='工作树/日志/责备'; done
+# Git Town
+for _n in append hack kill new-pull-request prepend prune-branches rename-branch repo ship sync; do _git_uc_cat[$_n]='Git Town'; done
+
 for _p in ${_git_user_cmd_pairs[@]}; do
   _name=${_p%%:*}
   _desc=${_p#*:}
   _exp=$(git config --get alias.${_name} 2>/dev/null)
   [[ -z ${_exp} ]] && _exp=${_name}
-  _git_user_cmd_built+=("${_name}:${_desc}：${_exp}")
+  _cat=${_git_uc_cat[$_name]}
+  [[ -z ${_cat} ]] && _cat='其他'
+  _git_user_cmd_built+=("${_name}:${_cat} — ${_desc}：${_exp}")
 done
 zstyle ':completion:*:*:git:*' user-commands ${_git_user_cmd_built[@]}
 unset _git_user_cmd_pairs _git_user_cmd_built _p _name _desc _exp
