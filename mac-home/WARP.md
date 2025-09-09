@@ -12,6 +12,26 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
     - wezterm start --config-file ~/.config/wezterm/wezterm.lua
   - 调试：
     - wezterm ls（检查会话/窗格），wezterm help
+  - 会话保存/恢复（基于 resurrect.wezterm 插件）：
+    - 保存/恢复
+      - 保存当前工作区并设为下次自动恢复：Cmd+Option+S
+      - 保存当前窗口：Cmd+Option+Shift+W；保存当前标签：Cmd+Option+Shift+T
+      - 保存工作区快照（时间戳）：Cmd+Option+Shift+S
+      - 保存工作区快照（自定义名）：Cmd+Option+Ctrl+S
+      - 先保存再关闭标签：Cmd+Option+W
+      - 先保存再关闭窗口：Cmd+Shift+W（逐个关闭该窗口的所有标签）
+      - 交互恢复历史状态（带时间戳展示）：Cmd+Option+R
+      - 直接恢复上次标记的工作区：Cmd+Option+L
+      - 重新打开最近保存的标签：Cmd+Shift+L
+      - 删除已保存状态（选择器）：Cmd+Option+D
+    - 工作区管理
+      - 重命名当前工作区：Cmd+Option+Ctrl+R
+      - 切换/创建工作区（输入名称）：Cmd+Option+Ctrl+G
+    - 自动化
+      - 自动恢复：WezTerm GUI 启动时会尝试恢复上次保存并标记的工作区
+      - 自动保存窗口：关闭窗口时自动保存一个带时间戳的“窗口快照”（无需快捷键，可通过 WEZ_RES_AUTO_SAVE_ON_CLOSE=0 关闭）
+      - 可选定时保存：设置 WEZ_RES_AUTO_SAVE=1 每 10 分钟保存一次工作区
+      - 启动时清理旧状态：设置 WEZ_RES_PRUNE_DAYS=30（示例）清理早于 30 天的状态
 
 - Yazi（目录：~/.config/yazi）
   - 启动：yazi
@@ -38,12 +58,13 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 - WezTerm（~/.config/wezterm/wezterm.lua）
   - 主题：使用内置配色 "Selenized Light (Gogh)"，从内置 schemes 读取背景色 bg，并统一用于：
     - 标签栏（tab_bar）各状态背景色、标题栏（window_frame）的前/背景色。
-    - 满足“浅色标题栏”的偏好；与用户规则一致（Command+W 关闭 pane 且带确认；Ctrl+Space/ Ctrl+V 垂直 50% 分割；Ctrl+S 下分 50%）。
+    - 满足“浅色标题栏”的偏好；与用户规则一致（Cmd+W 保存带时间戳的标签并关闭标签（确认）；Ctrl+W 关闭 pane；Ctrl+Space/Ctrl+V 垂直分割；Ctrl+S 水平分割）。
   - 字体链：JetBrains Mono → MesloLGS Nerd Font Mono → Symbols Nerd Font Mono；字体大小 15。
   - 窗口装饰：INTEGRATED_BUTTONS|RESIZE；启用 fancy tab bar；不隐藏单 tab 的 tab bar。
   - 关键键位绑定（均在 wezterm.lua 内集中定义并返回 config）：
-    - Cmd+w 仅关闭当前 pane（confirm=true）。
-    - Ctrl+Space / Ctrl+v：向右 50% 垂直分割；Ctrl+s：向下 50% 水平分割。
+    - Cmd+W：保存“当前标签”快照（自动加时间戳），随后关闭标签（带确认）。
+    - Ctrl+W：仅关闭当前 pane（带确认）。
+    - Ctrl+Space/Ctrl+V：向右 50% 垂直分割；Ctrl+S：向下 50% 水平分割。
 
 - Yazi（~/.config/yazi）
   - init.lua：
@@ -172,4 +193,3 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
   - 新会话首次写入忘带标题：补上 -t "中文标题"
   - 新命令未生效：rehash 或开启新 shell
   - 查看最新日志内容： warp-log-latest
-

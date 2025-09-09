@@ -6,38 +6,8 @@ local config = wezterm.config_builder()
 
 -- This is where you actually apply your config choices
 
--- resurrect.wezterm 插件
-local resurrect = nil
-
--- 直接加载插件文件（绕过 wezterm.plugin API）
-do
-  local HOME = os.getenv("HOME") or ""
-  local plugin_dir = HOME .. "/.config/wezterm/plugins/resurrect.wezterm/plugin"
-
-  -- 设置加载路径
-  package.path = plugin_dir .. "/?.lua;" .. plugin_dir .. "/resurrect/?.lua;" .. package.path
-
-  -- 设置全局 wezterm 对象供插件使用
-  _G.wezterm = wezterm
-
-  -- 尝试加载插件
-  local ok, plugin = pcall(function()
-    return dofile(plugin_dir .. "/init.lua")
-  end)
-
-  if ok and plugin then
-    resurrect = plugin
-    -- 配置插件
-    if resurrect.state_manager then
-      resurrect.state_manager.set_max_nlines(2000)
-      -- 暂时禁用周期性保存，先让基本功能工作
-      -- resurrect.state_manager.periodic_save({ interval_seconds = 900, save_workspaces = true, save_windows = true, save_tabs = true })
-    end
-    wezterm.log_info("resurrect.wezterm 已加载（直接加载）")
-  else
-    wezterm.log_error("resurrect.wezterm 加载失败: " .. tostring(plugin))
-  end
-end
+-- Resurrect 相关逻辑已分离至独立模块
+local resurrect_cfg = require("resurrect_config")
 
 config.color_scheme = "Selenized Light (Gogh)"
 -- config.color_scheme = "Catppuccin Latte"
@@ -149,12 +119,10 @@ config.webgpu_power_preference = "HighPerformance"
 -- config.window_background_opacity = 0.8
 -- config.macos_window_background_blur = 10
 
--- key bindings
+-- key bindings（基础通用部分；resurrect 相关快捷键在模块中附加）
 config.keys = {
-  -- Close current pane (with confirmation) via Cmd+W instead of closing the whole tab
-  { key = "w", mods = "CMD",  action = wezterm.action.CloseCurrentPane { confirm = true } },
   -- Close current pane via Ctrl+W (Linux/Windows-style alternative)
-  -- { key = "w", mods = "CTRL", action = wezterm.action.CloseCurrentPane { confirm = true } },
+  { key = "w", mods = "CTRL", action = wezterm.action.CloseCurrentPane { confirm = true } },
   -- Split pane right 50% via Ctrl+Space
   { key = "Space", mods = "CTRL", action = wezterm.action.SplitPane { direction = "Right", size = { Percent = 50 } } },
   -- Split pane horizontally 50% via Ctrl+S
@@ -167,68 +135,10 @@ config.keys = {
 config.keys = config.keys or {}
 table.insert(config.keys, { key = "Enter", mods = "CMD", action = wezterm.action.ToggleFullScreen })
 table.insert(config.keys, { key = "r", mods = "CMD|SHIFT", action = wezterm.action.ReloadConfiguration })
--- 调试：测试配置是否加载
-table.insert(config.keys, {
-  key = "t",
-  mods = "CMD|CTRL",
-  action = wezterm.action_callback(function(window, pane)
-    -- 输出为注释，避免 shell 解释
-    if resurrect then
-      pane:send_text("\necho '✅ WezTerm 插件已加载'\n")
-    else
-      pane:send_text("\necho '❌ WezTerm 插件未加载'\n")
-    end
-  end),
-})
--- Save workspace (Cmd+Option+S)
-table.insert(config.keys, {
-  key = "s",
-  mods = "CMD|OPT",
-  action = wezterm.action_callback(function(win, pane)
-    if resurrect and resurrect.state_manager then
-      local ok, err = pcall(function()
-        resurrect.state_manager.save_state(resurrect.workspace_state.get_workspace_state())
-      end)
-      if ok then
-        pane:send_text("\necho '✅ 工作区已保存'\n")
-      else
-        pane:send_text("\necho '❌ 保存失败: " .. tostring(err):gsub("'", "") .. "'\n")
-      end
-    else
-      pane:send_text("\necho '❌ 插件未加载'\n")
-    end
-  end),
-})
--- Restore (Cmd+Option+R)
-table.insert(config.keys, {
-  key = "r",
-  mods = "CMD|OPT",
-  action = wezterm.action_callback(function(win, pane)
-    if resurrect and resurrect.fuzzy_loader then
-      local opts = { relative = true, restore_text = true }
-      resurrect.fuzzy_loader.fuzzy_load(win, pane, function(id, label)
-        local type = id:match("^([^/]+)")
-        id = id:match("([^/]+)$")
-        id = (id and id:match("(.+)%.%w+$")) or id
-        if type == "workspace" then
-          local state = resurrect.state_manager.load_state(id, "workspace")
-          resurrect.workspace_state.restore_workspace(state, opts)
-        elseif type == "window" then
-          local state = resurrect.state_manager.load_state(id, "window")
-          resurrect.window_state.restore_window(pane:window(), state, opts)
-        elseif type == "tab" then
-          local state = resurrect.state_manager.load_state(id, "tab")
-          resurrect.tab_state.restore_tab(pane:tab(), state, opts)
-        end
-      end, { title = "Load state" })
-    else
-      pane:send_text("\necho '❌ 插件未加载'\n")
-    end
-  end),
-})
-
 -- 不关闭终端
 config.quit_when_all_windows_are_closed = false
 
 -- and finally, return the configuration to wezterm
+-- 将 resurrect 相关配置与快捷键附加到 config
+resurrect_cfg.setup(config)
 return config

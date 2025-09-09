@@ -36,6 +36,11 @@ if [[ $- == *i* ]]; then
   _ami_expand_or_complete() {
     if typeset -f _lazy_compinit_run >/dev/null; then
       _lazy_compinit_run
+      # Allow modules to run post-compinit hooks exactly once
+      if typeset -f __ami_after_compinit >/dev/null; then
+        __ami_after_compinit
+        unfunction __ami_after_compinit 2>/dev/null || true
+      fi
     fi
     zle expand-or-complete
   }
@@ -78,6 +83,8 @@ fi
 
 
 # 使用 fpath + autoload 自动注册 functions 目录中的所有函数（文件名=函数名，无扩展名）
+
+typeset -U fpath
 fpath+="$HOME/.config/zsh/functions"
 typeset -Ua _ami_funcs
 _ami_funcs=("$HOME/.config/zsh/functions"/*(N:t))

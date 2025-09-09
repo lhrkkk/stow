@@ -6,6 +6,9 @@ export TERM_ITALICS=true
 export EDITOR=hx
 # export EDITOR='emacsclient -t'
 
+# export WEZ_RES_AUTO_SAVE=1
+
+
 # Locale and history
 export LANG=en_US.UTF-8
 export LC_CTYPE=en_US.UTF-8

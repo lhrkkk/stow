@@ -24,9 +24,15 @@ source ~/.config/zsh/tmux.zsh
 
 # fzf-tab theme colors (Selenized Light - Gogh)
 zstyle ':fzf-tab:*' fzf-flags '--ansi' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
+zstyle ':fzf-tab:*' show-group yes
+# Show descriptions for git completion and put description first for our user-commands
+zstyle ':fzf-tab:complete:git:*' descriptions yes
 
-# Git alias descriptions for better completion
+# Git alias descriptions (user-commands) — baseline method that already works
 source ~/.config/zsh/git-alias-descriptions.zsh
+
+# Git enhanced completion tweaks — remove native alias duplicates and integrate with lazy loading
+# source ~/.config/zsh/git-completion-enhanced.zsh
 
 # JJ enhanced completion with alias support
 source ~/.config/zsh/jj-completion-enhanced.zsh
