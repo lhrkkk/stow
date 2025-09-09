@@ -4,6 +4,7 @@ export LC_CTYPE=zh_CN.UTF-8
 unset LC_ALL
 
 
+
 # common
 source ~/.config/env/common/all.zsh
 
@@ -13,8 +14,8 @@ source ~/.config/env/common/all.zsh
 
 # zim
 source ~/.config/zsh/plugins.zsh
-# source ~/.config/zsh/lazyload.zsh
-source ~/.config/zsh/load.sh
+source ~/.config/zsh/lazyload.zsh
+# source ~/.config/zsh/load.sh
 
 # zsh
 # source ~/.config/zsh/vi.zsh
@@ -28,15 +29,19 @@ zstyle ':fzf-tab:*' fzf-flags '--ansi' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#
 zstyle ':fzf-tab:*' show-group yes
 # Show descriptions for git completion and put description first for our user-commands
 zstyle ':fzf-tab:complete:git:*' descriptions yes
+zstyle ':fzf-tab:complete:git:*' group-order 'user-commands' 'common-commands' 'all-commands' 'alias-commands'
 
 # JJ group order for fzf-tab (commands last)
 zstyle ':fzf-tab:complete:jj:*' group-order 'essential-aliases' 'status-aliases' 'commit-aliases' 'rebase-aliases' 'bookmark-aliases' 'other-aliases' 'commands'
+
+fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
+fpath=(/usr/share/zsh/5.9/functions $fpath)
 
 # Git alias descriptions (user-commands) — baseline method that already works
 source ~/.config/zsh/git-alias-descriptions.zsh
 
 # Git enhanced completion tweaks — remove native alias duplicates and integrate with lazy loading
-# source ~/.config/zsh/git-completion-enhanced.zsh
+source ~/.config/zsh/git-completion-enhanced.zsh
 
 # JJ enhanced completion with alias support
 source ~/.config/zsh/jj-completion-enhanced.zsh

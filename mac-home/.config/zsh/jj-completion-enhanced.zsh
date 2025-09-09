@@ -308,6 +308,11 @@ zstyle ':completion:*:*:jj:*' group-order \
   'other-aliases' \
   'commands'
 
+# fzf-tab group order for jj
+zstyle ':fzf-tab:complete:jj:*' descriptions yes
+zstyle ':fzf-tab:complete:jj:*' show-group yes
+zstyle ':fzf-tab:complete:jj:*' group-order 'essential-aliases' 'status-aliases' 'commit-aliases' 'rebase-aliases' 'bookmark-aliases' 'other-aliases' 'commands'
+
 # Make the essential commands stand out
 zstyle ':completion:*:*:jj:*:essential-aliases' list-colors '=*=1;32'
 zstyle ':completion:*:*:jj:*:commands' list-colors '=*=0;37'

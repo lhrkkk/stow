@@ -49,8 +49,8 @@ if [[ ${1:-} == clean || ${1:-} == --clean || ${1:-} == -c ]]; then
     [[ -f "$_bp/opt/fzf/shell/completion.zsh" ]] && source "$_bp/opt/fzf/shell/completion.zsh"
   fi
   [[ -d /opt/homebrew/share/zsh/site-functions ]] && _extra_fpath+=(/opt/homebrew/share/zsh/site-functions)
-  [[ -d /usr/local/share/zsh/site-functions ]] && _extra_fpath+=(/usr/local/share/zsh/site-functions)
-  [[ -d /usr/share/zsh/site-functions ]] && _extra_fpath+=(/usr/share/zsh/site-functions)
+  # [[ -d /usr/local/share/zsh/site-functions ]] && _extra_fpath+=(/usr/local/share/zsh/site-functions)
+  # [[ -d /usr/share/zsh/site-functions ]] && _extra_fpath+=(/usr/share/zsh/site-functions)
   fpath=( ${_extra_fpath[@]} $fpath )
   autoload -Uz compinit
   compinit -d "$dump" -i >/dev/null 2>&1 || compinit -i >/dev/null 2>&1
@@ -112,8 +112,8 @@ if [[ ! -f "$dump" ]]; then
     fi
   fi
   [[ -d /opt/homebrew/share/zsh/site-functions ]] && _extra_fpath+=(/opt/homebrew/share/zsh/site-functions)
-  [[ -d /usr/local/share/zsh/site-functions ]] && _extra_fpath+=(/usr/local/share/zsh/site-functions)
-  [[ -d /usr/share/zsh/site-functions ]] && _extra_fpath+=(/usr/share/zsh/site-functions)
+  # [[ -d /usr/local/share/zsh/site-functions ]] && _extra_fpath+=(/usr/local/share/zsh/site-functions)
+  # [[ -d /usr/share/zsh/site-functions ]] && _extra_fpath+=(/usr/share/zsh/site-functions)
   fpath=( ${_extra_fpath[@]} $fpath )
 
   autoload -Uz compinit

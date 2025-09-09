@@ -135,6 +135,6 @@ zstyle ':completion:*:*:git:*' verbose yes
 zstyle ':completion:*:descriptions' format '%B%d%b'
 zstyle ':completion:*:*:git:*' group-name ''
 
-# Prefer our user-commands first and hide native alias duplicates
-zstyle ':completion:*:*:git:*' tag-order 'user-commands' 'common-commands' 'all-commands'
-zstyle ':completion:*:*:git:*' group-order 'user-commands' 'common-commands' 'all-commands'
+# Prefer our user-commands first; put native alias-commands last
+zstyle ':completion:*:*:git:*' tag-order 'user-commands' 'common-commands' 'all-commands' 'alias-commands'
+zstyle ':completion:*:*:git:*' group-order 'user-commands' 'common-commands' 'all-commands' 'alias-commands'
