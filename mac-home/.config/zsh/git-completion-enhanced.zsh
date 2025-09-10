@@ -258,50 +258,95 @@ __git_apply_styles() {
   zstyle ':completion:*:*:git:*' sort false
   # Plain text descriptions so fzf-tab recognizes groups
   zstyle ':completion:*:descriptions' format '[%d]'
-  # Show only our alias buckets (hide system commands entirely)
+  # Only show our 8 alias groups (hide system commands entirely)
   zstyle ':completion:*:*:git:*' tag-order \
-    'ami-alias-repo' \
-    'ami-alias-status' \
-    'ami-alias-stash' \
-    'ami-alias-branch' \
-    'ami-alias-commit' \
-    'ami-alias-diff' \
-    'ami-alias-remote' \
-    'ami-alias-rebase' \
-    'ami-alias-pr' \
-    'ami-alias-worktree' \
-    'ami-alias-town' \
-    'ami-alias-other'
+    'git8-essential' \
+    'git8-statuslog' \
+    'git8-viewdiff' \
+    'git8-commitedit' \
+    'git8-rebase' \
+    'git8-branchworktree' \
+    'git8-remotepr' \
+    'git8-repoops'
   zstyle ':completion:*:*:git:*' group-order \
-    'ami-alias-repo' \
-    'ami-alias-status' \
-    'ami-alias-stash' \
-    'ami-alias-branch' \
-    'ami-alias-commit' \
-    'ami-alias-diff' \
-    'ami-alias-remote' \
-    'ami-alias-rebase' \
-    'ami-alias-pr' \
-    'ami-alias-worktree' \
-    'ami-alias-town' \
-    'ami-alias-other'
+    'git8-essential' \
+    'git8-statuslog' \
+    'git8-viewdiff' \
+    'git8-commitedit' \
+    'git8-rebase' \
+    'git8-branchworktree' \
+    'git8-remotepr' \
+    'git8-repoops'
 }
 
 __git_emit_ami_alias_groups() {
   emulate -L zsh
   __git_build_user_commands
-  (( ${#__git_bucket_repo[@]}      )) && _describe -t ami-alias-repo      '初始化/克隆'         __git_bucket_repo
-  (( ${#__git_bucket_status[@]}    )) && _describe -t ami-alias-status    '状态/日志'           __git_bucket_status
-  (( ${#__git_bucket_stash[@]}     )) && _describe -t ami-alias-stash     '暂存/快照'           __git_bucket_stash
-  (( ${#__git_bucket_branch[@]}    )) && _describe -t ami-alias-branch    '分支/切换'           __git_bucket_branch
-  (( ${#__git_bucket_commit[@]}    )) && _describe -t ami-alias-commit    '提交'                 __git_bucket_commit
-  (( ${#__git_bucket_diff[@]}      )) && _describe -t ami-alias-diff      '差异/查看'           __git_bucket_diff
-  (( ${#__git_bucket_remote[@]}    )) && _describe -t ami-alias-remote    '远程/推送/拉取'       __git_bucket_remote
-  (( ${#__git_bucket_rebase[@]}    )) && _describe -t ami-alias-rebase    'Rebase'              __git_bucket_rebase
-  (( ${#__git_bucket_pr[@]}        )) && _describe -t ami-alias-pr        'PR'                  __git_bucket_pr
-  (( ${#__git_bucket_worktree[@]}  )) && _describe -t ami-alias-worktree  '工作树/日志/责备'     __git_bucket_worktree
-  (( ${#__git_bucket_town[@]}      )) && _describe -t ami-alias-town      'Git Town'            __git_bucket_town
-  (( ${#__git_bucket_other[@]}     )) && _describe -t ami-alias-other     '其他'                 __git_bucket_other
+  local -a __g8_essential __g8_statuslog __g8_viewdiff __g8_commitedit __g8_rebase __g8_branchworktree __g8_remotepr __g8_repoops
+  local it name
+
+  # Helpers to append pairs
+  __append_all() { local -a src=("$@"); (( ${#src[@]} )) && eval "$1"; }
+
+  # status -> essential(s,l) + statuslog(others)
+  for it in ${__git_bucket_status[@]}; do
+    name=${it%%:*}
+    case $name in
+      s|l) __g8_essential+=("$it") ;;
+      *)   __g8_statuslog+=("$it") ;;
+    esac
+  done
+  # diff/show -> viewdiff
+  (( ${#__git_bucket_diff[@]} )) && __g8_viewdiff+=("${__git_bucket_diff[@]}")
+
+  # commit + stash -> commitedit
+  (( ${#__git_bucket_commit[@]} )) && __g8_commitedit+=("${__git_bucket_commit[@]}")
+  (( ${#__git_bucket_stash[@]}  )) && __g8_commitedit+=("${__git_bucket_stash[@]}")
+
+  # rebase
+  (( ${#__git_bucket_rebase[@]} )) && __g8_rebase+=("${__git_bucket_rebase[@]}")
+
+  # branch + worktree -> branchworktree (but move blame fn/fnr to viewdiff)
+  (( ${#__git_bucket_branch[@]}   )) && __g8_branchworktree+=("${__git_bucket_branch[@]}")
+  if (( ${#__git_bucket_worktree[@]} )); then
+    local _wt
+    for _wt in ${__git_bucket_worktree[@]}; do
+      name=${_wt%%:*}
+      case $name in
+        fn|fnr) __g8_viewdiff+=("$_wt") ;;
+        *)      __g8_branchworktree+=("$_wt") ;;
+      esac
+    done
+  fi
+
+  # remote + pr -> remotepr
+  (( ${#__git_bucket_remote[@]} )) && __g8_remotepr+=("${__git_bucket_remote[@]}")
+  (( ${#__git_bucket_pr[@]}     )) && __g8_remotepr+=("${__git_bucket_pr[@]}")
+
+  # repo + town -> repoops
+  (( ${#__git_bucket_repo[@]} )) && __g8_repoops+=("${__git_bucket_repo[@]}")
+  (( ${#__git_bucket_town[@]} )) && __g8_repoops+=("${__git_bucket_town[@]}")
+
+  # other -> re-route to closest groups
+  for it in ${__git_bucket_other[@]}; do
+    name=${it%%:*}
+    case $name in
+      ad|ads)                 __g8_viewdiff+=("$it") ;;
+      a|chunkyadd|mt|cp)      __g8_commitedit+=("$it") ;;
+      contributors)           __g8_statuslog+=("$it") ;;
+      svnr|svnd|svnl)         __g8_repoops+=("$it") ;;
+      *)                      __g8_commitedit+=("$it") ;;
+    esac
+  done
+
+  (( ${#__g8_essential[@]}      )) && _describe -t git8-essential      '核心'                 __g8_essential
+  (( ${#__g8_statuslog[@]}      )) && _describe -t git8-statuslog      '状态/日志'            __g8_statuslog
+  (( ${#__g8_viewdiff[@]}       )) && _describe -t git8-viewdiff       '查看/差异'            __g8_viewdiff
+  (( ${#__g8_commitedit[@]}     )) && _describe -t git8-commitedit     '提交/暂存'            __g8_commitedit
+  (( ${#__g8_rebase[@]}         )) && _describe -t git8-rebase         'Rebase'               __g8_rebase
+  (( ${#__g8_branchworktree[@]} )) && _describe -t git8-branchworktree '分支/工作树'          __g8_branchworktree
+  (( ${#__g8_remotepr[@]}       )) && _describe -t git8-remotepr       '远程/推送/PR'          __g8_remotepr
+  (( ${#__g8_repoops[@]}        )) && _describe -t git8-repoops        '仓库/协作'            __g8_repoops
 }
 
 __git_complete_with_aliases() {
@@ -347,7 +392,7 @@ __git_load_and_override() {
     functions[_git_commands_original]=$functions[_git_commands]
     _git_commands() {
       emulate -L zsh
-      # Only emit our alias groups (hide system commands)
+      # Only emit our 8 alias groups (hide system commands)
       __git_emit_ami_alias_groups "$@"
       return 0
     }
