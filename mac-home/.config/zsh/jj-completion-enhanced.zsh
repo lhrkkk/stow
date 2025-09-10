@@ -271,14 +271,14 @@ if (( $+commands[jj] )); then
     (( ${#workspacefile_aliases} )) && workspacefile_aliases=(${(o)workspacefile_aliases})
 
     # Add aliases to completion with 8 groups
-    (( ${#essential_aliases}     )) && _describe -t essential-aliases       '核心 (Essential)'             essential_aliases "$@"
-    (( ${#statuslog_aliases}     )) && _describe -t statuslog-aliases       '状态/日志/操作 (Status/Log)'  statuslog_aliases "$@"
-    (( ${#viewdiff_aliases}      )) && _describe -t viewdiff-aliases        '查看/差异 (View/Diff)'        viewdiff_aliases "$@"
-    (( ${#commitedit_aliases}    )) && _describe -t commit-edit-aliases     '提交/编辑 (Commit/Edit)'      commitedit_aliases "$@"
-    (( ${#rebase_aliases}        )) && _describe -t rebase-aliases          'Rebase'                        rebase_aliases "$@"
-    (( ${#bookmark_aliases}      )) && _describe -t bookmark-aliases        '书签/分支 (Bookmarks)'        bookmark_aliases "$@"
-    (( ${#remoterepo_aliases}    )) && _describe -t remote-repo-aliases     '仓库/远程/推送/PR (Remote)'   remoterepo_aliases "$@"
-    (( ${#workspacefile_aliases} )) && _describe -t workspace-file-aliases  '工作区/文件 (Workspace/File)' workspacefile_aliases "$@"
+    (( ${#essential_aliases}     )) && _describe -t essential-aliases       'Core'                essential_aliases "$@"
+    (( ${#statuslog_aliases}     )) && _describe -t statuslog-aliases       'Status/Log/Ops'      statuslog_aliases "$@"
+    (( ${#viewdiff_aliases}      )) && _describe -t viewdiff-aliases        'View/Diff'           viewdiff_aliases "$@"
+    (( ${#commitedit_aliases}    )) && _describe -t commit-edit-aliases     'Commit/Edit'         commitedit_aliases "$@"
+    (( ${#rebase_aliases}        )) && _describe -t rebase-aliases          'Rebase'              rebase_aliases "$@"
+    (( ${#bookmark_aliases}      )) && _describe -t bookmark-aliases        'Bookmarks'           bookmark_aliases "$@"
+    (( ${#remoterepo_aliases}    )) && _describe -t remote-repo-aliases     'Remote/Repo/PR'      remoterepo_aliases "$@"
+    (( ${#workspacefile_aliases} )) && _describe -t workspace-file-aliases  'Workspace/File/UI'   workspacefile_aliases "$@"
 
     # Finally, call the original provider to emit the built-in commands group(s)
     if typeset -f _jj_commands_original >/dev/null; then

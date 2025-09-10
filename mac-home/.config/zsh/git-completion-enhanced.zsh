@@ -339,14 +339,14 @@ __git_emit_ami_alias_groups() {
     esac
   done
 
-  (( ${#__g8_essential[@]}      )) && _describe -t git8-essential      '核心'                 __g8_essential
-  (( ${#__g8_statuslog[@]}      )) && _describe -t git8-statuslog      '状态/日志'            __g8_statuslog
-  (( ${#__g8_viewdiff[@]}       )) && _describe -t git8-viewdiff       '查看/差异'            __g8_viewdiff
-  (( ${#__g8_commitedit[@]}     )) && _describe -t git8-commitedit     '提交/暂存'            __g8_commitedit
-  (( ${#__g8_rebase[@]}         )) && _describe -t git8-rebase         'Rebase'               __g8_rebase
-  (( ${#__g8_branchworktree[@]} )) && _describe -t git8-branchworktree '分支/工作树'          __g8_branchworktree
-  (( ${#__g8_remotepr[@]}       )) && _describe -t git8-remotepr       '远程/推送/PR'          __g8_remotepr
-  (( ${#__g8_repoops[@]}        )) && _describe -t git8-repoops        '仓库/协作'            __g8_repoops
+  (( ${#__g8_essential[@]}      )) && _describe -t git8-essential      'Core'          __g8_essential
+  (( ${#__g8_statuslog[@]}      )) && _describe -t git8-statuslog      'Status/Log'    __g8_statuslog
+  (( ${#__g8_viewdiff[@]}       )) && _describe -t git8-viewdiff       'View/Diff'     __g8_viewdiff
+  (( ${#__g8_commitedit[@]}     )) && _describe -t git8-commitedit     'Commit/Stage'  __g8_commitedit
+  (( ${#__g8_rebase[@]}         )) && _describe -t git8-rebase         'Rebase'        __g8_rebase
+  (( ${#__g8_branchworktree[@]} )) && _describe -t git8-branchworktree 'Branch/WT'     __g8_branchworktree
+  (( ${#__g8_remotepr[@]}       )) && _describe -t git8-remotepr       'Remote/PR'     __g8_remotepr
+  (( ${#__g8_repoops[@]}        )) && _describe -t git8-repoops        'Repo/Ops'      __g8_repoops
 }
 
 __git_complete_with_aliases() {
