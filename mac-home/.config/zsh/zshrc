@@ -29,28 +29,18 @@ zstyle ':fzf-tab:*' fzf-flags '--ansi' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#
 zstyle ':fzf-tab:*' show-group yes
 # Keep git candidate list order matching header order
 zstyle ':fzf-tab:complete:git:*' fzf-flags '--ansi' '--no-sort' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
-# Ensure completion results remain grouped (affects both compsys and fzf-tab)
-zstyle ':completion:*' list-grouped yes
+# Completion behavior for fzf-tab integration
 zstyle ':completion:*' menu no
-# Show descriptions for git completion and put description first for our user-commands
+zstyle ':completion:*:descriptions' format '[%d]'
+# Git fzf-tab display
 zstyle ':fzf-tab:complete:git:*' descriptions yes
-zstyle ':fzf-tab:complete:git:*' group-order \
-  'user commands' 'user-commands' \
-  'main porcelain commands' 'main-porcelain-commands' \
-  'third party commands' 'third-party-commands' \
-  'ancillary manipulator commands' 'ancillary-manipulator-commands' \
-  'ancillary interrogator commands' 'ancillary-interrogator-commands' \
-  'interaction commands' 'interaction-commands' \
-  'plumbing manipulator commands' 'plumbing-manipulator-commands' \
-  'plumbing interrogator commands' 'plumbing-interrogator-commands' \
-  'plumbing sync commands' 'plumbing-sync-commands' \
-  'plumbing sync helper commands' 'plumbing-sync-helper-commands' \
-  'plumbing internal helper commands' 'plumbing-internal-helper-commands' \
-  'commands' \
-  'alias' 'aliases'
 
-# JJ group order for fzf-tab (commands last)
-zstyle ':fzf-tab:complete:jj:*' group-order 'essential-aliases' 'status-aliases' 'commit-aliases' 'rebase-aliases' 'bookmark-aliases' 'other-aliases' 'commands' 'command'
+# JJ group order for fzf-tab (expanded, commands last)
+zstyle ':fzf-tab:complete:jj:*' group-order \
+  'essential-aliases' 'repo-aliases' 'status-aliases' 'view-aliases' \
+  'commit-aliases' 'rebase-aliases' 'bookmark-aliases' \
+  'remote-aliases' 'workspace-aliases' 'file-aliases' 'absorb-aliases' \
+  'ops-aliases' 'ui-aliases' 'other-aliases' 'commands' 'command'
 
 fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
 fpath=(/usr/share/zsh/5.9/functions $fpath)

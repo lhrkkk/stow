@@ -16,13 +16,15 @@ if (( $+commands[jj] )); then
 
   # Override _jj_commands to include aliases with grouping
   _jj_commands() {
-    # Define essential aliases group (most commonly used)
+    # Define alias groups (compact to 8 groups)
     local -a essential_aliases
-    local -a status_aliases
-    local -a commit_aliases
+    local -a statuslog_aliases
+    local -a viewdiff_aliases
+    local -a commitedit_aliases
     local -a rebase_aliases
     local -a bookmark_aliases
-    local -a other_aliases
+    local -a remoterepo_aliases
+    local -a workspacefile_aliases
 
     # Build and add aliases with categorization first (so commands can be last)
     local alias_line name value desc
@@ -226,65 +228,57 @@ if (( $+commands[jj] )); then
           *) desc="alias for ${value}" ;;
         esac
 
-        # Categorize the alias more logically
+        # Categorize the alias more logically (8 groups)
         case $name in
-          # Essential (most commonly used single-letter)
-          s|l|d|n|e|w|f) essential_aliases+=("${name}:${desc}") ;;
+          # Essential (keep minimal)
+          s|l) essential_aliases+=("${name}:${desc}") ;;
 
-          # Status, log and history
-          sf|lg|lp|lr|ls|default|ol|or|ow|owp) status_aliases+=("${name}:${desc}") ;;
+          # Status & Log (include Ops: ol/or/ow/owp)
+          sf|lg|lp|lr|ls|default|ol|or|ow|owp) statuslog_aliases+=("${name}:${desc}") ;;
 
-          # Creating and editing commits
-          ci|cm|cim|de|dem|nm|nt|ntm|na|nae|naem|nb|nbe|nbem|ad|adb|adk|sp|spp|sppr|spr|sq|sqa|sqt|sqat|sqf|sqaf|sqr|sqar) commit_aliases+=("${name}:${desc}") ;;
+          # View & Diff
+          w|ws|d|dr) viewdiff_aliases+=("${name}:${desc}") ;;
 
-          # Navigation
-          ep|epc|en|enc|eh) commit_aliases+=("${name}:${desc}") ;;
+          # Commit & Edit (incl. split/squash/abandon/navigate/absorb)
+          ci|cm|cim|de|dem|nm|nt|ntm|na|nae|naem|nb|nbe|nbem|ad|adb|adk|sp|spp|sppr|spr|sq|sqa|sqt|sqat|sqf|sqaf|sqr|sqar|ep|epc|en|enc|eh|ab|abf) commitedit_aliases+=("${name}:${desc}") ;;
 
-          # Rebase operations (all rb* commands)
+          # Rebase
           rb*) rebase_aliases+=("${name}:${desc}") ;;
 
-          # Bookmark and branch management
-          b[dflrstu]*|bmw|bmb) bookmark_aliases+=("${name}:${desc}") ;;
+          # Bookmarks & Branches
+          b[dflrstu]*|bmw|bmb|br|bs|bsr|bst|bt|bu) bookmark_aliases+=("${name}:${desc}") ;;
 
-          # Git integration (push, pull, fetch)
-          ps*|pr*|fo|fa|faw|fw|cl*|init) other_aliases+=("${name}:${desc}") ;;
+          # Remote & Repo (push/fetch/PR + init/clone)
+          ps*|pr*|pro|prow|prw|fo|fa|faw|fw|init|cl|clg|clgp|clgu|clsp|clsu) remoterepo_aliases+=("${name}:${desc}") ;;
 
-          # File and workspace operations
-          fn*|ft|fu|re|wa*|wf*|wl|wo*|wr|ab|abf|ui) other_aliases+=("${name}:${desc}") ;;
+          # Workspace & Files (workspaces + file operations + ui)
+          wl|wa*|wf*|wo*|wr|fn*|ft|fu|re|ui) workspacefile_aliases+=("${name}:${desc}") ;;
 
-          # Everything else
-          *) other_aliases+=("${name}:${desc}") ;;
+          # Fallbacks → put into Commit/Edit to avoid extra groups
+          *) commitedit_aliases+=("${name}:${desc}") ;;
         esac
       fi
     done < <(jj config list --user 2>/dev/null | grep '^aliases\.')
 
     # Sort each group by alias name for stable ordering, then add to completion
-    (( ${#essential_aliases} )) && essential_aliases=(${(o)essential_aliases})
-    (( ${#status_aliases}    )) && status_aliases=(${(o)status_aliases})
-    (( ${#commit_aliases}    )) && commit_aliases=(${(o)commit_aliases})
-    (( ${#rebase_aliases}    )) && rebase_aliases=(${(o)rebase_aliases})
-    (( ${#bookmark_aliases}  )) && bookmark_aliases=(${(o)bookmark_aliases})
-    (( ${#other_aliases}     )) && other_aliases=(${(o)other_aliases})
+    (( ${#essential_aliases}     )) && essential_aliases=(${(o)essential_aliases})
+    (( ${#statuslog_aliases}     )) && statuslog_aliases=(${(o)statuslog_aliases})
+    (( ${#viewdiff_aliases}      )) && viewdiff_aliases=(${(o)viewdiff_aliases})
+    (( ${#commitedit_aliases}    )) && commitedit_aliases=(${(o)commitedit_aliases})
+    (( ${#rebase_aliases}        )) && rebase_aliases=(${(o)rebase_aliases})
+    (( ${#bookmark_aliases}      )) && bookmark_aliases=(${(o)bookmark_aliases})
+    (( ${#remoterepo_aliases}    )) && remoterepo_aliases=(${(o)remoterepo_aliases})
+    (( ${#workspacefile_aliases} )) && workspacefile_aliases=(${(o)workspacefile_aliases})
 
-    # Add aliases to completion with groups
-    if (( ${#essential_aliases} > 0 )); then
-      _describe -t essential-aliases '核心命令 (Essential)' essential_aliases "$@"
-    fi
-    if (( ${#status_aliases} > 0 )); then
-      _describe -t status-aliases '状态/日志/历史 (Status/Log)' status_aliases "$@"
-    fi
-    if (( ${#commit_aliases} > 0 )); then
-      _describe -t commit-aliases '提交编辑 (Commit/Edit)' commit_aliases "$@"
-    fi
-    if (( ${#rebase_aliases} > 0 )); then
-      _describe -t rebase-aliases 'Rebase 操作' rebase_aliases "$@"
-    fi
-    if (( ${#bookmark_aliases} > 0 )); then
-      _describe -t bookmark-aliases '书签管理 (Bookmarks)' bookmark_aliases "$@"
-    fi
-    if (( ${#other_aliases} > 0 )); then
-      _describe -t other-aliases '其他操作 (Git/File/Workspace)' other_aliases "$@"
-    fi
+    # Add aliases to completion with 8 groups
+    (( ${#essential_aliases}     )) && _describe -t essential-aliases       '核心 (Essential)'             essential_aliases "$@"
+    (( ${#statuslog_aliases}     )) && _describe -t statuslog-aliases       '状态/日志/操作 (Status/Log)'  statuslog_aliases "$@"
+    (( ${#viewdiff_aliases}      )) && _describe -t viewdiff-aliases        '查看/差异 (View/Diff)'        viewdiff_aliases "$@"
+    (( ${#commitedit_aliases}    )) && _describe -t commit-edit-aliases     '提交/编辑 (Commit/Edit)'      commitedit_aliases "$@"
+    (( ${#rebase_aliases}        )) && _describe -t rebase-aliases          'Rebase'                        rebase_aliases "$@"
+    (( ${#bookmark_aliases}      )) && _describe -t bookmark-aliases        '书签/分支 (Bookmarks)'        bookmark_aliases "$@"
+    (( ${#remoterepo_aliases}    )) && _describe -t remote-repo-aliases     '仓库/远程/推送/PR (Remote)'   remoterepo_aliases "$@"
+    (( ${#workspacefile_aliases} )) && _describe -t workspace-file-aliases  '工作区/文件 (Workspace/File)' workspacefile_aliases "$@"
 
     # Finally, call the original provider to emit the built-in commands group(s)
     if typeset -f _jj_commands_original >/dev/null; then
@@ -302,18 +296,23 @@ zstyle ':completion:*:descriptions' format '[%d]'
 # Avoid restricting results to a single tag; rely on group-order only
 zstyle ':completion:*:*:jj:*' group-order \
   'essential-aliases' \
-  'status-aliases' \
-  'commit-aliases' \
+  'statuslog-aliases' \
+  'viewdiff-aliases' \
+  'commit-edit-aliases' \
   'rebase-aliases' \
   'bookmark-aliases' \
-  'other-aliases' \
+  'remote-repo-aliases' \
+  'workspace-file-aliases' \
   'commands' \
   'command'
 
 # fzf-tab group order for jj
 zstyle ':fzf-tab:complete:jj:*' descriptions yes
 zstyle ':fzf-tab:complete:jj:*' show-group yes
-zstyle ':fzf-tab:complete:jj:*' group-order 'essential-aliases' 'status-aliases' 'commit-aliases' 'rebase-aliases' 'bookmark-aliases' 'other-aliases' 'commands' 'command'
+zstyle ':fzf-tab:complete:jj:*' group-order \
+  'essential-aliases' 'statuslog-aliases' 'viewdiff-aliases' 'commit-edit-aliases' \
+  'rebase-aliases' 'bookmark-aliases' 'remote-repo-aliases' 'workspace-file-aliases' \
+  'commands' 'command'
 
 # Make the essential commands stand out
 zstyle ':completion:*:*:jj:*:essential-aliases' list-colors '=*=1;32'
