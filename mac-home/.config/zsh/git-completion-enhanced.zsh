@@ -258,7 +258,7 @@ __git_apply_styles() {
   zstyle ':completion:*:*:git:*' sort false
   # Plain text descriptions so fzf-tab recognizes groups
   zstyle ':completion:*:descriptions' format '[%d]'
-  # Force tag order: inject our alias buckets as independent tags; omit 'aliases'
+  # Show only our alias buckets (hide system commands entirely)
   zstyle ':completion:*:*:git:*' tag-order \
     'ami-alias-repo' \
     'ami-alias-status' \
@@ -271,19 +271,7 @@ __git_apply_styles() {
     'ami-alias-pr' \
     'ami-alias-worktree' \
     'ami-alias-town' \
-    'ami-alias-other' \
-    'main-porcelain-commands' \
-    'third-party-commands' \
-    'ancillary-manipulator-commands' \
-    'ancillary-interrogator-commands' \
-    'interaction-commands' \
-    'plumbing-manipulator-commands' \
-    'plumbing-interrogator-commands' \
-    'plumbing-sync-commands' \
-    'plumbing-sync-helper-commands' \
-    'plumbing-internal-helper-commands' \
-    'commands'
-  # Corresponding group order
+    'ami-alias-other'
   zstyle ':completion:*:*:git:*' group-order \
     'ami-alias-repo' \
     'ami-alias-status' \
@@ -296,18 +284,7 @@ __git_apply_styles() {
     'ami-alias-pr' \
     'ami-alias-worktree' \
     'ami-alias-town' \
-    'ami-alias-other' \
-    'main-porcelain-commands' \
-    'third-party-commands' \
-    'ancillary-manipulator-commands' \
-    'ancillary-interrogator-commands' \
-    'interaction-commands' \
-    'plumbing-manipulator-commands' \
-    'plumbing-interrogator-commands' \
-    'plumbing-sync-commands' \
-    'plumbing-sync-helper-commands' \
-    'plumbing-internal-helper-commands' \
-    'commands'
+    'ami-alias-other'
 }
 
 __git_emit_ami_alias_groups() {
@@ -330,6 +307,8 @@ __git_emit_ami_alias_groups() {
 __git_complete_with_aliases() {
   emulate -L zsh
   autoload -Uz _git 2>/dev/null || true
+  # Ensure our overrides are loaded before any emission
+  __git_load_and_override
   __git_apply_styles
   # Ensure fzf-tab shows descriptions and groups
   zstyle ':fzf-tab:complete:git:*' descriptions yes 2>/dev/null || true
@@ -361,14 +340,16 @@ __git_load_and_override() {
   # Neutralize system alias providers (we inject aliases via _git_commands wrapper)
   __git_zsh_cmd_alias() { return 1 }
   __git_aliases() { return 1 }
+  __git_extract_aliases() { aliases=() }
 
   # Override command list to prepend our alias groups in the same completion pass
   if typeset -f _git_commands >/dev/null; then
     functions[_git_commands_original]=$functions[_git_commands]
     _git_commands() {
       emulate -L zsh
+      # Only emit our alias groups (hide system commands)
       __git_emit_ami_alias_groups "$@"
-      _git_commands_original "$@"
+      return 0
     }
   fi
   __git_apply_styles
