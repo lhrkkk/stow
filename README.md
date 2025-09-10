@@ -199,6 +199,22 @@
 
 ---
 
+## 6. Zsh 补全（Git/JJ 分组版）
+
+- 说明文档：`mac-home/.config/zsh/README.completion.md`
+- 功能要点：
+  - Git/JJ 别名按 8 个任务域分组展示（可选隐藏 Git 系统命令组）
+  - 分组顺序与候选顺序稳定一致（禁排序、单次发射）
+  - 提供 `ftb-debug-on/off` 抓取本次补全的分组与候选，用于排错
+- 入口：
+  - Git：`mac-home/.config/zsh/git-completion-enhanced.zsh`
+  - JJ：`mac-home/.config/zsh/jj-completion-enhanced.zsh`
+  - fzf-tab/样式：`mac-home/.config/zsh/zshrc`
+
+> 打开文档查看 8 组分法、每条别名说明、调试与自定义方法。
+
+---
+
 ## 6. 验证与常见应用
 
 - WezTerm：保存 `~/.config/wezterm/wezterm.lua` 后自动热重载；偏好“浅色标题栏”已在配置中处理。
@@ -352,4 +368,3 @@
     ```sh
      zimfw doctor
     ```
-
