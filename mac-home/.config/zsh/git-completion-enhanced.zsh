@@ -123,8 +123,8 @@ if (( $+commands[git] )); then
 
     # Category mapping
     local -A cat_map; cat_map=()
-    # 状态/日志
-    for k in s st stat sf l lg default filelog changes short simple shortnocolor; do cat_map[$k]=status; done
+    # 状态/日志（含 reflog 与贡献统计）
+    for k in s st stat sf l lg default filelog changes short simple shortnocolor ol contributors; do cat_map[$k]=status; done
     # 暂存/快照
     for k in ss sl sa sd snapshot snapshots; do cat_map[$k]=stash; done
     # 分支/切换
@@ -139,8 +139,8 @@ if (( $+commands[git] )); then
     for k in rb rbt rbr rc rs; do cat_map[$k]=rebase; done
     # PR
     for k in pro pr; do cat_map[$k]=pr; done
-    # 工作树/引用日志/责备
-    for k in wl wa wf ol fn fnr; do cat_map[$k]=worktree; done
+    # 工作树/责备（reflog 归入“状态/日志”）
+    for k in wl wa wf fn fnr; do cat_map[$k]=worktree; done
     # 初始化/克隆
     for k in init cl clg clgp clgu; do cat_map[$k]=repo; done
     # Git Town

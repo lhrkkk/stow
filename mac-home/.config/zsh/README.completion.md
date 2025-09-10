@@ -37,36 +37,11 @@ exec zsh -l
 
 ---
 
-## Git：8 组别名规划（系统命令可隐藏/可恢复）
+## Git：8 组别名（系统命令可隐藏/可恢复）
 
 > 当前已默认“隐藏系统命令组”，只展示别名 8 组；如需恢复见文末“可选项”。
 
-1) 核心（`git8-essential`）
-   - s, l
-
-2) 状态/日志（`git8-statuslog`）
-   - st, stat, sf, lg, changes, short, simple, shortnocolor, filelog, default, ol, contributors
-
-3) 查看/差异（`git8-viewdiff`）
-   - d, dc, dr, last, w, ws, ad, ads, fn, fnr
-
-4) 提交/暂存（`git8-commitedit`）
-   - a, chunkyadd, c, ca, ci, amend, ammend,
-   - ss, sl, sa, sd, snapshot, snapshots,
-   - cp, mt
-
-5) Rebase（`git8-rebase`）
-   - rb, rbt, rbr, rc, rs
-
-6) 分支/工作树（`git8-branchworktree`）
-   - b, co, nb, recent-branches, wl, wa, wf
-
-7) 远程/推送/PR（`git8-remotepr`）
-   - r, pl, fo, f, ps, psa, psd, psb, pscb, pro, pr
-
-8) 仓库/协作（`git8-repoops`）
-   - init, cl, clg, clgp, clgu, svnr, svnd, svnl,
-   - append, hack, kill, new-pull-request, prepend, prune-branches, rename-branch, repo, ship, sync
+> 下方“Git 别名详解（按组）”为唯一事实来源（SSOT）。这里不再重复列清单。
 
 分组实现要点：
 
@@ -79,19 +54,8 @@ exec zsh -l
 为什么是这 8 组？
 
 - 贴合 Git 官方 Porcelain 职责，面向“日常工作域”而不是底层命令族；
-- 减少“找命令”的心智负担：读状态/读历史（状态/日志）、看变更（查看/差异）、组织提交（提交/暂存）、线性化（Rebase）、本地开发单元（分支/工作树）、对外同步（远程/推送/PR）、仓库生命周期（仓库/协作）、高频入口（核心）。
-- 尽量避免“其他”：通过别名模式路由，将易歧义命令（如 blame/difftool/svn/pr 流程）定向到最常见使用场景。
-
-当前归并策略（逐条说明）
-
-- s/l → 核心（高频、入口级）
-- st/stat/sf/lg/changes/short/simple/shortnocolor/filelog/default/ol/contributors → 状态/日志（读状态/读历史/汇总/操作历史）
-- d/dc/dr/last/w/ws/ad/ads/fn/fnr → 查看/差异（所有 diff/show/blame；图形工具与目录对比也在此）
-- a/chunkyadd/c/ca/ci/amend/ammend/ss/sl/sa/sd/snapshot/snapshots/cp/mt → 提交/暂存（暂存/提交/修订/挑拣/冲突解决/快照）
-- rb/rbt/rbr/rc/rs → Rebase（历史重写/流程节点）
-- b/co/nb/recent-branches/wl/wa/wf → 分支/工作树（本地开发单元管理）
-- r/pl/fo/f/ps*/pro/pr → 远程/推送/PR（对外同步、协作）
-- init/cl/clg/clgp/clgu/svnr/svnd/svnl/Git Town 全家 → 仓库/协作（初始化/克隆/协作生态）
+- 降低查找成本：读状态/读历史、看变化、组织提交、线性化、本地开发单元、对外同步、仓库生命周期、高频入口。
+- 尽量避免“其他”：通过别名模式路由，将易歧义命令（如 blame/difftool/svn/pr 流程）定向到常见场景。
 
 想改组？（快速路由）
 
@@ -118,14 +82,14 @@ exec zsh -l
 
 - 核心（入口/高频）
   - s: 状态总览（`git status`）
-  - l: 简洁图形化日志（`git log --graph --date=short ...`）
+  - l: 简洁图形化日志（`git log --graph --date=short …`）
 
 - 状态/日志（读状态/读历史/汇总）
   - st/stat: 状态（`git status`）
   - sf: 简洁状态 + diff 统计（`status --short --branch; diff --stat`）
   - lg: 全量图形化日志（`--decorate --abbrev-commit --date=relative --pretty=jj --all`）
-  - changes: 提交变更列表（`log --pretty=... --name-status`）
-  - short/simple/shortnocolor: 多种精简日志格式（不同 `--pretty` 模板）
+  - changes: 提交变更列表（`log --pretty=… --name-status`）
+  - short/simple/shortnocolor: 精简日志视图（不同 `--pretty` 模板）
   - filelog: 单文件级历史（`git log -u -- <file>`）
   - default: 快速总览（先 `sf` 再 `lg -n 20`）
   - ol: 操作日志（`git reflog`）
@@ -135,7 +99,7 @@ exec zsh -l
   - d/dc: 差异（工作区/暂存区，`git diff` / `git diff --cached`）
   - dr/last: 指定/上一次提交的差异（`git diff ${1:-HEAD}` / `git diff HEAD^`）
   - w/ws: 提交详情/统计（`git show` / `git show --stat`）
-  - ad/ads: 目录级对比（Araxis difftool；含暂存区版本）
+  - ad/ads: 目录级对比（Araxis difftool；含暂存区版）
   - fn/fnr: 逐行追责/指定范围追责（`git blame` / `git blame -L <range> -- <file>`）
 
 - 提交/暂存（组织改动与形成提交）
@@ -144,7 +108,7 @@ exec zsh -l
   - amend/ammend: 修订上次提交（`git commit --amend`；`ammend` 为兼容拼写）
   - ss/sl/sa/sd: stash（保存/列表/应用/删除）
   - snapshot/snapshots: 快照工作区（保存并列出贴“snapshot”标签的 stash）
-  - cp: 挑拣（`git cherry-pick -x`，保留来源）
+  - cp: 挑拣（`git cherry-pick -x` 保留来源）
   - mt: 合并工具（`git mergetool`）
 
 - Rebase（线性化与拼接）
@@ -290,6 +254,14 @@ zstyle -L ':fzf-tab:complete:git:*'          # 查看 git 在 fzf-tab 下的样�
 whence -v _git                               # 确认系统 _git 源头
 whence -v __git_complete_with_aliases        # 确认增强包装函数已加载
 bindkey '^I'                                 # 确认 Tab 由 fzf-tab-complete 负责
+```
+
+自检（打印“组 → 别名”）：
+
+```zsh
+git-groups-dump   # 打印当前 Git 8 组及各组别名（含描述）
+jj-groups-dump    # 打印当前 JJ 8 组及各组别名（name=value）
+comp-groups-dump  # 两者都打印
 ```
 
 ---

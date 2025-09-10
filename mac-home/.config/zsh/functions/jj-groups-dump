@@ -1,0 +1,73 @@
+#!/usr/bin/env zsh
+# Print current JJ alias groups (8-group plan) with items (name=value)
+
+jj-groups-dump() {
+  emulate -L zsh
+  setopt errexit pipefail 2>/dev/null || true
+
+  (( $+commands[jj] )) || { print -ru2 -- "[jj-groups-dump] jj not found"; return 1 }
+
+  local line name value
+  local -a essential statuslog viewdiff commitedit rebase bookmark remote workspacefile
+
+  jj config list --user 2>/dev/null | grep '^aliases\.' | while IFS= read -r line; do
+    [[ $line =~ ^aliases\.([^[:space:]=]+)[[:space:]]*=[[:space:]]*(.+)$ ]] || continue
+    name=${match[1]}
+    value=${match[2]}
+    # trim brackets/quotes/commas from value for readability
+    value=${value//\[/}
+    value=${value//\]/}
+    value=${value//\'/}
+    value=${value//,/}
+
+    case $name in
+      # essential
+      s|l) essential+=("$name=$value") ;;
+
+      # status/log/ops
+      sf|lg|lp|lr|ls|default|ol|or|ow|owp) statuslog+=("$name=$value") ;;
+
+      # view/diff
+      w|ws|d|dr) viewdiff+=("$name=$value") ;;
+
+      # commit/edit (+ split/squash/abandon/navigate/absorb)
+      ci|cm|cim|de|dem|nm|nt|ntm|na|nae|naem|nb|nbe|nbem|ad|adb|adk|sp|spp|sppr|spr|sq|sqa|sqt|sqat|sqf|sqaf|sqr|sqar|ep|epc|en|enc|eh|ab|abf)
+        commitedit+=("$name=$value") ;;
+
+      # rebase
+      rb*) rebase+=("$name=$value") ;;
+
+      # bookmarks/branches
+      b[dflrstu]*|bmw|bmb|br|bs|bsr|bst|bt|bu) bookmark+=("$name=$value") ;;
+
+      # remote/repo (push/fetch/PR)
+      ps*|pr*|pro|prow|prw|fo|fa|faw|fw|init|cl|clg|clgp|clgu|clsp|clsu)
+        remote+=("$name=$value") ;;
+
+      # workspace/files/ui
+      wl|wa*|wf*|wo*|wr|fn*|ft|fu|re|ui) workspacefile+=("$name=$value") ;;
+
+      # fallback
+      *) commitedit+=("$name=$value") ;;
+    esac
+  done
+
+  local -a headers=(
+    '核心' '状态/日志/操作' '查看/差异' '提交/编辑' 'Rebase' '书签/分支' '远程/仓库/PR' '工作区/文件/UI'
+  )
+  local -a groups=( essential statuslog viewdiff commitedit rebase bookmark remote workspacefile )
+
+  print -r -- '== jj alias groups =='
+  integer i=1; local -a ref; local item
+  while (( i <= ${#groups} )); do
+    ref=(${(P)groups[$i]})
+    if (( ${#ref[@]} )); then
+      print -r -- "[${headers[$i]}]"
+      for item in ${ref[@]}; do
+        print -r -- "  ${item}"
+      done
+      print -r -- ''
+    fi
+    (( i++ ))
+  done
+}

@@ -1,0 +1,9 @@
+#!/usr/bin/env zsh
+# Run both git-groups-dump and jj-groups-dump (if available)
+
+comp-groups-dump() {
+  emulate -L zsh
+  whence -w git-groups-dump >/dev/null 2>&1 && git-groups-dump || print -ru2 -- "[comp-groups-dump] skip git (function missing)"
+  whence -w jj-groups-dump  >/dev/null 2>&1 && jj-groups-dump  || print -ru2 -- "[comp-groups-dump] skip jj (function missing)"
+}
+
