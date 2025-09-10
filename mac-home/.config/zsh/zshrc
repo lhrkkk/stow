@@ -27,21 +27,38 @@ source ~/.config/zsh/tmux.zsh
 # fzf-tab theme colors (Selenized Light - Gogh)
 zstyle ':fzf-tab:*' fzf-flags '--ansi' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
 zstyle ':fzf-tab:*' show-group yes
+# Keep git candidate list order matching header order
+zstyle ':fzf-tab:complete:git:*' fzf-flags '--ansi' '--no-sort' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
+# Ensure completion results remain grouped (affects both compsys and fzf-tab)
+zstyle ':completion:*' list-grouped yes
+zstyle ':completion:*' menu no
 # Show descriptions for git completion and put description first for our user-commands
 zstyle ':fzf-tab:complete:git:*' descriptions yes
-zstyle ':fzf-tab:complete:git:*' group-order 'user-commands' 'common-commands' 'all-commands' 'alias-commands'
+zstyle ':fzf-tab:complete:git:*' group-order \
+  'user commands' 'user-commands' \
+  'main porcelain commands' 'main-porcelain-commands' \
+  'third party commands' 'third-party-commands' \
+  'ancillary manipulator commands' 'ancillary-manipulator-commands' \
+  'ancillary interrogator commands' 'ancillary-interrogator-commands' \
+  'interaction commands' 'interaction-commands' \
+  'plumbing manipulator commands' 'plumbing-manipulator-commands' \
+  'plumbing interrogator commands' 'plumbing-interrogator-commands' \
+  'plumbing sync commands' 'plumbing-sync-commands' \
+  'plumbing sync helper commands' 'plumbing-sync-helper-commands' \
+  'plumbing internal helper commands' 'plumbing-internal-helper-commands' \
+  'commands' \
+  'alias' 'aliases'
 
 # JJ group order for fzf-tab (commands last)
-zstyle ':fzf-tab:complete:jj:*' group-order 'essential-aliases' 'status-aliases' 'commit-aliases' 'rebase-aliases' 'bookmark-aliases' 'other-aliases' 'commands'
+zstyle ':fzf-tab:complete:jj:*' group-order 'essential-aliases' 'status-aliases' 'commit-aliases' 'rebase-aliases' 'bookmark-aliases' 'other-aliases' 'commands' 'command'
 
 fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
 fpath=(/usr/share/zsh/5.9/functions $fpath)
 
-# Git alias descriptions (user-commands) — baseline method that already works
-source ~/.config/zsh/git-alias-descriptions.zsh
+# source ~/.config/zsh/git-alias-descriptions.zsh
 
-# Git enhanced completion tweaks — remove native alias duplicates and integrate with lazy loading
-# source ~/.config/zsh/git-completion-enhanced.zsh
+# Git completion (enhanced): consistent tag names + alias grouping
+source ~/.config/zsh/git-completion-enhanced.zsh
 
 # JJ enhanced completion with alias support
 source ~/.config/zsh/jj-completion-enhanced.zsh

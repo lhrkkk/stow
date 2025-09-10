@@ -1,0 +1,48 @@
+#!/usr/bin/env zsh
+# Dump fzf-tab debug info for current completion into a temp file
+{
+  local log=${TMPDIR:-/tmp}/fzf-tab-debug-$$.log
+  {
+    print -r -- "== fzf-tab debug =="
+    print -r -- "curcontext: ${_ftb_curcontext:-}"
+    print -r -- "query: ${_ftb_query:-}"
+    print -r -- "headers (#=${#_ftb_headers}):"
+    if (( ${#_ftb_headers} )); then
+      print -rl -- ${_ftb_headers[@]}
+    fi
+    print -r -- "groups (#=${#_ftb_groups}):"
+    if (( ${#_ftb_groups} )); then
+      print -rl -- ${_ftb_groups[@]}
+    fi
+    if (( ${#_ftb_compcap} )); then
+      print -r -- "candidates (#=${#_ftb_compcap}):"
+      local i=1 item desc tmp grpidx grpname word bs=$'\2' nul=$'\0'
+      for item in ${_ftb_compcap[@]}; do
+        desc=${item%%$bs*}
+        tmp=${item#*$bs}
+        # extract group index and word by parsing NUL-separated key/value pairs
+        local -a fields; fields=("${(s:${nul}:)tmp}")
+        grpidx=""; word=""
+        local j key val
+        for (( j=1; j<=${#fields}; j+=2 )); do
+          key=${fields[j]}
+          val=${fields[j+1]}
+          [[ $key == group ]] && grpidx=$val
+          [[ $key == word  ]] && word=$val
+        done
+        if [[ -n $grpidx ]]; then
+          grpname=${_ftb_groups[$grpidx]}
+        else
+          grpname='(no-group)'
+        fi
+        print -r -- "$i) [$grpname] ${desc:-$word}"
+        (( ++i ))
+      done
+    fi
+  } >! "$log"
+  # also echo a short hint to stderr if possible
+  print -ru2 -- "[fzf-tab] wrote debug to $log"
+} always {
+  # non-zero exit to skip inserting anything
+  return 1
+}

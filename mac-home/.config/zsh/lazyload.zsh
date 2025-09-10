@@ -10,7 +10,30 @@ if [[ $- == *i* ]]; then
     # 释放 compdef 名字，恢复为真正的 compdef
     unfunction compdef 2>/dev/null || true
 
+    # 在 compinit 之前，确保 fpath 包含系统函数目录与 zsh-completions
+    if [[ -n ${ZIM_HOME} && -d ${ZIM_HOME}/modules/zsh-completions/src ]]; then
+      typeset -U fpath
+      fpath=("${ZIM_HOME}/modules/zsh-completions/src" $fpath)
+    fi
+    # 通用系统目录（存在就加入）
+    typeset -U fpath
+    local _d
+    for _d in \
+      /usr/share/zsh/5.9/functions \
+      /usr/share/zsh/functions \
+      /opt/homebrew/share/zsh/site-functions \
+      /usr/local/share/zsh/site-functions \
+      /opt/homebrew/share/zsh/functions; do
+      [[ -d $_d ]] && fpath=($_d $fpath)
+    done
+
     autoload -Uz compinit
+    # 若 compinit 文件仍不可用则直接返回，避免报错
+    local _has_compinit=0
+    for _d in $fpath; do [[ -r $_d/compinit ]] && _has_compinit=1 && break; done
+    if (( ! _has_compinit )); then
+      return 0
+    fi
     local dump=${ZDOTDIR:-$HOME}/.zcompdump
     compinit -C -d "$dump"
 
@@ -25,11 +48,6 @@ if [[ $- == *i* ]]; then
     # 执行一次后移除自己，防止被 Tab 兜底再次调用
     unfunction _lazy_compinit_run 2>/dev/null || true
   }
-
-  # 如果支持 sched，则在提示符显示后的下一轮事件循环执行
-  if zmodload zsh/sched 2>/dev/null; then
-    sched +0 _lazy_compinit_run
-  fi
 
   # 首次 Tab 兜底：若尚未初始化，则先运行再补全
   zle -N _ami_expand_or_complete
@@ -67,6 +85,11 @@ _lazy_zim_init_run() {
   autopair-init
   source ~/.config/zsh/prompt.zsh
 
+  # 确保我们的 completion 覆盖（如 git 别名分组）在 Zim 之后仍然生效
+  if typeset -f __ami_after_compinit >/dev/null; then
+    __ami_after_compinit
+  fi
+
   unfunction _lazy_zim_init_run 2>/dev/null || true
 }
 
@@ -74,6 +97,14 @@ if [[ $- == *i* ]]; then
   autoload -Uz add-zsh-hook
   _zim_precmd_once() {
     add-zsh-hook -d precmd _zim_precmd_once 2>/dev/null || true
+    # 确保在加载 Zim 与 fzf-tab 之前已经完成 compinit
+    if typeset -f _lazy_compinit_run >/dev/null; then
+      _lazy_compinit_run
+      if typeset -f __ami_after_compinit >/dev/null; then
+        __ami_after_compinit
+        unfunction __ami_after_compinit 2>/dev/null || true
+      fi
+    fi
     _lazy_zim_init_run
   }
   add-zsh-hook precmd _zim_precmd_once

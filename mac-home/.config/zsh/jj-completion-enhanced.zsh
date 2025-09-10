@@ -24,12 +24,7 @@ if (( $+commands[jj] )); then
     local -a bookmark_aliases
     local -a other_aliases
 
-    # Call the original function first
-    if typeset -f _jj_commands_original >/dev/null; then
-      _jj_commands_original "$@"
-    fi
-
-    # Now add aliases with categorization
+    # Build and add aliases with categorization first (so commands can be last)
     local alias_line name value desc
 
     # Parse jj aliases from config
@@ -263,6 +258,14 @@ if (( $+commands[jj] )); then
       fi
     done < <(jj config list --user 2>/dev/null | grep '^aliases\.')
 
+    # Sort each group by alias name for stable ordering, then add to completion
+    (( ${#essential_aliases} )) && essential_aliases=(${(o)essential_aliases})
+    (( ${#status_aliases}    )) && status_aliases=(${(o)status_aliases})
+    (( ${#commit_aliases}    )) && commit_aliases=(${(o)commit_aliases})
+    (( ${#rebase_aliases}    )) && rebase_aliases=(${(o)rebase_aliases})
+    (( ${#bookmark_aliases}  )) && bookmark_aliases=(${(o)bookmark_aliases})
+    (( ${#other_aliases}     )) && other_aliases=(${(o)other_aliases})
+
     # Add aliases to completion with groups
     if (( ${#essential_aliases} > 0 )); then
       _describe -t essential-aliases '核心命令 (Essential)' essential_aliases "$@"
@@ -282,23 +285,21 @@ if (( $+commands[jj] )); then
     if (( ${#other_aliases} > 0 )); then
       _describe -t other-aliases '其他操作 (Git/File/Workspace)' other_aliases "$@"
     fi
+
+    # Finally, call the original provider to emit the built-in commands group(s)
+    if typeset -f _jj_commands_original >/dev/null; then
+      _jj_commands_original "$@"
+    fi
   }
 fi
 
 # Enable better formatting
 zstyle ':completion:*:*:jj:*' verbose yes
-zstyle ':completion:*:*:jj:*' group-name ''
-zstyle ':completion:*:descriptions' format '%B%d%b'
+# Use plain text (no escapes) so fzf-tab can read group headers
+zstyle ':completion:*:descriptions' format '[%d]'
 
 # Define tag and group order for jj (commands last)
-zstyle ':completion:*:*:jj:*' tag-order \
-  'essential-aliases' \
-  'status-aliases' \
-  'commit-aliases' \
-  'rebase-aliases' \
-  'bookmark-aliases' \
-  'other-aliases' \
-  'commands'
+# Avoid restricting results to a single tag; rely on group-order only
 zstyle ':completion:*:*:jj:*' group-order \
   'essential-aliases' \
   'status-aliases' \
@@ -306,12 +307,13 @@ zstyle ':completion:*:*:jj:*' group-order \
   'rebase-aliases' \
   'bookmark-aliases' \
   'other-aliases' \
-  'commands'
+  'commands' \
+  'command'
 
 # fzf-tab group order for jj
 zstyle ':fzf-tab:complete:jj:*' descriptions yes
 zstyle ':fzf-tab:complete:jj:*' show-group yes
-zstyle ':fzf-tab:complete:jj:*' group-order 'essential-aliases' 'status-aliases' 'commit-aliases' 'rebase-aliases' 'bookmark-aliases' 'other-aliases' 'commands'
+zstyle ':fzf-tab:complete:jj:*' group-order 'essential-aliases' 'status-aliases' 'commit-aliases' 'rebase-aliases' 'bookmark-aliases' 'other-aliases' 'commands' 'command'
 
 # Make the essential commands stand out
 zstyle ':completion:*:*:jj:*:essential-aliases' list-colors '=*=1;32'

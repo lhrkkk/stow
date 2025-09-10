@@ -3,6 +3,9 @@
 # - Autoloads _git if needed
 # - Reads aliases from git config and exposes them to completion with descriptions
 
+# Marker env for quick verification in shell: echo $GIT_COMPLETION_ENHANCED
+typeset -g GIT_COMPLETION_ENHANCED=1
+
 if (( $+commands[git] )); then
   # Ensure git completion is available if not yet autoloaded
   if ! typeset -f _git >/dev/null; then
@@ -186,7 +189,7 @@ if (( $+commands[git] )); then
       [[ -z $base_desc ]] && base_desc="别名"
       local c=${cat_map[$name]:-other}
       local label=${cat_label[$c]:-其他}
-      local desc="${label} — ${base_desc}：${val}"
+      local desc="${label} — ${base_desc} - ${val}"
       # Append into its bucket without nameref (compat with older zsh)
       case $c in
         repo)      bucket_repo+=("${name}:${desc}") ;;
@@ -248,12 +251,80 @@ if (( $+commands[git] )); then
 fi
 
 __git_apply_styles() {
-  # Use single alias tag (required by system _git), but put it first
-  zstyle ':completion:*:*:git:*' tag-order 'alias-commands' 'common-commands' 'all-commands'
-  zstyle ':completion:*:*:git:*' group-order 'alias-commands' 'common-commands' 'all-commands'
-  zstyle ':completion:*:*:git:*' group-name ''
+  # Keep completions grouped and consistent with system _git
+  zstyle ':completion:*' list-grouped yes
   zstyle ':completion:*:*:git:*' verbose yes
-  zstyle ':completion:*:descriptions' format '%B%d%b'
+  # Do not sort matches; preserve emission order across groups
+  zstyle ':completion:*:*:git:*' sort false
+  # Plain text descriptions so fzf-tab recognizes groups
+  zstyle ':completion:*:descriptions' format '[%d]'
+  # Force tag order: inject our alias buckets as independent tags; omit 'aliases'
+  zstyle ':completion:*:*:git:*' tag-order \
+    'ami-alias-repo' \
+    'ami-alias-status' \
+    'ami-alias-stash' \
+    'ami-alias-branch' \
+    'ami-alias-commit' \
+    'ami-alias-diff' \
+    'ami-alias-remote' \
+    'ami-alias-rebase' \
+    'ami-alias-pr' \
+    'ami-alias-worktree' \
+    'ami-alias-town' \
+    'ami-alias-other' \
+    'main-porcelain-commands' \
+    'third-party-commands' \
+    'ancillary-manipulator-commands' \
+    'ancillary-interrogator-commands' \
+    'interaction-commands' \
+    'plumbing-manipulator-commands' \
+    'plumbing-interrogator-commands' \
+    'plumbing-sync-commands' \
+    'plumbing-sync-helper-commands' \
+    'plumbing-internal-helper-commands' \
+    'commands'
+  # Corresponding group order
+  zstyle ':completion:*:*:git:*' group-order \
+    'ami-alias-repo' \
+    'ami-alias-status' \
+    'ami-alias-stash' \
+    'ami-alias-branch' \
+    'ami-alias-commit' \
+    'ami-alias-diff' \
+    'ami-alias-remote' \
+    'ami-alias-rebase' \
+    'ami-alias-pr' \
+    'ami-alias-worktree' \
+    'ami-alias-town' \
+    'ami-alias-other' \
+    'main-porcelain-commands' \
+    'third-party-commands' \
+    'ancillary-manipulator-commands' \
+    'ancillary-interrogator-commands' \
+    'interaction-commands' \
+    'plumbing-manipulator-commands' \
+    'plumbing-interrogator-commands' \
+    'plumbing-sync-commands' \
+    'plumbing-sync-helper-commands' \
+    'plumbing-internal-helper-commands' \
+    'commands'
+}
+
+__git_emit_ami_alias_groups() {
+  emulate -L zsh
+  __git_build_user_commands
+  (( ${#__git_bucket_repo[@]}      )) && _describe -t ami-alias-repo      '初始化/克隆'         __git_bucket_repo
+  (( ${#__git_bucket_status[@]}    )) && _describe -t ami-alias-status    '状态/日志'           __git_bucket_status
+  (( ${#__git_bucket_stash[@]}     )) && _describe -t ami-alias-stash     '暂存/快照'           __git_bucket_stash
+  (( ${#__git_bucket_branch[@]}    )) && _describe -t ami-alias-branch    '分支/切换'           __git_bucket_branch
+  (( ${#__git_bucket_commit[@]}    )) && _describe -t ami-alias-commit    '提交'                 __git_bucket_commit
+  (( ${#__git_bucket_diff[@]}      )) && _describe -t ami-alias-diff      '差异/查看'           __git_bucket_diff
+  (( ${#__git_bucket_remote[@]}    )) && _describe -t ami-alias-remote    '远程/推送/拉取'       __git_bucket_remote
+  (( ${#__git_bucket_rebase[@]}    )) && _describe -t ami-alias-rebase    'Rebase'              __git_bucket_rebase
+  (( ${#__git_bucket_pr[@]}        )) && _describe -t ami-alias-pr        'PR'                  __git_bucket_pr
+  (( ${#__git_bucket_worktree[@]}  )) && _describe -t ami-alias-worktree  '工作树/日志/责备'     __git_bucket_worktree
+  (( ${#__git_bucket_town[@]}      )) && _describe -t ami-alias-town      'Git Town'            __git_bucket_town
+  (( ${#__git_bucket_other[@]}     )) && _describe -t ami-alias-other     '其他'                 __git_bucket_other
 }
 
 __git_complete_with_aliases() {
@@ -270,8 +341,9 @@ __git_complete_with_aliases() {
 compdef __git_complete_with_aliases=git 2>/dev/null || compdef __git_complete_with_aliases git 2>/dev/null || true
 if [[ $- == *i* ]]; then
   autoload -Uz add-zsh-hook 2>/dev/null || true
-  __git_compdef_once() { compdef __git_complete_with_aliases=git; add-zsh-hook -d precmd __git_compdef_once 2>/dev/null || true }
-  add-zsh-hook precmd __git_compdef_once 2>/dev/null || true
+  # 轻量兜底：每次 precmd 重新保证 git 的 compdef 指向我们
+  __git_compdef_always() { compdef __git_complete_with_aliases=git }
+  add-zsh-hook -Uz precmd __git_compdef_always 2>/dev/null || true
 fi
 
 # Load git's zsh wrapper (after compinit) and override its alias provider
@@ -286,27 +358,19 @@ __git_load_and_override() {
       break
     done
   fi
-  # Override alias provider to emit our ordered alias list within the expected tag
-  __git_zsh_cmd_alias() {
-    emulate -L zsh
-    __git_build_user_commands
-    local -a __ordered
-    __ordered=( \
-      "${__git_bucket_repo[@]}" \
-      "${__git_bucket_status[@]}" \
-      "${__git_bucket_stash[@]}" \
-      "${__git_bucket_branch[@]}" \
-      "${__git_bucket_commit[@]}" \
-      "${__git_bucket_diff[@]}" \
-      "${__git_bucket_remote[@]}" \
-      "${__git_bucket_rebase[@]}" \
-      "${__git_bucket_pr[@]}" \
-      "${__git_bucket_worktree[@]}" \
-      "${__git_bucket_town[@]}" \
-      "${__git_bucket_other[@]}" \
-    )
-    (( ${#__ordered[@]} )) && _describe -t alias-commands '用户命令' __ordered && _ret=0
-  }
+  # Neutralize system alias providers (we inject aliases via _git_commands wrapper)
+  __git_zsh_cmd_alias() { return 1 }
+  __git_aliases() { return 1 }
+
+  # Override command list to prepend our alias groups in the same completion pass
+  if typeset -f _git_commands >/dev/null; then
+    functions[_git_commands_original]=$functions[_git_commands]
+    _git_commands() {
+      emulate -L zsh
+      __git_emit_ami_alias_groups "$@"
+      _git_commands_original "$@"
+    }
+  fi
   __git_apply_styles
 }
 
@@ -331,5 +395,5 @@ __ami_after_compinit() {
   compdef __git_complete_with_aliases=git 2>/dev/null || compdef __git_complete_with_aliases git 2>/dev/null || true
   __git_load_and_override
   __git_apply_styles
-  __git_set_user_commands
+  # Do not inject user-commands via zstyle to avoid one big group
 }

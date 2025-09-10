@@ -130,11 +130,24 @@ done
 zstyle ':completion:*:*:git:*' user-commands ${_git_user_cmd_built[@]}
 unset _git_user_cmd_pairs _git_user_cmd_built _p _name _desc _exp
 
-# Enable better formatting for completions
+# Enable better formatting for completions and consistent grouping
 zstyle ':completion:*:*:git:*' verbose yes
-zstyle ':completion:*:descriptions' format '%B%d%b'
-zstyle ':completion:*:*:git:*' group-name ''
+# Use plain text for fzf-tab to recognize groups
+zstyle ':completion:*:descriptions' format '[%d]'
 
-# Prefer our user-commands first; put native alias-commands last
-zstyle ':completion:*:*:git:*' tag-order 'user-commands' 'common-commands' 'all-commands' 'alias-commands'
-zstyle ':completion:*:*:git:*' group-order 'user-commands' 'common-commands' 'all-commands' 'alias-commands'
+# Prefer our user-commands first; mirror tags from system _git exactly
+# Avoid restricting results to a single tag; rely on group-order only
+zstyle ':completion:*:*:git:*' group-order \
+  'user-commands' \
+  'main-porcelain-commands' \
+  'third-party-commands' \
+  'ancillary-manipulator-commands' \
+  'ancillary-interrogator-commands' \
+  'interaction-commands' \
+  'plumbing-manipulator-commands' \
+  'plumbing-interrogator-commands' \
+  'plumbing-sync-commands' \
+  'plumbing-sync-helper-commands' \
+  'plumbing-internal-helper-commands' \
+  'commands' \
+  'aliases'
