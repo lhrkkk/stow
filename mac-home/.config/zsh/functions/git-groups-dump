@@ -1,0 +1,101 @@
+#!/usr/bin/env zsh
+# Print current Git alias groups (8-group plan) with items
+
+git-groups-dump() {
+  emulate -L zsh
+  setopt errexit pipefail 2>/dev/null || true
+
+  # Require our enhanced builder
+  whence -w __git_build_user_commands >/dev/null 2>&1 || {
+    print -ru2 -- "[git-groups-dump] __git_build_user_commands not found; source git-completion-enhanced.zsh first"
+    return 1
+  }
+
+  __git_build_user_commands
+
+  # Source arrays from builder
+  local -a repo=(${__git_bucket_repo[@]:-}) s_status=(${__git_bucket_status[@]:-}) stash=(${__git_bucket_stash[@]:-})
+  local -a branch=(${__git_bucket_branch[@]:-}) commit=(${__git_bucket_commit[@]:-}) diff=(${__git_bucket_diff[@]:-})
+  local -a remote=(${__git_bucket_remote[@]:-}) rebase=(${__git_bucket_rebase[@]:-}) pr=(${__git_bucket_pr[@]:-})
+  local -a worktree=(${__git_bucket_worktree[@]:-}) town=(${__git_bucket_town[@]:-}) other=(${__git_bucket_other[@]:-})
+
+  # 8-group buckets
+  local -a g_essential g_statuslog g_viewdiff g_commitedit g_rebase g_branchwt g_remotepr g_repoops
+  local it name
+
+  # status -> essential(status/log shortcuts) + statuslog(others)
+  for it in ${s_status[@]}; do
+    name=${it%%:*}
+    case $name in
+      s|l) g_essential+=("$it");;
+      *)   g_statuslog+=("$it");;
+    esac
+  done
+
+  # diff/show -> viewdiff
+  (( ${#diff[@]} )) && g_viewdiff+=(${diff[@]})
+
+  # commit + stash -> commitedit
+  (( ${#commit[@]} )) && g_commitedit+=(${commit[@]})
+  (( ${#stash[@]}  )) && g_commitedit+=(${stash[@]})
+
+  # rebase
+  (( ${#rebase[@]} )) && g_rebase+=(${rebase[@]})
+
+  # branch + worktree -> branchwt (move blame to viewdiff)
+  (( ${#branch[@]}   )) && g_branchwt+=(${branch[@]})
+  if (( ${#worktree[@]} )); then
+    local _wt
+    for it in ${worktree[@]}; do
+      name=${it%%:*}
+      case $name in
+        fn|fnr) g_viewdiff+=("$it");;
+        *)      g_branchwt+=("$it");;
+      esac
+    done
+  fi
+
+  # remote + pr -> remotepr
+  (( ${#remote[@]} )) && g_remotepr+=(${remote[@]})
+  (( ${#pr[@]}     )) && g_remotepr+=(${pr[@]})
+
+  # repo + town -> repoops
+  (( ${#repo[@]} )) && g_repoops+=(${repo[@]})
+  (( ${#town[@]} )) && g_repoops+=(${town[@]})
+
+  # route leftovers from other
+  for it in ${other[@]}; do
+    name=${it%%:*}
+    case $name in
+      ad|ads)                 g_viewdiff+=("$it");;
+      a|chunkyadd|mt|cp)      g_commitedit+=("$it");;
+      contributors)           g_statuslog+=("$it");;
+      svnr|svnd|svnl)         g_repoops+=("$it");;
+      *)                      g_commitedit+=("$it");;
+    esac
+  done
+
+  # Printer
+  local -a headers=(
+    '核心' '状态/日志' '查看/差异' '提交/暂存' 'Rebase' '分支/工作树' '远程/推送/PR' '仓库/协作'
+  )
+  local -a groups=( g_essential g_statuslog g_viewdiff g_commitedit g_rebase g_branchwt g_remotepr g_repoops )
+
+  print -r -- '== git alias groups =='
+  integer i=1
+  while (( i <= ${#groups} )); do
+    local gname=${headers[$i]}
+    local -a ref; ref=(${(P)groups[$i]})
+    if (( ${#ref[@]} )); then
+      print -r -- "[${gname}]"
+      local item nm desc
+      for item in ${ref[@]}; do
+        nm=${item%%:*}; desc=${item#*:}
+        print -r -- "  ${nm} — ${desc}"
+      done
+      print -r -- ''
+    fi
+    (( i++ ))
+  done
+  return 0
+}

@@ -1,0 +1,237 @@
+#!/usr/bin/env zsh
+# Print current JJ alias groups (8-group plan) with items (name=value)
+
+jj-groups-dump() {
+  emulate -L zsh
+  setopt errexit pipefail 2>/dev/null || true
+
+  (( $+commands[jj] )) || { print -ru2 -- "[jj-groups-dump] jj not found"; return 1 }
+
+  __jj_desc() {
+    local name=$1; local value=$2; local desc
+    case $name in
+      # 状态与日志
+      s) desc="查看状态：$value" ;;
+      sf) desc="当前改动的 diff 摘要：$value" ;;
+      l) desc="查看日志：$value" ;;
+      lr) desc="查看指定版本集的日志：$value" ;;
+      ls) desc="查看 stash 日志：$value" ;;
+      lp) desc="查看私有提交：$value" ;;
+      lg) desc="查看所有提交：$value" ;;
+      default) desc="显示状态和最近日志：$value" ;;
+      ol) desc="查看操作日志：$value" ;;
+      or) desc="恢复到指定操作：$value" ;;
+      ow) desc="显示操作详情：$value" ;;
+      owp) desc="显示操作的改动：$value" ;;
+
+      # 仓库操作
+      init) desc="初始化 Git 共存仓库：$value" ;;
+      cl) desc="克隆为 Git 共存仓库：$value" ;;
+      clg) desc="从 GitHub 克隆 HTTPS：$value" ;;
+      clgp) desc="从 GitHub 克隆 SSH：$value" ;;
+      clgu) desc="从 GitHub 克隆自己的仓库：$value" ;;
+      clsp) desc="从 Sourcehut 克隆 SSH：$value" ;;
+      clsu) desc="从 Sourcehut 克隆自己的仓库：$value" ;;
+
+      # 差异
+      d) desc="查看当前改动：$value" ;;
+      dr) desc="查看指定版本的改动：$value" ;;
+
+      # 创建新提交
+      n) desc="创建新提交：$value" ;;
+      nm) desc="创建新提交并设置消息：$value" ;;
+      nt) desc="从 trunk 创建新提交：$value" ;;
+      ntm) desc="从 trunk 创建新提交并设置消息：$value" ;;
+      na) desc="在指定提交后插入：$value" ;;
+      nae) desc="在当前提交后插入：$value" ;;
+      naem) desc="在当前提交后插入并设置消息：$value" ;;
+      nb) desc="在指定提交前插入：$value" ;;
+      nbe) desc="在当前提交前插入：$value" ;;
+      nbem) desc="在当前提交前插入并设置消息：$value" ;;
+
+      # 描述与提交
+      de) desc="编辑提交描述：$value" ;;
+      dem) desc="设置提交描述：$value" ;;
+      ci) desc="交互式提交：$value" ;;
+      cm) desc="快速提交：$value" ;;
+      cim) desc="交互式快速提交：$value" ;;
+
+      # 查看
+      w) desc="显示提交详情：$value" ;;
+      ws) desc="显示提交统计：$value" ;;
+
+      # 编辑与导航
+      e) desc="编辑提交：$value" ;;
+      eh) desc="编辑当前提交链的所有头部：$value" ;;
+      ep) desc="编辑前一个提交：$value" ;;
+      epc) desc="编辑前一个冲突提交：$value" ;;
+      en) desc="编辑下一个提交：$value" ;;
+      enc) desc="编辑下一个冲突提交：$value" ;;
+
+      # 放弃
+      ad) desc="放弃提交：$value" ;;
+      adb) desc="放弃但保留书签：$value" ;;
+      adk) desc="放弃但保留书签并恢复后代：$value" ;;
+
+      # 拆分与合并
+      sp) desc="交互式拆分提交：$value" ;;
+      spr) desc="拆分指定提交：$value" ;;
+      spp) desc="并行拆分：$value" ;;
+      sppr) desc="并行拆分指定提交：$value" ;;
+      sq) desc="交互式合并到父提交：$value" ;;
+      sqa) desc="自动合并到父提交：$value" ;;
+      sqt) desc="交互式合并到指定提交：$value" ;;
+      sqat) desc="自动合并到指定提交：$value" ;;
+      sqf) desc="交互式从指定提交合并：$value" ;;
+      sqaf) desc="自动从指定提交合并：$value" ;;
+      sqr) desc="交互式合并指定提交：$value" ;;
+      sqar) desc="自动合并指定提交：$value" ;;
+
+      # Rebase 家族（具体变体）
+      rb) desc="基础 rebase：$value" ;;
+      rba) desc="rebase 到指定提交之后：$value" ;;
+      rbb) desc="rebase 到指定提交之前：$value" ;;
+      rbd) desc="rebase 到指定目标：$value" ;;
+      rbt) desc="rebase 到 trunk：$value" ;;
+      rbtr) desc="rebase 到 trunk（范围）：$value" ;;
+      rbtw) desc="rebase 当前提交链到 trunk：$value" ;;
+      rbte) desc="rebase 当前提交到 trunk：$value" ;;
+      rbtb) desc="rebase 分支到 trunk：$value" ;;
+      rbta) desc="rebase 所有可变头部到 trunk：$value" ;;
+      rbts) desc="从指定源 rebase 到 trunk：$value" ;;
+      rbtse) desc="从当前提交 rebase 到 trunk：$value" ;;
+      rbe) desc="rebase 到当前提交：$value" ;;
+      rber) desc="将指定提交 rebase 到当前（范围）：$value" ;;
+      rbeb) desc="将分支 rebase 到当前：$value" ;;
+      rbes) desc="从指定源 rebase 到当前：$value" ;;
+      rbs) desc="从指定源开始 rebase：$value" ;;
+      rbse) desc="从当前提交开始 rebase：$value" ;;
+      rbsed) desc="从当前 rebase 到指定目标：$value" ;;
+      rbsea) desc="从当前 rebase 到指定提交之后：$value" ;;
+      rbseb) desc="从当前 rebase 到指定提交之前：$value" ;;
+      rbr) desc="rebase 指定提交（范围）：$value" ;;
+      rbrw) desc="rebase 当前提交链（范围）：$value" ;;
+      rbrwd) desc="将当前提交链 rebase 到指定目标：$value" ;;
+      rbrwa) desc="将当前提交链 rebase 到指定提交之后：$value" ;;
+      rbrwb) desc="将当前提交链 rebase 到指定提交之前：$value" ;;
+      rbre) desc="rebase 当前提交（范围）：$value" ;;
+      rbred) desc="将当前提交 rebase 到指定目标（范围）：$value" ;;
+      rbrea) desc="将当前提交 rebase 到指定提交之后（范围）：$value" ;;
+      rbreb) desc="将当前提交 rebase 到指定提交之前（范围）：$value" ;;
+      rbrb) desc="rebase 分支：$value" ;;
+      rb*) desc="rebase 变体：$value" ;;
+
+      # 恢复
+      re) desc="恢复文件：$value" ;;
+
+      # 书签管理
+      bd) desc="删除书签：$value" ;;
+      bf) desc="忘记书签：$value" ;;
+      bl) desc="列出所有书签：$value" ;;
+      blr) desc="列出指定版本的书签：$value" ;;
+      blrw) desc="列出当前提交链的书签：$value" ;;
+      blrb) desc="列出当前分支的书签：$value" ;;
+      bmw) desc="移动当前提交链的书签：$value" ;;
+      bmb) desc="移动当前分支的书签：$value" ;;
+      br) desc="重命名书签：$value" ;;
+      bs) desc="设置书签：$value" ;;
+      bsr) desc="设置书签到指定提交：$value" ;;
+      bst) desc="设置书签到 trunk：$value" ;;
+      bt) desc="跟踪远程书签：$value" ;;
+      bu) desc="取消跟踪远程书签：$value" ;;
+
+      # Git 集成 / 远程 / PR
+      f) desc="获取更新并 rebase：$value" ;;
+      fw) desc="监视 PR 检查后同步：$value" ;;
+      fo) desc="获取所有远程更新：$value" ;;
+      fa) desc="获取并 rebase 所有：$value" ;;
+      faw) desc="监视 PR 检查后同步所有分支：$value" ;;
+      ps|psb|psc|pscw|pscb|psca|psa|psd|psm|psms) desc="推送/变体：$value" ;;
+      pro) desc="为当前分支创建 PR：$value" ;;
+      pr) desc="推送并创建 PR：$value" ;;
+      prow) desc="为当前提交链创建 PR：$value" ;;
+      prw) desc="推送当前提交链并创建 PR：$value" ;;
+
+      # 工作区 / 文件 / UI
+      wl) desc="列出工作区：$value" ;;
+      wa|wa1|wa2|wa3) desc="添加工作区：$value" ;;
+      wo1|wo2|wo3) desc="切换至工作区：$value" ;;
+      wf|wf1|wf2|wf3) desc="忘记工作区：$value" ;;
+      wr) desc="重命名工作区：$value" ;;
+      fn|fnr) desc="文件注释：$value" ;;
+      ft) desc="跟踪文件：$value" ;;
+      fu) desc="取消跟踪文件：$value" ;;
+      ui) desc="启动 UI：$value" ;;
+
+      # fallback
+      *) desc="别名：$value" ;;
+    esac
+    print -r -- "$desc"
+  }
+
+  local line name value
+  local -a essential statuslog viewdiff commitedit rebase bookmark remote workspacefile
+
+  jj config list --user 2>/dev/null | grep '^aliases\.' | while IFS= read -r line; do
+    [[ $line =~ ^aliases\.([^[:space:]=]+)[[:space:]]*=[[:space:]]*(.+)$ ]] || continue
+    name=${match[1]}
+    value=${match[2]}
+    # trim brackets/quotes/commas from value for readability
+    value=${value//\[/}
+    value=${value//\]/}
+    value=${value//\'/}
+    value=${value//,/}
+
+    case $name in
+      # essential
+      s|l) essential+=("$name=$value") ;;
+
+      # status/log/ops
+      sf|lg|lp|lr|ls|default|ol|or|ow|owp) statuslog+=("$name=$value") ;;
+
+      # view/diff
+      w|ws|d|dr) viewdiff+=("$name=$value") ;;
+
+      # commit/edit (+ split/squash/abandon/navigate/absorb)
+      ci|cm|cim|de|dem|nm|nt|ntm|na|nae|naem|nb|nbe|nbem|ad|adb|adk|sp|spp|sppr|spr|sq|sqa|sqt|sqat|sqf|sqaf|sqr|sqar|ep|epc|en|enc|eh|ab|abf)
+        commitedit+=("$name=$value") ;;
+
+      # rebase
+      rb*) rebase+=("$name=$value") ;;
+
+      # bookmarks/branches
+      b[dflrstu]*|bmw|bmb|br|bs|bsr|bst|bt|bu) bookmark+=("$name=$value") ;;
+
+      # remote/repo (push/fetch/PR)
+      ps*|pr*|pro|prow|prw|fo|fa|faw|fw|init|cl|clg|clgp|clgu|clsp|clsu)
+        remote+=("$name=$value") ;;
+
+      # workspace/files/ui
+      wl|wa*|wf*|wo*|wr|fn*|ft|fu|re|ui) workspacefile+=("$name=$value") ;;
+
+      # fallback
+      *) commitedit+=("$name=$value") ;;
+    esac
+  done
+
+  local -a headers=(
+    '核心' '状态/日志/操作' '查看/差异' '提交/编辑' 'Rebase' '书签/分支' '远程/仓库/PR' '工作区/文件/UI'
+  )
+  local -a groups=( essential statuslog viewdiff commitedit rebase bookmark remote workspacefile )
+
+  print -r -- '== jj alias groups =='
+  integer i=1; local -a ref; local item nm val desc
+  while (( i <= ${#groups} )); do
+    ref=(${(P)groups[$i]})
+    if (( ${#ref[@]} )); then
+      print -r -- "[${headers[$i]}]"
+      for item in ${ref[@]}; do
+        nm=${item%%=*}; val=${item#*=}
+        desc=$(__jj_desc "$nm" "$val")
+        print -r -- "  ${nm} — ${desc}"
+      done
+      print -r -- ''
+    fi
+    (( i++ ))
+  done
+}

@@ -3,6 +3,9 @@
 # - Autoloads _git if needed
 # - Reads aliases from git config and exposes them to completion with descriptions
 
+# Marker env for quick verification in shell: echo $GIT_COMPLETION_ENHANCED
+typeset -g GIT_COMPLETION_ENHANCED=1
+
 if (( $+commands[git] )); then
   # Ensure git completion is available if not yet autoloaded
   if ! typeset -f _git >/dev/null; then
@@ -120,8 +123,8 @@ if (( $+commands[git] )); then
 
     # Category mapping
     local -A cat_map; cat_map=()
-    # 状态/日志
-    for k in s st stat sf l lg default filelog changes short simple shortnocolor; do cat_map[$k]=status; done
+    # 状态/日志（含 reflog 与贡献统计）
+    for k in s st stat sf l lg default filelog changes short simple shortnocolor ol contributors; do cat_map[$k]=status; done
     # 暂存/快照
     for k in ss sl sa sd snapshot snapshots; do cat_map[$k]=stash; done
     # 分支/切换
@@ -136,8 +139,8 @@ if (( $+commands[git] )); then
     for k in rb rbt rbr rc rs; do cat_map[$k]=rebase; done
     # PR
     for k in pro pr; do cat_map[$k]=pr; done
-    # 工作树/引用日志/责备
-    for k in wl wa wf ol fn fnr; do cat_map[$k]=worktree; done
+    # 工作树/责备（reflog 归入“状态/日志”）
+    for k in wl wa wf fn fnr; do cat_map[$k]=worktree; done
     # 初始化/克隆
     for k in init cl clg clgp clgu; do cat_map[$k]=repo; done
     # Git Town
@@ -181,12 +184,12 @@ if (( $+commands[git] )); then
       # Remove all straight double quotes just for description readability
       val=${val//\"/}
 
-      # Build description with category label and friendly text
+      # Build description with category label + friendly text + expansion
       local base_desc=${desc_map[$name]}
-      [[ -z $base_desc ]] && base_desc="别名 -> ${val}"
+      [[ -z $base_desc ]] && base_desc="别名"
       local c=${cat_map[$name]:-other}
       local label=${cat_label[$c]:-其他}
-      local desc="${label} — ${base_desc}"
+      local desc="${label} — ${base_desc} - ${val}"
       # Append into its bucket without nameref (compat with older zsh)
       case $c in
         repo)      bucket_repo+=("${name}:${desc}") ;;
@@ -225,24 +228,132 @@ if (( $+commands[git] )); then
     done
 
     # Export globally for our alias provider
-    typeset -g -a __git_uc_list
+    typeset -g -a __git_uc_list \
+      __git_bucket_repo __git_bucket_status __git_bucket_stash __git_bucket_branch \
+      __git_bucket_commit __git_bucket_diff __git_bucket_remote __git_bucket_rebase \
+      __git_bucket_pr __git_bucket_worktree __git_bucket_town __git_bucket_other
     __git_uc_list=("${ordered[@]}")
+    __git_bucket_repo=("${bucket_repo[@]}")
+    __git_bucket_status=("${bucket_status[@]}")
+    __git_bucket_stash=("${bucket_stash[@]}")
+    __git_bucket_branch=("${bucket_branch[@]}")
+    __git_bucket_commit=("${bucket_commit[@]}")
+    __git_bucket_diff=("${bucket_diff[@]}")
+    __git_bucket_remote=("${bucket_remote[@]}")
+    __git_bucket_rebase=("${bucket_rebase[@]}")
+    __git_bucket_pr=("${bucket_pr[@]}")
+    __git_bucket_worktree=("${bucket_worktree[@]}")
+    __git_bucket_town=("${bucket_town[@]}")
+    __git_bucket_other=("${bucket_other[@]}")
   }
 
   __git_build_user_commands
 fi
 
 __git_apply_styles() {
-  zstyle ':completion:*:*:git:*' tag-order 'user-commands' 'common-commands' 'all-commands'
-  zstyle ':completion:*:*:git:*' group-order 'user-commands' 'common-commands' 'all-commands'
-  zstyle ':completion:*:*:git:*' group-name ''
+  # Keep completions grouped and consistent with system _git
+  zstyle ':completion:*' list-grouped yes
   zstyle ':completion:*:*:git:*' verbose yes
-  zstyle ':completion:*:descriptions' format '%B%d%b'
+  # Do not sort matches; preserve emission order across groups
+  zstyle ':completion:*:*:git:*' sort false
+  # Plain text descriptions so fzf-tab recognizes groups
+  zstyle ':completion:*:descriptions' format '[%d]'
+  # Only show our 8 alias groups (hide system commands entirely)
+  zstyle ':completion:*:*:git:*' tag-order \
+    'git8-essential' \
+    'git8-statuslog' \
+    'git8-viewdiff' \
+    'git8-commitedit' \
+    'git8-rebase' \
+    'git8-branchworktree' \
+    'git8-remotepr' \
+    'git8-repoops'
+  zstyle ':completion:*:*:git:*' group-order \
+    'git8-essential' \
+    'git8-statuslog' \
+    'git8-viewdiff' \
+    'git8-commitedit' \
+    'git8-rebase' \
+    'git8-branchworktree' \
+    'git8-remotepr' \
+    'git8-repoops'
+}
+
+__git_emit_ami_alias_groups() {
+  emulate -L zsh
+  __git_build_user_commands
+  local -a __g8_essential __g8_statuslog __g8_viewdiff __g8_commitedit __g8_rebase __g8_branchworktree __g8_remotepr __g8_repoops
+  local it name
+
+  # Helpers to append pairs
+  __append_all() { local -a src=("$@"); (( ${#src[@]} )) && eval "$1"; }
+
+  # status -> essential(s,l) + statuslog(others)
+  for it in ${__git_bucket_status[@]}; do
+    name=${it%%:*}
+    case $name in
+      s|l) __g8_essential+=("$it") ;;
+      *)   __g8_statuslog+=("$it") ;;
+    esac
+  done
+  # diff/show -> viewdiff
+  (( ${#__git_bucket_diff[@]} )) && __g8_viewdiff+=("${__git_bucket_diff[@]}")
+
+  # commit + stash -> commitedit
+  (( ${#__git_bucket_commit[@]} )) && __g8_commitedit+=("${__git_bucket_commit[@]}")
+  (( ${#__git_bucket_stash[@]}  )) && __g8_commitedit+=("${__git_bucket_stash[@]}")
+
+  # rebase
+  (( ${#__git_bucket_rebase[@]} )) && __g8_rebase+=("${__git_bucket_rebase[@]}")
+
+  # branch + worktree -> branchworktree (but move blame fn/fnr to viewdiff)
+  (( ${#__git_bucket_branch[@]}   )) && __g8_branchworktree+=("${__git_bucket_branch[@]}")
+  if (( ${#__git_bucket_worktree[@]} )); then
+    local _wt
+    for _wt in ${__git_bucket_worktree[@]}; do
+      name=${_wt%%:*}
+      case $name in
+        fn|fnr) __g8_viewdiff+=("$_wt") ;;
+        *)      __g8_branchworktree+=("$_wt") ;;
+      esac
+    done
+  fi
+
+  # remote + pr -> remotepr
+  (( ${#__git_bucket_remote[@]} )) && __g8_remotepr+=("${__git_bucket_remote[@]}")
+  (( ${#__git_bucket_pr[@]}     )) && __g8_remotepr+=("${__git_bucket_pr[@]}")
+
+  # repo + town -> repoops
+  (( ${#__git_bucket_repo[@]} )) && __g8_repoops+=("${__git_bucket_repo[@]}")
+  (( ${#__git_bucket_town[@]} )) && __g8_repoops+=("${__git_bucket_town[@]}")
+
+  # other -> re-route to closest groups
+  for it in ${__git_bucket_other[@]}; do
+    name=${it%%:*}
+    case $name in
+      ad|ads)                 __g8_viewdiff+=("$it") ;;
+      a|chunkyadd|mt|cp)      __g8_commitedit+=("$it") ;;
+      contributors)           __g8_statuslog+=("$it") ;;
+      svnr|svnd|svnl)         __g8_repoops+=("$it") ;;
+      *)                      __g8_commitedit+=("$it") ;;
+    esac
+  done
+
+  (( ${#__g8_essential[@]}      )) && _describe -t git8-essential      '核心'                 __g8_essential
+  (( ${#__g8_statuslog[@]}      )) && _describe -t git8-statuslog      '状态/日志'            __g8_statuslog
+  (( ${#__g8_viewdiff[@]}       )) && _describe -t git8-viewdiff       '查看/差异'            __g8_viewdiff
+  (( ${#__g8_commitedit[@]}     )) && _describe -t git8-commitedit     '提交/暂存'            __g8_commitedit
+  (( ${#__g8_rebase[@]}         )) && _describe -t git8-rebase         'Rebase'               __g8_rebase
+  (( ${#__g8_branchworktree[@]} )) && _describe -t git8-branchworktree '分支/工作树'          __g8_branchworktree
+  (( ${#__g8_remotepr[@]}       )) && _describe -t git8-remotepr       '远程/推送/PR'          __g8_remotepr
+  (( ${#__g8_repoops[@]}        )) && _describe -t git8-repoops        '仓库/协作'            __g8_repoops
 }
 
 __git_complete_with_aliases() {
   emulate -L zsh
   autoload -Uz _git 2>/dev/null || true
+  # Ensure our overrides are loaded before any emission
+  __git_load_and_override
   __git_apply_styles
   # Ensure fzf-tab shows descriptions and groups
   zstyle ':fzf-tab:complete:git:*' descriptions yes 2>/dev/null || true
@@ -254,8 +365,9 @@ __git_complete_with_aliases() {
 compdef __git_complete_with_aliases=git 2>/dev/null || compdef __git_complete_with_aliases git 2>/dev/null || true
 if [[ $- == *i* ]]; then
   autoload -Uz add-zsh-hook 2>/dev/null || true
-  __git_compdef_once() { compdef __git_complete_with_aliases=git; add-zsh-hook -d precmd __git_compdef_once 2>/dev/null || true }
-  add-zsh-hook precmd __git_compdef_once 2>/dev/null || true
+  # 轻量兜底：每次 precmd 重新保证 git 的 compdef 指向我们
+  __git_compdef_always() { compdef __git_complete_with_aliases=git }
+  add-zsh-hook -Uz precmd __git_compdef_always 2>/dev/null || true
 fi
 
 # Load git's zsh wrapper (after compinit) and override its alias provider
@@ -270,8 +382,21 @@ __git_load_and_override() {
       break
     done
   fi
-  # Override alias provider to NO-OP so we don't duplicate system aliases.
-  __git_zsh_cmd_alias() { return 0 }
+  # Neutralize system alias providers (we inject aliases via _git_commands wrapper)
+  __git_zsh_cmd_alias() { return 1 }
+  __git_aliases() { return 1 }
+  __git_extract_aliases() { aliases=() }
+
+  # Override command list to prepend our alias groups in the same completion pass
+  if typeset -f _git_commands >/dev/null; then
+    functions[_git_commands_original]=$functions[_git_commands]
+    _git_commands() {
+      emulate -L zsh
+      # Only emit our 8 alias groups (hide system commands)
+      __git_emit_ami_alias_groups "$@"
+      return 0
+    }
+  fi
   __git_apply_styles
 }
 
@@ -296,5 +421,5 @@ __ami_after_compinit() {
   compdef __git_complete_with_aliases=git 2>/dev/null || compdef __git_complete_with_aliases git 2>/dev/null || true
   __git_load_and_override
   __git_apply_styles
-  __git_set_user_commands
+  # Do not inject user-commands via zstyle to avoid one big group
 }

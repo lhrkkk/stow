@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+zstyle -d ':fzf-tab:*' debug-command
+print -r -- 'fzf-tab debug: OFF'
+

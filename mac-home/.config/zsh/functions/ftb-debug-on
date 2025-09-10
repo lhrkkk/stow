@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+zstyle ':fzf-tab:*' debug-command ftb-debug-dump
+print -r -- 'fzf-tab debug: ON'
+
