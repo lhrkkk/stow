@@ -108,16 +108,6 @@ if [[ $- == *i* ]]; then
   autoload -Uz add-zsh-hook
   _zim_precmd_once() {
     add-zsh-hook -d precmd _zim_precmd_once 2>/dev/null || true
-    # 在 compinit 之前加载补全脚本，以便 after-compinit 能在下方被调用
-    __ami_source_completions_once
-    # 确保在加载 Zim 与 fzf-tab 之前已经完成 compinit
-    if typeset -f _lazy_compinit_run >/dev/null; then
-      _lazy_compinit_run
-      if typeset -f __ami_after_compinit >/dev/null; then
-        __ami_after_compinit
-        unfunction __ami_after_compinit 2>/dev/null || true
-      fi
-    fi
     _lazy_zim_init_run
   }
   add-zsh-hook precmd _zim_precmd_once

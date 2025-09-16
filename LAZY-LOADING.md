@@ -10,8 +10,8 @@
 文件职责
 
 - `~/.config/zsh/lazyload.zsh`
-  - 捕获启动期 `compdef` 调用，避免未 `compinit` 前报错；
-  - 首个 Tab/首个提示符前执行 `_lazy_compinit_run` 初始化补全；
+- 捕获启动期 `compdef` 调用，避免未 `compinit` 前报错；
+- 首次按 Tab 时执行 `_lazy_compinit_run` 初始化补全；
   - `compinit` 之后调用一次 `__ami_after_compinit`（由各模块提供）；
   - 懒加载 Git/JJ 增强补全：`__ami_source_completions_once` 首次按需 `source` 脚本；
   - 延后加载 Zim（prompt/autopair）并保持覆盖顺序。
@@ -33,7 +33,7 @@
    - 检测当前/父目录是否有配置；若有则运行一次 hook-env；
    - 未执行 `compinit`，提示符尽快出现。
 
-2) 首个提示符：
+2) 首次 Tab：
    - 懒加载 Git/JJ 脚本；
    - 运行 `compinit`；
    - 执行各模块的 `__ami_after_compinit` 完成 compdef/样式挂接；

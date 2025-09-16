@@ -20,7 +20,7 @@
   - fzf-tab 主题与行为（`--no-sort`）、completion 基础样式（`menu no`、`[ %d ]` 组名）
   - 注意：git/jj 增强补全脚本已改为懒加载，不再在 zshrc 中直接 `source`
 - `~/.config/zsh/lazyload.zsh`
-  - 负责懒加载：首次 Tab/首个提示符前，按需 `source` 上述两个增强脚本，并在 `compinit` 之后挂接生效
+  - 负责懒加载：首次 Tab 时按需 `source` 上述两个增强脚本，并在 `compinit` 之后挂接生效
 - `~/.config/zsh/functions/ftb-debug-{on,off}`、`ftb-debug-dump`
   - fzf-tab 调试工具：捕获本次补全的分组与候选顺序到临时文件
 
@@ -29,7 +29,7 @@
 ## 预置要求
 
 - zsh ≥ 5.8，已安装 [fzf-tab](https://github.com/Aloxaf/fzf-tab)
-- fzf-tab 在 `compinit` 之后加载（zshrc 已处理：懒加载 compinit → 再加载 Zim/fzf-tab）
+- compinit 在首次 Tab 触发；fzf-tab 由 Zim 预加载，但其补全在 compinit 之后生效（无需在 zshrc 手动排序）
 - 当前配置已由 `~/.config/zsh/lazyload.zsh` 懒加载，无需在 `~/.zshrc` 直接 `source`
 
 重载配置：
@@ -307,7 +307,7 @@ comp-groups-dump  # 两者都打印
 
 与 Zim/fzf/其它插件的相容性
 
-- 确保 fzf-tab 在 `compinit` 之后加载（`lazyload.zsh` 已处理）；
+- compinit 在首次 Tab 触发；fzf-tab 实际工作发生在 compinit 之后（无需手动调整加载顺序）；
 - 不要再加载 fzf 的自带 Tab 补全（会与 fzf-tab 抢 Tab）；
 - 不建议在 zshrc 里对 git/jj 再设置 tag-order/group-order（避免与本增强脚本冲突）。
 
