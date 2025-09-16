@@ -152,6 +152,33 @@ export PATH="$HOME/.local/bin:$PATH"   # 确保能找到 mise
 
 # 2) 懒加载一次（bash/zsh 通用）：首个提示符执行一次 hook-env，之后不再运行
 
+# 通用注册/卸载：precmd（zsh）或 PROMPT_COMMAND（bash）
+_ami_precmd_register() {
+  _fn="$1"
+  if [ -n "${ZSH_VERSION-}" ]; then
+    autoload -Uz add-zsh-hook
+    add-zsh-hook precmd "$_fn"
+  elif [ -n "${BASH_VERSION-}" ]; then
+    if [ -n "${PROMPT_COMMAND-}" ]; then
+      PROMPT_COMMAND="$_fn; ${PROMPT_COMMAND}"
+    else
+      PROMPT_COMMAND="$_fn"
+    fi
+  fi
+}
+
+_ami_precmd_unregister() {
+  _fn="$1"
+  if [ -n "${ZSH_VERSION-}" ]; then
+    add-zsh-hook -d precmd "$_fn" 2>/dev/null || true
+  elif [ -n "${BASH_VERSION-}" ]; then
+    case ";${PROMPT_COMMAND-};" in
+      *";${_fn};"*) PROMPT_COMMAND="${PROMPT_COMMAND/$_fn; /}";;
+      *";${_fn}"*)  PROMPT_COMMAND="${PROMPT_COMMAND/$_fn/}";;
+    esac
+  fi
+}
+
 _mise_hook_once() {
   # 确保能找到 mise（二次兜底：常见安装路径）
   if ! command -v mise >/dev/null 2>&1; then
@@ -162,29 +189,13 @@ _mise_hook_once() {
   fi
   command -v mise >/dev/null 2>&1 || { return 0; }
   eval "$(mise hook-env -q)"
-  # 自卸载（zsh: 移除 precmd 钩子；bash: 从 PROMPT_COMMAND 清除自身）
-  if [ -n "${ZSH_VERSION-}" ]; then
-    add-zsh-hook -d precmd _mise_hook_once 2>/dev/null || true
-    unset -f _mise_hook_once 2>/dev/null || true
-  elif [ -n "${BASH_VERSION-}" ]; then
-    case ";${PROMPT_COMMAND-};" in
-      *"_mise_hook_once;"*) PROMPT_COMMAND="${PROMPT_COMMAND/_mise_hook_once; /}";;
-      *"_mise_hook_once"*)  PROMPT_COMMAND="${PROMPT_COMMAND/_mise_hook_once/}";;
-    esac
-    unset -f _mise_hook_once 2>/dev/null || true
-  fi
+  # 自卸载（统一入口）
+  _ami_precmd_unregister _mise_hook_once
+  unset -f _mise_hook_once 2>/dev/null || true
 }
 
-if [ -n "${ZSH_VERSION-}" ]; then
-  autoload -Uz add-zsh-hook
-  add-zsh-hook precmd _mise_hook_once
-elif [ -n "${BASH_VERSION-}" ]; then
-  if [ -n "${PROMPT_COMMAND-}" ]; then
-    PROMPT_COMMAND="_mise_hook_once; ${PROMPT_COMMAND}"
-  else
-    PROMPT_COMMAND="_mise_hook_once"
-  fi
-fi
+# 一次性注册（bash/zsh 通用调用）
+_ami_precmd_register _mise_hook_once
 
 # 3) 删掉/注释掉原来的：
 # eval "$(mise activate zsh)"
