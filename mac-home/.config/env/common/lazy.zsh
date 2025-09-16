@@ -150,9 +150,9 @@ fi
 export PATH="$HOME/.local/share/mise/shims:$PATH"
 export PATH="$HOME/.local/bin:$PATH"   # 确保能找到 mise
 
-# 2) 懒加载（bash/zsh 通用）：在提示符/切目录时执行 hook-env
-# 由 mise 自行判断是否需要更新环境（-q 静默，未变更时开销极小）
-_mise_maybe_hook() {
+# 2) 懒加载一次（bash/zsh 通用）：首个提示符执行一次 hook-env，之后不再运行
+
+_mise_hook_once() {
   # 确保能找到 mise（二次兜底：常见安装路径）
   if ! command -v mise >/dev/null 2>&1; then
     for _mb in /opt/homebrew/bin/mise /home/linuxbrew/.linuxbrew/bin/mise "$HOME/.local/bin/mise"; do
@@ -160,20 +160,31 @@ _mise_maybe_hook() {
     done
     unset _mb
   fi
-  command -v mise >/dev/null 2>&1 || return 0
+  command -v mise >/dev/null 2>&1 || { return 0; }
   eval "$(mise hook-env -q)"
+  # 自卸载（zsh: 移除 precmd 钩子；bash: 从 PROMPT_COMMAND 清除自身）
+  if [ -n "${ZSH_VERSION-}" ]; then
+    add-zsh-hook -d precmd _mise_hook_once 2>/dev/null || true
+    unset -f _mise_hook_once 2>/dev/null || true
+  elif [ -n "${BASH_VERSION-}" ]; then
+    case ";${PROMPT_COMMAND-};" in
+      *"_mise_hook_once;"*) PROMPT_COMMAND="${PROMPT_COMMAND/_mise_hook_once; /}";;
+      *"_mise_hook_once"*)  PROMPT_COMMAND="${PROMPT_COMMAND/_mise_hook_once/}";;
+    esac
+    unset -f _mise_hook_once 2>/dev/null || true
+  fi
 }
+
 if [ -n "${ZSH_VERSION-}" ]; then
   autoload -Uz add-zsh-hook
-  add-zsh-hook chpwd _mise_maybe_hook
+  add-zsh-hook precmd _mise_hook_once
 elif [ -n "${BASH_VERSION-}" ]; then
   if [ -n "${PROMPT_COMMAND-}" ]; then
-    PROMPT_COMMAND="_mise_maybe_hook; ${PROMPT_COMMAND}"
+    PROMPT_COMMAND="_mise_hook_once; ${PROMPT_COMMAND}"
   else
-    PROMPT_COMMAND="_mise_maybe_hook"
+    PROMPT_COMMAND="_mise_hook_once"
   fi
 fi
-_mise_maybe_hook  # 启动时在当前目录跑一次
 
 # 3) 删掉/注释掉原来的：
 # eval "$(mise activate zsh)"
@@ -200,4 +211,3 @@ __x_cmd_lazy_boot() {
 # 包装 x 与 xc：第一次调用触发加载
 x()  { __x_cmd_lazy_boot; command x  "$@"; }
 xc() { __x_cmd_lazy_boot; command xc "$@"; }
-

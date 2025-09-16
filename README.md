@@ -210,12 +210,23 @@
   - Git：`mac-home/.config/zsh/git-completion-enhanced.zsh`
   - JJ：`mac-home/.config/zsh/jj-completion-enhanced.zsh`
   - fzf-tab/样式：`mac-home/.config/zsh/zshrc`
+  - 加载方式：由 `mac-home/.config/zsh/lazyload.zsh` 懒加载（首次 Tab/首个提示符触发），不再在 zshrc 中直接 `source`
+  
+ > 打开文档查看 8 组分法、每条别名说明、调试与自定义方法。
+ 
+ ---
+ 
+ ### 附：mise 懒加载说明
+ 
+ - 启动仅注入 shims：`$HOME/.local/share/mise/shims` 优先加入 PATH；其余按需。
+ - Zsh/Bash：首次提示符执行一次 `eval "$(mise hook-env -q)"`，之后不再自动触发。
+ - 目录切换后依赖 mise shims 正常工作；如需手动刷新，可执行：`eval "$(mise hook-env -q)"`。
+ - 为确保能发现 `mise`，在 `~/.config/env/common/paths.zsh` 中提前注入 Homebrew 路径（Apple Silicon 与 Linuxbrew）。
+ - 推荐保持此模式，通常比 `eval "$(mise activate zsh)"` 更轻量。
+ 
+ ---
 
-> 打开文档查看 8 组分法、每条别名说明、调试与自定义方法。
-
----
-
-## 6. 验证与常见应用
+## 7. 验证与常见应用
 
 - WezTerm：保存 `~/.config/wezterm/wezterm.lua` 后自动热重载；偏好“浅色标题栏”已在配置中处理。
 - Yazi：
@@ -246,7 +257,7 @@
 
 ---
 
-## 7. 故障排查与回滚
+## 8. 故障排查与回滚
 
 - 预览输出包含 LINK/CONFLICT/REMOVE 等关键字时，请先停止执行并确认方案。
 - 冲突（目标存在非链接同名文件）：优先选择 adopt；若不想保留现状，可走“覆盖式部署”（谨慎）。
@@ -271,7 +282,7 @@
 
 ---
 
-## 8. 版本控制建议
+## 9. 版本控制建议
 
 - 小步提交：每次变更（尤其是 adopt/抓取）后，及时 `git add/commit`。
 - 推送前再次 `stowx preview`，确保没有意外路径。
@@ -279,7 +290,7 @@
 
 ---
 
-## 9. Warp 会话日志（可选）
+## 10. Warp 会话日志（可选）
 
 若你在 Warp 中使用日志脚本（例如 `warp-log` 系列），可参考：
 
@@ -300,7 +311,7 @@
 
 ---
 
-## 10. 速查表
+## 11. 速查表
 
 - 预览 → 应用：
   
@@ -340,7 +351,7 @@
 
 ---
 
-## 11. Zim（zimfw）安装与初始化
+## 12. Zim（zimfw）安装与初始化
 
 本仓库使用 Zim（zimfw）作为 zsh 框架；已在 `mac-home/.config/zsh/plugins.zsh` 中内置“首次自动安装”逻辑：首次启动 zsh 时若未检测到 `~/.zim`，会自动下载安装，并把 `~/.zimrc` 链接到仓库内的 `~/.config/zsh/zimrc`。
 
