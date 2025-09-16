@@ -17,8 +17,8 @@
   - 延后加载 Zim（prompt/autopair）并保持覆盖顺序。
 
 - `~/.config/env/common/lazy.zsh`
-- mise：只把 shims 放 PATH；Zsh/Bash 在首次提示符时执行一次 `eval "$(mise hook-env -q)"`；
-  - direnv：首个提示符/切目录时初始化并同步当前目录环境；
+  - mise：只把 shims 放 PATH；Zsh/Bash 在首次提示符时执行一次 `eval "$(mise hook-env -q)"`；
+  - direnv：首次提示符初始化一次并同步当前目录环境（随后由 direnv 自身 hook 接管）；
   - conda/brew/zoxide/x-cmd：函数/命令首次调用时初始化；
   - 兜底：找不到 `mise` 时尝试注入常见 Homebrew/本地 bin 路径。
 
@@ -51,7 +51,7 @@
 
 - 放入 `~/.config/env/common/lazy.zsh`；
 - 优先使用：占位函数包装 + 首次调用初始化；
-- 若需基于目录更新环境（如 asdf/mise/direnv），用 `precmd/chpwd` 钩子触发，保持静默与幂等。
+- 若需“基于目录持续更新”的外部工具，请使用其自带 hook（如 direnv 在 init 后会注册自身钩子）；对于仅需一次的初始化（如本仓库的 mise/direnv），使用一次性 `precmd` 更轻量。
 
 验证步骤
 

@@ -29,7 +29,7 @@
   - Zsh/Bash 在首次提示符时执行一次 `eval "$(mise hook-env -q)"`，之后不再自动触发；
   - 保留常见路径兜底：若未找到 `mise`，尝试加入 `/opt/homebrew/bin`、`/home/linuxbrew/.linuxbrew/bin`、`$HOME/.local/bin`；
   - 不要使用 `eval "$(mise activate zsh)"` 覆盖现有策略。
-- direnv：首次提示符/切目录触发初始化并同步当前目录环境。
+- direnv：首次提示符初始化一次并同步当前目录环境（随后由 direnv 自身的钩子接管）。
 - 其它工具（conda/brew/zoxide/x-cmd）：首次调用时再初始化。
 
 3) PATH 与 Homebrew 提前注入

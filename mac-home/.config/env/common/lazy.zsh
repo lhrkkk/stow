@@ -26,8 +26,37 @@ conda() {
     return 127
   fi
 }
+ 
+ 
 
-# direnv 懒加载（bash/zsh 通用：cd 或首个提示符触发）
+# 通用注册/卸载：precmd（zsh）或 PROMPT_COMMAND（bash）
+_ami_precmd_register() {
+  _fn="$1"
+  if [ -n "${ZSH_VERSION-}" ]; then
+    autoload -Uz add-zsh-hook
+    add-zsh-hook precmd "$_fn"
+  elif [ -n "${BASH_VERSION-}" ]; then
+    if [ -n "${PROMPT_COMMAND-}" ]; then
+      PROMPT_COMMAND="$_fn; ${PROMPT_COMMAND}"
+    else
+      PROMPT_COMMAND="$_fn"
+    fi
+  fi
+}
+
+_ami_precmd_unregister() {
+  _fn="$1"
+  if [ -n "${ZSH_VERSION-}" ]; then
+    add-zsh-hook -d precmd "$_fn" 2>/dev/null || true
+  elif [ -n "${BASH_VERSION-}" ]; then
+    case ";${PROMPT_COMMAND-};" in
+      *";${_fn};"*) PROMPT_COMMAND="${PROMPT_COMMAND/$_fn; /}";;
+      *";${_fn}"*)  PROMPT_COMMAND="${PROMPT_COMMAND/$_fn/}";;
+    esac
+  fi
+}
+
+# direnv 懒加载（bash/zsh 通用）：首个提示符初始化一次
 # 仅在交互式且存在 direnv 时启用
 _lazy_is_interactive=0
 case "$-" in *i*) _lazy_is_interactive=1;; esac
@@ -44,23 +73,12 @@ if [ "$_lazy_is_interactive" -eq 1 ] && command -v direnv >/dev/null 2>&1; then
     fi
     _LAZY_DIRENV_INITIALIZED=1
   }
-  if [ -n "${ZSH_VERSION-}" ]; then
-    autoload -Uz add-zsh-hook
-    _lazy_direnv_chpwd()  { _lazy_direnv_init; }
-    _lazy_direnv_precmd() { _lazy_direnv_init; }
-    add-zsh-hook chpwd  _lazy_direnv_chpwd
-    add-zsh-hook precmd _lazy_direnv_precmd
-  elif [ -n "${BASH_VERSION-}" ]; then
-    _lazy_direnv_precmd() { _lazy_direnv_init; }
-    if [ -n "${PROMPT_COMMAND-}" ]; then
-      PROMPT_COMMAND="_lazy_direnv_precmd; ${PROMPT_COMMAND}"
-    else
-      PROMPT_COMMAND="_lazy_direnv_precmd"
-    fi
-    cd() { builtin cd "$@" && _lazy_direnv_init; }
-  else
+  _lazy_direnv_once() {
     _lazy_direnv_init
-  fi
+    _ami_precmd_unregister _lazy_direnv_once
+    unset -f _lazy_direnv_once 2>/dev/null || true
+  }
+  _ami_precmd_register _lazy_direnv_once
 fi
 
 
@@ -151,33 +169,6 @@ export PATH="$HOME/.local/share/mise/shims:$PATH"
 export PATH="$HOME/.local/bin:$PATH"   # 确保能找到 mise
 
 # 2) 懒加载一次（bash/zsh 通用）：首个提示符执行一次 hook-env，之后不再运行
-
-# 通用注册/卸载：precmd（zsh）或 PROMPT_COMMAND（bash）
-_ami_precmd_register() {
-  _fn="$1"
-  if [ -n "${ZSH_VERSION-}" ]; then
-    autoload -Uz add-zsh-hook
-    add-zsh-hook precmd "$_fn"
-  elif [ -n "${BASH_VERSION-}" ]; then
-    if [ -n "${PROMPT_COMMAND-}" ]; then
-      PROMPT_COMMAND="$_fn; ${PROMPT_COMMAND}"
-    else
-      PROMPT_COMMAND="$_fn"
-    fi
-  fi
-}
-
-_ami_precmd_unregister() {
-  _fn="$1"
-  if [ -n "${ZSH_VERSION-}" ]; then
-    add-zsh-hook -d precmd "$_fn" 2>/dev/null || true
-  elif [ -n "${BASH_VERSION-}" ]; then
-    case ";${PROMPT_COMMAND-};" in
-      *";${_fn};"*) PROMPT_COMMAND="${PROMPT_COMMAND/$_fn; /}";;
-      *";${_fn}"*)  PROMPT_COMMAND="${PROMPT_COMMAND/$_fn/}";;
-    esac
-  fi
-}
 
 _mise_hook_once() {
   # 确保能找到 mise（二次兜底：常见安装路径）
