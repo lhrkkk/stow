@@ -42,8 +42,9 @@ zstyle ':fzf-tab:complete:jj:*' group-order \
   'remote-aliases' 'workspace-aliases' 'file-aliases' 'absorb-aliases' \
   'ops-aliases' 'ui-aliases' 'other-aliases' 'commands' 'command'
 
-fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
-fpath=(/usr/share/zsh/5.9/functions $fpath)
+# fpath 由 lazyload.zsh 在 compinit 前统一处理，这里无需重复设置
+# fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
+# fpath=(/usr/share/zsh/5.9/functions $fpath)
 
 # source ~/.config/zsh/git-alias-descriptions.zsh
 
