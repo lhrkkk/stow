@@ -150,13 +150,18 @@ fi
 export PATH="$HOME/.local/share/mise/shims:$PATH"
 export PATH="$HOME/.local/bin:$PATH"   # 确保能找到 mise
 
-# 2) 懒加载（bash/zsh 通用）：进入含配置的目录才执行 hook-env
+# 2) 懒加载（bash/zsh 通用）：在提示符/切目录时执行 hook-env
+# 由 mise 自行判断是否需要更新环境（-q 静默，未变更时开销极小）
 _mise_maybe_hook() {
-  if command -v mise >/dev/null 2>&1; then
-    if [ -f .mise.toml ] || [ -f .tool-versions ] || [ -f .python-version ] || [ -f .node-version ] || [ -f .nvmrc ]; then
-      eval "$(mise hook-env -q)"
-    fi
+  # 确保能找到 mise（二次兜底：常见安装路径）
+  if ! command -v mise >/dev/null 2>&1; then
+    for _mb in /opt/homebrew/bin/mise /home/linuxbrew/.linuxbrew/bin/mise "$HOME/.local/bin/mise"; do
+      [ -x "$_mb" ] && PATH="$(dirname "$_mb"):$PATH" && break
+    done
+    unset _mb
   fi
+  command -v mise >/dev/null 2>&1 || return 0
+  eval "$(mise hook-env -q)"
 }
 if [ -n "${ZSH_VERSION-}" ]; then
   autoload -Uz add-zsh-hook
@@ -195,5 +200,4 @@ __x_cmd_lazy_boot() {
 # 包装 x 与 xc：第一次调用触发加载
 x()  { __x_cmd_lazy_boot; command x  "$@"; }
 xc() { __x_cmd_lazy_boot; command xc "$@"; }
-
 

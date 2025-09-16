@@ -6,6 +6,12 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export GOPATH="$HOME/go"
 export PATH="$PATH:$HOME/go/bin"
 
+# Ensure Homebrew bins are on PATH early (for tools like mise)
+# for _hb in /opt/homebrew/bin /opt/homebrew/sbin /home/linuxbrew/.linuxbrew/bin /home/linuxbrew/.linuxbrew/sbin; do
+  # [ -d "$_hb" ] && PATH="$_hb:$PATH"
+# done
+# unset _hb
+
 # local
 export PLATFORM=$(uname -s)
 . ~/.config/env/local/${PLATFORM}.sh
@@ -33,4 +39,3 @@ export BAT_THEME="TwoDark"
 # Cargo env for scripts and interactive shells
 export PATH="$PATH:$HOME/.cargo/bin"
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
-
