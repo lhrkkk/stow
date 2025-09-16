@@ -65,6 +65,15 @@ bindkey '^I'                             # 确认 Tab 绑定到 fzf-tab 流程
 zstyle -L ':completion:*:*:git:*'        # 检查 sort false、group-order 等
 ```
 
+调优与计时（可选）
+
+```zsh
+# 打印一次性时长：首个提示符、首次 Tab 初始化
+AMI_TIMING=1 exec zsh -l
+# 关闭（默认即为关闭）
+AMI_TIMING=0 exec zsh -l
+```
+
 常见问题与排查
 
 - 启动就报 compdef 错：未走懒加载流程；确认 `lazyload.zsh` 是否被 `zshrc` 引入，且未提前 `compinit`。
