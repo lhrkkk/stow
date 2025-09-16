@@ -44,6 +44,9 @@ vendor/
 .aider*
 .claude*
 
+# Ignore embedded wezterm plugins (keep local, not tracked)
+mac-home/.config/wezterm/plugins/
+
 nvim
 emacs
 mac-home/.config/yazi/bookmark

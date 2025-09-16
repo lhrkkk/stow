@@ -3,8 +3,8 @@ export TERM=xterm-256color
 export TERM_ITALICS=true
 # export RANGER_LOAD_DEFAULT_RC="false"
 # export EDITOR=nvim
-export EDITOR=hx
-# export EDITOR='emacsclient -t'
+# export EDITOR=hx
+export EDITOR='emacsclient -t'
 
 # export WEZ_RES_AUTO_SAVE=1
 

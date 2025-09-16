@@ -1,0 +1,5 @@
+#!/bin/sh
+# jj ww && jj rbd main && jj ww
+# jj rbd main
+jj rb -d main
+# jj ww

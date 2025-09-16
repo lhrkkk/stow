@@ -28,7 +28,7 @@
 ;; up, `M-x eval-region' to execute elisp code, and 'M-x doom/reload-font' to
 ;; refresh your font settings. If Emacs still can't find your font, it likely
 ;; wasn't installed correctly. Font issues are rarely Doom issues!
-
+(setq debug-on-quit t)      ; 先开这个，再复现一次卡顿，C-g
 ;; 对齐 WezTerm：JetBrains Mono 15pt（GUI 启动默认等宽字体）
 (setq doom-font (font-spec :family "Fira Code" :size 15))
 ;; Symbol font for icons (Nerd Font recommended)

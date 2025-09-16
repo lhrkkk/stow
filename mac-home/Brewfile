@@ -1,6 +1,6 @@
 # === Homebrew 源配置 ===
 tap "borkdude/brew"
-tap "d12frosted/emacs-plus"
+# tap "d12frosted/emacs-plus"
 # tap "homebrew/cask-fonts", "https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask-fonts.git"
 # tap "homebrew/cask-versions", "https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask-versions.git"
 # tap "homebrew/services"
@@ -115,7 +115,7 @@ brew "netcdf"
 
 # === Emacs ===
 # brew "d12frosted/emacs-plus/emacs-plus@30", args: ["with-no-frame-refocus", "with-savchenkovaleriy-big-sur-curvy-3d-icon"]
-cask "emacs"
+# cask "emacs"
 cask "android-platform-tools"
 
 # === 从已安装但未收录的条目（生成于 2025-08-15）===
@@ -152,7 +152,7 @@ brew "git-crypt"
 brew "yq"
 brew "cmake"
 # brew "openjdk"
-cask "emacs-app"
+# cask "emacs-app"
 cask "stolendata-mpv"
 brew "openjdk"
 cask "font-fira-code"
@@ -167,3 +167,9 @@ brew "specstoryai/tap/specstory"
 
 brew "frpc"
 brew "v2ray"
+brew "codex"
+brew "just"
+brew "shellcheck"
+brew "texinfo"
+brew "tree-sitter"
+cask "quarto"

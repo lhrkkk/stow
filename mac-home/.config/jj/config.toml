@@ -11,6 +11,7 @@ email = "airhenry@gmail.com"
 # adapted config entries are commented with [NOTE]
 
 [ui]
+merge-editor='smerge'
 default-command = 'default'
 # [NOTE] prefer helix
 # editor = 'nvim'
@@ -306,14 +307,264 @@ wa = ['workspace', 'add']
 wa1 = ['workspace', 'add', '--name', 'one', '.jj/workspace-one']
 wa2 = ['workspace', 'add', '--name', 'two', '.jj/workspace-two']
 wa3 = ['workspace', 'add', '--name', 'three', '.jj/workspace-three']
-wo1 = ['util', 'exec', '--', 'bash', '-c', 'cd .jj/workspace-one']
-wo2 = ['util', 'exec', '--', 'bash', '-c', 'cd .jj/workspace-two']
-wo3 = ['util', 'exec', '--', 'bash', '-c', 'cd .jj/workspace-three']
+wo1 = ["util", "exec", "--", "bash", "-c",
+       "cd $(jj workspace root)/.jj/workspace-one; if [ $# -eq 0 ]; then exec \"$SHELL\" -l; else \"$@\"; fi",
+       ""]
+wo2 = ["util", "exec", "--", "bash", "-c",
+       "cd $(jj workspace root)/.jj/workspace-two; if [ $# -eq 0 ]; then exec \"$SHELL\" -l; else \"$@\"; fi",
+       ""]
+wo3 = ["util", "exec", "--", "bash", "-c",
+       "cd $(jj workspace root)/.jj/workspace-three; if [ $# -eq 0 ]; then exec \"$SHELL\" -l; else \"$@\"; fi",
+       ""]
 wf = ['workspace', 'forget']
 wf1 = ['workspace', 'forget', 'one']
 wf2 = ['workspace', 'forget', 'two']
 wf3 = ['workspace', 'forget', 'three']
 wr = ['workspace', 'rename']
+ww = ['workspace', 'update-stale']
+ff = ['log', '-r', 'parents(@)']
+
+# wm1 = ["util", "exec", "--", "bash", "-lc","jj new main one@ && jj bs main"]
+# wm2 = ["util", "exec", "--", "bash", "-lc","jj new main two@ && jj bs main"]
+# wm3 = ["util", "exec", "--", "bash", "-lc","jj new main three@ && jj bs main "]
+
+# wm1 = ["util", "exec", "--", "bash", "-c","time jj rb -s one -d main && jj bs main -r one && jj wo1 jj new  && jj wo1 jj bs one -r @ && jj e main"]
+# wm2 = ["util", "exec", "--", "bash", "-c","jj rb -s two -d main && jj bs main -r two && jj wo2 jj new && jj wo2 jj bs two -r @ && jj e main"]
+# wm3 = ["util", "exec", "--", "bash", "-c","jj rb -s three -d main && jj bs main -r three && jj wo3 jj new && jj wo3 jj bs three -r @ && jj e main"]
+
+
+# wm1 = ["util", "exec", "--", "bash", "-c","jj rb -s one -d main && jj bs main -r one && jj wo1 jj new "]
+# wm2 = ["util", "exec", "--", "bash", "-c","jj rb -s two -d main && jj bs main -r two && jj wo2 jj new "]
+# wm3 = ["util", "exec", "--", "bash", "-c","jj rb -s three -d main && jj bs main -r three && jj wo3 jj new"]
+
+
+### ref
+# wm1 = ["util", "exec", "--", "bash", "-c","jj rb -s one -d main && jj bs main -r one "]
+# wm2 = ["util", "exec", "--", "bash", "-c","jj rb -s two -d main && jj bs main -r two "]
+# wm3 = ["util", "exec", "--", "bash", "-c","jj rb -s three -d main && jj bs main -r three "]
+
+# ws1 = ["util", "exec", "--", "bash", "-lc","jj dr one && jj wo1 jj-sync && jj wo1 jj bs one"]
+# ws2 = ["util", "exec", "--", "bash", "-lc","jj dr two && jj wo2 jj-sync && jj wo2 jj bs two"]
+# ws3 = ["util", "exec", "--", "bash", "-lc","jj dr three && jj wo3 jj-sync && jj wo3 jj bs three"]
+
+# 两边都要 jj ww 才能刷新。否则用 jj config set --user snapshot.auto-update-stale true 自动两边刷新
+# ws1 = ["util", "exec", "--", "bash", "-lc","jj ww && jj wo1 jj-sync && jj wo1 jj bs one -r @"]
+# ws2 = ["util", "exec", "--", "bash", "-lc","jj ww && jj wo2 jj-sync && jj wo2 jj bs two -r @"]
+# ws3 = ["util", "exec", "--", "bash", "-lc","jj ww && jj wo3 jj-sync && jj wo3 jj bs three -r @"]
+
+# wmsaa = ["util", "exec", "--", "bash", "-lc","jj wms1 && jj wms2 && jj wms3"]
+
+### 更新标记，把上一个节点进行标记
+# wm1 = ["util", "exec", "--", "bash", "-c","&& jj bs main -r one "]
+
+
+wn1 = ["util", "exec", "--", "bash", "-c","jj wo1 jj new "]
+wn2 = ["util", "exec", "--", "bash", "-c","jj wo2 jj new "]
+wn3 = ["util", "exec", "--", "bash", "-c","jj wo3 jj new"]
+
+wms1 = ["util", "exec", "--", "bash", "-c","jj wm1 && jj wsa"]
+wms2 = ["util", "exec", "--", "bash", "-c","jj wm2 && jj wsa"]
+wms3 = ["util", "exec", "--", "bash", "-c","jj wm3 && jj wsa"]
+
+# # --------------1.1s wnsa
+# ## v1 第一个工作的 new 版本，但是 one，two，three 指向 @，是先合并再 new。work well
+# wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one -d main && jj bs main -r one && jj wo1 jj new "]
+# wm2 = ["util", "exec", "--", "bash", "-c","jj rb -b two -d main && jj bs main -r two && jj wo2 jj new "]
+# wm3 = ["util", "exec", "--", "bash", "-c","jj rb -b three -d main && jj bs main -r three && jj wo3 jj new"]
+
+# # 移动头部
+# ws1 = ["util", "exec", "--", "bash", "-c","jj wo1 jj-sync && jj wo1 jj bs one -r @"]
+# ws2 = ["util", "exec", "--", "bash", "-c","jj wo2 jj-sync && jj wo2 jj bs two -r @"]
+# ws3 = ["util", "exec", "--", "bash", "-c","jj wo3 jj-sync && jj wo3 jj bs three -r @"]
+
+# # 同步所有工作区分支
+# wsa = ["util", "exec", "--", "bash", "-c","jj ws1 && jj ws2 && jj ws3"]
+
+# wnsa = ["util", "exec", "--", "bash", "-c","jj wm1 && jj wm2 && jj wm3 && jj wsa && jj e main"]
+
+
+
+# # --------------1.5s wnsa  0.7s wmsa
+# ### v2 第一个工作的 @- 版本。work well
+# wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one -d main && jj bs main -r one "]
+# wm2 = ["util", "exec", "--", "bash", "-c","jj rb -b two -d main && jj bs main -r two "]
+# wm3 = ["util", "exec", "--", "bash", "-c","jj rb -b three -d main && jj bs main -r three "]
+
+# ws1 = ["util", "exec", "--", "bash", "-c","jj wo1 jj-sync && jj wo1 jj bs one -r @-"]
+# ws2 = ["util", "exec", "--", "bash", "-c","jj wo2 jj-sync && jj wo2 jj bs two -r @-"]
+# ws3 = ["util", "exec", "--", "bash", "-c","jj wo3 jj-sync && jj wo3 jj bs three -r @-"]
+
+# # 同步所有工作区分支
+# wsa = ["util", "exec", "--", "bash", "-c","jj ws1 && jj ws2 && jj ws3"]
+
+# #### wmsa = ["util", "exec", "--", "bash", "-c","jj wsa && jj wm1 && jj wm2 && jj wm3 && jj wsa   && pwd"]
+# wmsa = ["util", "exec", "--", "bash", "-c","jj ws1 && jj wm1 && jj ws2 &&jj wm2 && jj ws3 && jj wm3 && jj wsa && jj e main"]
+
+# wnsa = ["util", "exec", "--", "bash", "-c","jj wo1 jj new && jj wo2 jj new && jj wo3 jj new&&jj wsa && jj wm1 &&jj wm2 && jj wm3 && jj wsa && jj e main"]
+
+
+# # --------------1.0s wnsa 0.4s wmsa 1.0wmsa
+# ### v3 改进性能的 v2 版本，合并只 set 不重复 sync，仍然具有 main，one，two，three 标签。work good。
+# wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one -d main && jj bs main -r one "]
+# wm2 = ["util", "exec", "--", "bash", "-c","jj rb -b two -d main && jj bs main -r two "]
+# wm3 = ["util", "exec", "--", "bash", "-c","jj rb -b three -d main && jj bs main -r three "]
+
+# ws1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@ -d main && jj wo1 jj bs one -r @-"]
+# ws2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@ -d main && jj wo2 jj bs two -r @-"]
+# ws3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@ -d main && jj wo3 jj bs three -r @-"]
+
+# wset1 = ["bookmark","set","one", "-r", "one@-"]
+# wset2 = ["bookmark","set","two", "-r", "two@-"]
+# wset3 = ["bookmark","set","three", "-r", "three@-"]
+
+# # 同步所有工作区分支
+# wsa = ["util", "exec", "--", "bash", "-c","jj ws1 && jj ws2 && jj ws3"]
+# wseta = ["util", "exec", "--", "bash", "-c","jj wset1 && jj wset2 && jj wset3"]
+
+# wmsa = ["util", "exec", "--", "bash", "-c","jj wset1 && jj wm1 && jj wset2 &&jj wm2 && jj wset3 && jj wm3 && jj wsa && pwd"]
+# wnsa = ["util", "exec", "--", "bash", "-c","jj wn1 && jj wn2 && jj wn3 &&jj wseta && jj wm1 &&jj wm2 && jj wm3 && jj wsa && jj e main"]
+
+
+# # --------------0.9s wnsa  0.3s wmsa
+# ### v3.5 并行性能的 v3 版本，仍然具有 main，one，two，three 标签。并行有时候有问题。
+# wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one -d main && jj bs main -r one "]
+# wm2 = ["util", "exec", "--", "bash", "-c","jj rb -b two -d main && jj bs main -r two "]
+# wm3 = ["util", "exec", "--", "bash", "-c","jj rb -b three -d main && jj bs main -r three "]
+
+# ws1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@ -d main && jj wo1 jj bs one -r @-"]
+# ws2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@ -d main && jj wo2 jj bs two -r @-"]
+# ws3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@ -d main && jj wo3 jj bs three -r @-"]
+
+# wset1 = ["bookmark","set","one", "-r", "one@-"]
+# wset2 = ["bookmark","set","two", "-r", "two@-"]
+# wset3 = ["bookmark","set","three", "-r", "three@-"]
+
+# # 同步所有工作区分支
+# wna = ["util", "exec", "--", "bash", "-c","jj wn1 & jj wn2 & jj wn3 & wait"]
+# wsa = ["util", "exec", "--", "bash", "-c","jj ws1 & jj ws2 & jj ws3 & wait"]
+# wseta = ["util", "exec", "--", "bash", "-c","jj wset1 & jj wset2 & jj wset3 & wait"]
+
+# wmsa = ["util", "exec", "--", "bash", "-c","jj wset1 && jj wm1 && jj wset2 &&jj wm2 && jj wset3 && jj wm3 && jj wsa && pwd"]
+# wnsa = ["util", "exec", "--", "bash", "-c","jj wna &&jj wseta && jj wm1 &&jj wm2 && jj wm3 && jj wsa && jj e main"]
+
+
+
+# # -------------- 0.8s wnsa  0.25s wmsa
+# ### v4, 极致性能的 @- 版本，依赖 main 标签和one@, two@, three@，  wnsa 则是 new 版本。work well
+# wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@- -d main && jj bs main -r one@- "]
+# wm2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@- -d main && jj bs main -r two@- "]
+# wm3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@- -d main && jj bs main -r three@- "]
+
+# ws1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@ -d main "]
+# ws2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@ -d main "]
+# ws3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@ -d main "]
+
+# # 同步所有工作区分支
+# wsa = ["util", "exec", "--", "bash", "-c","jj ws1 && jj ws2 && jj ws3"]
+
+# wmsa = ["util", "exec", "--", "bash", "-c","jj wm1 &&jj wm2 && jj wm3 && jj wsa && jj e main"]
+# wnsa = ["util", "exec", "--", "bash", "-c","jj wn1 && jj wn2 && jj wn3 && jj wm1 &&jj wm2 && jj wm3 && jj wsa && jj e main"]
+
+# -------------- 0.7s wnsa  0.23s wmsa 0.9 wmsa
+### v4。5, 并行性能的 @- 版本，依赖 main 标签和one@, two@, three@，  wnsa 则是 new 版本。work well
+wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@- -d main && jj bs main -r one@- "]
+wm2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@- -d main && jj bs main -r two@- "]
+wm3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@- -d main && jj bs main -r three@- "]
+
+ws1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@ -d main "]
+ws2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@ -d main "]
+ws3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@ -d main "]
+
+# 同步所有工作区分支
+wna = ["util", "exec", "--", "bash", "-c","jj wn1 & jj wn2 & jj wn3& wait"]
+wsa = ["util", "exec", "--", "bash", "-c","jj ws1 & jj ws2 & jj ws3& wait"]
+wma = ["util", "exec", "--", "bash", "-c","jj wm1 && jj wm2 && jj wm3"]
+
+wmsa = ["util", "exec", "--", "bash", "-c","jj wma && jj wsa && jj e main"]
+wnsa = ["util", "exec", "--", "bash", "-c","jj wna && jj wma && jj wsa && jj e main"]
+
+
+
+# # --------------
+# ### v6 并行性能的简单主线 new 版本。只有抓取和移动。
+# nm1 = ["util", "exec", "--", "bash", "-c","jj bs last && jj new && jj rbd one@"]
+# nm2 = ["util", "exec", "--", "bash", "-c","jj bs last && jj new && jj rbd two@ "]
+# nm3 = ["util", "exec", "--", "bash", "-c","jj bs last && jj new && jj rbd three@"]
+
+
+# # nm1 = ["util", "exec", "--", "bash", "-c","jj new @ one@"]
+# # nm2 = ["util", "exec", "--", "bash", "-c","jj new @ two@ "]
+# # nm3 = ["util", "exec", "--", "bash", "-c","jj new @ three@"]
+
+# # zs1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@ -d default@ "]
+# # zs2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@ -d default@ "]
+# # zs3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@ -d default@ "]
+
+
+# zn1 = ["util", "exec", "--", "bash", "-c","jj wo1 jj new default@"]
+# zn2 = ["util", "exec", "--", "bash", "-c","jj wo2 jj new default@"]
+# zn3 = ["util", "exec", "--", "bash", "-c","jj wo3 jj new default@"]
+# # zs1 = ["util", "exec", "--", "bash", "-c","jj wo1 jj new default@ "]
+
+# # 同步所有工作区分支
+# nma = ["util", "exec", "--", "bash", "-c","jj nm1 && jj nm2 && jj nm3"]
+# zna = ["util", "exec", "--", "bash", "-c","jj zn1 && jj zn2 && jj zn3"]
+# znma = ["util", "exec", "--", "bash", "-c","jj nma && jj zna && jj clean"]
+
+
+
+
+##### 推荐用 v3 或者 v4.5
+# v3   -------------- 1.0s wnsa  0.4s wmsa  1.0wmsa
+# v4.5 -------------- 0.7s wnsa  0.23s wmsa  0.9wmsa
+
+
+
+# --------------
+# ### v5 错误版本
+# wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@- -d main && jj bs main -r one@- "]
+# wm2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@- -d main && jj bs main -r two@- "]
+# wm3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@- -d main && jj bs main -r three@- "]
+
+# ws1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@- -d main"]
+# ws2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@- -d main"]
+# ws3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@- -d main"]
+
+
+# # 同步所有工作区分支
+# wsa = ["util", "exec", "--", "bash", "-c","jj ws1 && jj ws2 && jj ws3"]
+
+# # wmsa = ["util", "exec", "--", "bash", "-c","jj wsa && jj wm1 && jj wm2 && jj wm3 && jj wsa   && pwd"]
+# wmsa = ["util", "exec", "--", "bash", "-c","jj wm1 && jj wm2 && jj wm3 && jj wsa && pwd"]
+
+
+
+
+
+
+
+# 删除所有空节点，非静态，非 bookmark
+# clean = ["util", "exec", "--", "bash", "-lc","jj abandon -r 'empty() & ~merges() & mutable() & ~bookmarks() & ~remote_bookmarks()'"]
+
+clean = ["util","exec","--","bash","-lc","jj abandon -r 'empty() & ~merges() & mutable() & ~bookmarks() & ~remote_bookmarks() & ~working_copies()'"]
+
+cut = ["util","exec","--","bash","-lc","jj abandon -r 'mutable() & ~::(bookmarks() | working_copies())'"]
+
+
+gc = ["util", "gc" ,"--expire", "now"]
+
+
+
+#wo1 = ["util", "exec", "--", "bash", "-lc", "cd .jj/workspace-one; \"$@\"", ""]
+#wo2 = ["util", "exec", "--", "bash", "-lc", "cd .jj/workspace-two; \"$@\"", ""]
+#wo3 = ["util", "exec", "--", "bash", "-lc", "cd .jj/workspace-three; \"$@\"", ""]
+#wo1 = ['util', 'exec', '--', 'bash', '-c', 'cd .jj/workspace-one']
+#wo2 = ['util', 'exec', '--', 'bash', '-c', 'cd .jj/workspace-two']
+#wo3 = ['util', 'exec', '--', 'bash', '-c', 'cd .jj/workspace-three']
+
+r = ["util", "exec", "--", "bash", "-c", "echo args: $@; echo 0=$0 1=$1"]
+# 末尾这个空字符串会占用 $0，让你的实参从 $1 开始
+
 
 # [NOTE] muscle memory of jj + space
 # [NOTE] show all revisions, same as my `jj`
@@ -325,3 +576,6 @@ highlight-color = "#cbcfd4"
 diff-format = "color-words"     # Better for light themes
 layout = "horizontal"           # Classic horizontal layout
 layout-percent = 50             # Balanced split
+
+[snapshot]
+auto-update-stale = true
