@@ -2,6 +2,11 @@ export ZIM_HOME=${HOME}/.zim
 
 # 异步（事件循环延后）初始化补全系统：提示符先出来，随后在本 shell 完成 compinit
 if [[ $- == *i* ]]; then
+  # 计时器：记录加载起点与是否打印一次性用时
+  # 默认关闭；通过环境变量 AMI_TIMING=1 启用（不再读取外部配置）
+  typeset -gF _AMI_T0=${EPOCHREALTIME:-0}
+  typeset -g AMI_TIMING
+  : ${AMI_TIMING:=0}
   # 捕获启动期对 compdef 的调用，避免模块在 compinit 前报错
   typeset -ga __compdef_queue
   compdef() { __compdef_queue+=("$*"); }
@@ -64,11 +69,18 @@ if [[ $- == *i* ]]; then
     # 确保补全脚本已加载（定义 after-compinit 钩子）
     __ami_source_completions_once
     if typeset -f _lazy_compinit_run >/dev/null; then
+      local _t1=$EPOCHREALTIME
       _lazy_compinit_run
       # Allow modules to run post-compinit hooks exactly once
       if typeset -f __ami_after_compinit >/dev/null; then
         __ami_after_compinit
         unfunction __ami_after_compinit 2>/dev/null || true
+      fi
+      # 打印首次 Tab 初始化耗时（显示在提示区，不打断补全流）
+      if (( AMI_TIMING )); then
+        local _ms=$(( ( EPOCHREALTIME - _t1 ) * 1000 ))
+        _ms=${_ms%.*}
+        zle -M "[ami-timing] first Tab init: ${_ms} ms"
       fi
     fi
     zle expand-or-complete
@@ -108,6 +120,12 @@ if [[ $- == *i* ]]; then
   autoload -Uz add-zsh-hook
   _zim_precmd_once() {
     add-zsh-hook -d precmd _zim_precmd_once 2>/dev/null || true
+    # 打印首个提示符耗时（更贴近日常体感），不影响后续
+    if (( AMI_TIMING )); then
+      local ms=$(( ( EPOCHREALTIME - _AMI_T0 ) * 1000 ))
+      ms=${ms%.*}
+      print -- "[ami-timing] first prompt: ${ms} ms"
+    fi
     _lazy_zim_init_run
   }
   add-zsh-hook precmd _zim_precmd_once

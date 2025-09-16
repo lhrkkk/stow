@@ -7,7 +7,7 @@ export TERM_ITALICS=true
 export EDITOR='emacsclient -t'
 
 # export WEZ_RES_AUTO_SAVE=1
-
+export AMI_TIMING=0
 
 # Locale and history
 export LANG=en_US.UTF-8
