@@ -166,7 +166,6 @@ fi
 
 # 1) 只加载 shims（快速）
 export PATH="$HOME/.local/share/mise/shims:$PATH"
-export PATH="$HOME/.local/bin:$PATH"   # 确保能找到 mise
 
 # 2) 懒加载一次（bash/zsh 通用）：首个提示符执行一次 hook-env，之后不再运行
 
@@ -213,3 +212,12 @@ __x_cmd_lazy_boot() {
 # 包装 x 与 xc：第一次调用触发加载
 x()  { __x_cmd_lazy_boot; command x  "$@"; }
 xc() { __x_cmd_lazy_boot; command xc "$@"; }
+
+# Manual refresh helpers
+mise-refresh() {
+  command -v mise >/dev/null 2>&1 || return 0
+  eval "$(mise hook-env -q)"
+  { hash -r 2>/dev/null || rehash 2>/dev/null || true; }
+}
+
+env-rehash() { hash -r 2>/dev/null || rehash 2>/dev/null || true; }

@@ -342,6 +342,13 @@
    stowx list
   ```
 
+- 环境刷新：
+  
+  ```sh
+   mise-refresh   # 手动重跑 mise hook-env 并刷新命令缓存
+   env-rehash     # 仅刷新命令缓存（zsh/bash 通用）
+  ```
+
 ---
 
 > 备注
