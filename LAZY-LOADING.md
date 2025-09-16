@@ -19,7 +19,8 @@
 - `~/.config/env/common/lazy.zsh`
   - mise：只把 shims 放 PATH；Zsh/Bash 在首次提示符时执行一次 `eval "$(mise hook-env -q)"`；
   - direnv：首次提示符初始化一次并同步当前目录环境（随后由 direnv 自身 hook 接管）；
-  - conda/brew/zoxide/x-cmd：函数/命令首次调用时初始化；
+  - zoxide：首次提示符初始化一次（从会话开始记录目录历史；`ZOXIDE_USE_CD=1` 时覆盖 `cd`）；
+  - conda/brew/x-cmd：函数/命令首次调用时初始化；
   - 兜底：找不到 `mise` 时尝试注入常见 Homebrew/本地 bin 路径。
 
 - `~/.config/env/common/paths.zsh`

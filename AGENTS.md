@@ -30,7 +30,8 @@
   - 保留常见路径兜底：若未找到 `mise`，尝试加入 `/opt/homebrew/bin`、`/home/linuxbrew/.linuxbrew/bin`、`$HOME/.local/bin`；
   - 不要使用 `eval "$(mise activate zsh)"` 覆盖现有策略。
 - direnv：首次提示符初始化一次并同步当前目录环境（随后由 direnv 自身的钩子接管）。
-- 其它工具（conda/brew/zoxide/x-cmd）：首次调用时再初始化。
+- zoxide：首次提示符初始化一次（若 `ZOXIDE_USE_CD=1` 则使用 `--cmd cd` 覆盖 `cd`）。
+- 其它工具（conda/brew/x-cmd）：首次调用时再初始化。
 
 3) PATH 与 Homebrew 提前注入
 - 在 `~/.config/env/common/paths.zsh` 中优先注入 Homebrew 路径（如存在）：

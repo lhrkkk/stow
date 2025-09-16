@@ -26,8 +26,8 @@ conda() {
     return 127
   fi
 }
- 
- 
+
+
 
 # 通用注册/卸载：precmd（zsh）或 PROMPT_COMMAND（bash）
 _ami_precmd_register() {
@@ -118,21 +118,20 @@ fuck() {
 # fi
 
 
-# 懒加载 zoxide：第一次调用 z/zi 时才真正 init
-if command -v zoxide >/dev/null 2>&1; then
-  _load_zoxide() {
-    unset -f z zi        # 先移除占位函数
-    _zx_shell="zsh"
-    [ -n "${BASH_VERSION-}" ] && _zx_shell="bash"
-    if [ "${ZOXIDE_USE_CD:-0}" = "1" ]; then
-      eval "$(zoxide init "$_zx_shell" --cmd cd)"
-    else
-      eval "$(zoxide init "$_zx_shell")"
-    fi
-  }
-  z()  { _load_zoxide; z  "$@"; }   # 复用本次调用的参数
-  zi() { _load_zoxide; zi "$@"; }
-fi
+## zoxide：首次提示符初始化一次（便于从会话开始记录目录历史）
+_zoxide_init_once() {
+  command -v zoxide >/dev/null 2>&1 || { _ami_precmd_unregister _zoxide_init_once; unset -f _zoxide_init_once 2>/dev/null || true; return 0; }
+  _zx_shell="zsh"
+  [ -n "${BASH_VERSION-}" ] && _zx_shell="bash"
+  if [ "${ZOXIDE_USE_CD:-0}" = "1" ]; then
+    eval "$(zoxide init "$_zx_shell" --cmd cd)"
+  else
+    eval "$(zoxide init "$_zx_shell")"
+  fi
+  _ami_precmd_unregister _zoxide_init_once
+  unset -f _zoxide_init_once 2>/dev/null || true
+}
+_ami_precmd_register _zoxide_init_once
 
 
 # # 懒加载 zoxide：第一次调用 z/zi 时才真正 init
@@ -221,3 +220,25 @@ mise-refresh() {
 }
 
 env-rehash() { hash -r 2>/dev/null || rehash 2>/dev/null || true; }
+
+# Initialize Homebrew environment on demand
+brew-env() {
+  # Prefer existing BREW_BIN, else find brew
+  local _b="${BREW_BIN-}"
+  if [ -z "$_b" ]; then
+    if command -v brew >/dev/null 2>&1; then
+      _b="$(command -v brew)"
+    else
+      for _p in /opt/homebrew/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
+        [ -x "$_p" ] && _b="$_p" && break
+      done
+    fi
+  fi
+  if [ -z "$_b" ] || [ ! -x "$_b" ]; then
+    printf '%s\n' 'brew 未安装或未在 PATH 中' >&2
+    return 127
+  fi
+  eval "$("$_b" shellenv)"
+  unset -f brew 2>/dev/null || true
+  { hash -r 2>/dev/null || rehash 2>/dev/null || true; }
+}

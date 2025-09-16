@@ -347,6 +347,7 @@
   ```sh
    mise-refresh   # 手动重跑 mise hook-env 并刷新命令缓存
    env-rehash     # 仅刷新命令缓存（zsh/bash 通用）
+   brew-env       # 手动 eval "$(brew shellenv)" 并刷新缓存
   ```
 
 ---
