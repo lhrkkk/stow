@@ -6,6 +6,15 @@ if [[ $- == *i* ]]; then
   typeset -ga __compdef_queue
   compdef() { __compdef_queue+=("$*"); }
 
+  # 一次性按需加载 Git/JJ 增强补全脚本（避免启动时立即 source）
+  __ami_source_completions_once() {
+    [[ -n ${__AMI_COMPLETIONS_SOURCED:-} ]] && return
+    # 这些脚本会定义 __ami_after_compinit 钩子，稍后在 compinit 之后触发
+    source ~/.config/zsh/git-completion-enhanced.zsh
+    source ~/.config/zsh/jj-completion-enhanced.zsh
+    __AMI_COMPLETIONS_SOURCED=1
+  }
+
   _lazy_compinit_run() {
     # 释放 compdef 名字，恢复为真正的 compdef
     unfunction compdef 2>/dev/null || true
@@ -52,6 +61,8 @@ if [[ $- == *i* ]]; then
   # 首次 Tab 兜底：若尚未初始化，则先运行再补全
   zle -N _ami_expand_or_complete
   _ami_expand_or_complete() {
+    # 确保补全脚本已加载（定义 after-compinit 钩子）
+    __ami_source_completions_once
     if typeset -f _lazy_compinit_run >/dev/null; then
       _lazy_compinit_run
       # Allow modules to run post-compinit hooks exactly once
@@ -97,6 +108,8 @@ if [[ $- == *i* ]]; then
   autoload -Uz add-zsh-hook
   _zim_precmd_once() {
     add-zsh-hook -d precmd _zim_precmd_once 2>/dev/null || true
+    # 在 compinit 之前加载补全脚本，以便 after-compinit 能在下方被调用
+    __ami_source_completions_once
     # 确保在加载 Zim 与 fzf-tab 之前已经完成 compinit
     if typeset -f _lazy_compinit_run >/dev/null; then
       _lazy_compinit_run
