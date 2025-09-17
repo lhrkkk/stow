@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script="$HOME/_env/stow/mac-home/.local/bin/git-commit-ai"
+
+if [[ ! -x "$script" ]]; then
+  echo "git cai: 找不到 git-commit-ai 脚本 ($script)" >&2
+  exit 127
+fi
+
+mode="alias"
+have_preview=0
+SCRIPT_ARGS=()
+COMMIT_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model|--max-bytes|--extra|--lang|--wrap-subject)
+      if [[ $# -lt 2 ]]; then
+        echo "git cai: $1 需要参数" >&2
+        exit 2
+      fi
+      SCRIPT_ARGS+=("$1" "$2")
+      shift 2
+      ;;
+    --preview|--dry-run|--message-only)
+      have_preview=1
+      mode="preview"
+      SCRIPT_ARGS+=("$1")
+      shift
+      ;;
+    --commit|--yes|-y)
+      mode="script"
+      have_preview=0
+      SCRIPT_ARGS+=("$1")
+      shift
+      ;;
+    --show-prompt|--chinese|--bracket-title|--bracket-title-cn)
+      SCRIPT_ARGS+=("$1")
+      shift
+      ;;
+    -h|--help)
+      mode="script"
+      SCRIPT_ARGS+=("$1")
+      shift
+      ;;
+    --)
+      shift
+      while [[ $# -gt 0 ]]; do
+        COMMIT_ARGS+=("$1")
+        shift
+      done
+      break
+      ;;
+    *)
+      COMMIT_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ "$mode" == "script" ]]; then
+  exec "$script" "${SCRIPT_ARGS[@]}" "${COMMIT_ARGS[@]}"
+fi
+
+if [[ "$mode" == "preview" ]]; then
+  if (( have_preview == 0 )); then
+    SCRIPT_ARGS=("--preview" "${SCRIPT_ARGS[@]}")
+  fi
+  exec "$script" "${SCRIPT_ARGS[@]}" "${COMMIT_ARGS[@]}"
+fi
+
+TMP_MSG=$(mktemp "${TMPDIR:-/tmp}/git-cai-msg-XXXXXX")
+cleanup() {
+  [[ -n "$TMP_MSG" && -f "$TMP_MSG" ]] && rm -f "$TMP_MSG"
+}
+trap cleanup EXIT
+
+if ! "$script" --preview "${SCRIPT_ARGS[@]}" "${COMMIT_ARGS[@]}" >"$TMP_MSG"; then
+  rc=$?
+  rm -f "$TMP_MSG"
+  exit "$rc"
+fi
+
+if [[ ! -s "$TMP_MSG" ]]; then
+  echo "git-commit-ai: 未生成提交信息" >&2
+  rm -f "$TMP_MSG"
+  exit 1
+fi
+
+echo '使用的提交信息:'
+echo '----------------------------------------'
+cat "$TMP_MSG"
+echo '----------------------------------------'
+
+read -r -p "是否使用该提交信息并提交? [y/N] " REPLY
+case "$REPLY" in
+  [yY][eE][sS]|[yY])
+    ;;
+  *)
+    echo "git cai: 已取消提交" >&2
+    exit 1
+    ;;
+esac
+
+commit_cmd=(git commit)
+double_dash=0
+for arg in "${COMMIT_ARGS[@]}"; do
+  if (( double_dash == 0 )) && [[ "$arg" == "--" ]]; then
+    double_dash=1
+    commit_cmd+=(-F "$TMP_MSG" --)
+    continue
+  fi
+  commit_cmd+=("$arg")
+done
+
+if (( double_dash == 0 )); then
+  commit_cmd+=(-F "$TMP_MSG")
+fi
+
+"${commit_cmd[@]}"

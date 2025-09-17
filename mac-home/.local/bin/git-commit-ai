@@ -1,0 +1,536 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+show_help() {
+  cat <<'USAGE'
+Usage: git-commit-ai [options] [-- <git commit args>]
+
+生成提交信息（基于 Git 仓库）并可选直接 `git commit`。
+
+Options:
+  --model NAME         指定 Codex 模型（默认：$GIT_COMMIT_AI_MODEL 或 gpt-5-codex）
+  --max-bytes N        发送给模型的 diff 最大字节数（默认：$GIT_COMMIT_AI_MAX_BYTES 或 120000）
+  --preview            仅打印生成结果，不提交
+  --commit             直接提交（不再询问）
+  --yes                等同 --commit
+  --show-prompt        打印发送给模型的完整提示词
+  --extra TEXT         追加一段实时指令到提示词
+  --lang CODE          指定输出语言，如 zh、en（默认：zh）
+  --chinese            快捷方式，等同 --lang zh
+  --wrap-subject STYLE 自定义标题包装（例如 brackets、cn-brackets；默认：cn-brackets）
+  --bracket-title      标题使用半角方括号 []
+  --bracket-title-cn   标题使用全角方括号 【】
+  -h, --help           查看帮助
+
+环境变量：
+  GIT_COMMIT_AI_MODEL        默认模型名称
+  GIT_COMMIT_AI_MAX_BYTES    diff 上限
+  GIT_COMMIT_AI_EXTRA_PROMPT 额外固定提示词
+  GIT_COMMIT_AI_COMMAND      调用命令（默认：codex）
+  GIT_COMMIT_AI_CLI_ARGS     额外传给 Codex CLI 的参数（以空格分隔）
+  GIT_COMMIT_AI_LANG         默认输出语言（如 zh、en；默认 zh）
+  GIT_COMMIT_AI_WRAP_SUBJECT 默认标题包装样式（默认 cn-brackets）
+  GIT_COMMIT_AI_DEBUG        非空时打印调试信息
+USAGE
+}
+
+MODEL=${GIT_COMMIT_AI_MODEL:-gpt-5-codex}
+MAX_BYTES=${GIT_COMMIT_AI_MAX_BYTES:-120000}
+EXTRA_PROMPT=${GIT_COMMIT_AI_EXTRA_PROMPT:-}
+CLI_COMMAND=${GIT_COMMIT_AI_COMMAND:-codex}
+DEFAULT_CLI_ARGS=""
+LANG_PREF=${GIT_COMMIT_AI_LANG:-zh}
+SUBJECT_STYLE=${GIT_COMMIT_AI_WRAP_SUBJECT:-cn-brackets}
+DEBUG=${GIT_COMMIT_AI_DEBUG:-}
+
+AUTO_COMMIT=0
+PREVIEW_ONLY=0
+ASSUME_YES=0
+SHOW_PROMPT=0
+EXTRA_RUNTIME_PROMPT=""
+GIT_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      [[ $# -ge 2 ]] || { echo "git-commit-ai: --model 需要参数" >&2; exit 2; }
+      MODEL="$2"
+      shift 2
+      ;;
+    --max-bytes)
+      [[ $# -ge 2 ]] || { echo "git-commit-ai: --max-bytes 需要参数" >&2; exit 2; }
+      if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+        echo "git-commit-ai: --max-bytes 必须为整数" >&2
+        exit 2
+      fi
+      MAX_BYTES="$2"
+      shift 2
+      ;;
+    --preview|--dry-run|--message-only)
+      PREVIEW_ONLY=1
+      shift
+      ;;
+    --commit)
+      AUTO_COMMIT=1
+      shift
+      ;;
+    --yes|-y)
+      AUTO_COMMIT=1
+      ASSUME_YES=1
+      shift
+      ;;
+    --show-prompt)
+      SHOW_PROMPT=1
+      shift
+      ;;
+    --extra)
+      [[ $# -ge 2 ]] || { echo "git-commit-ai: --extra 需要参数" >&2; exit 2; }
+      EXTRA_RUNTIME_PROMPT="$2"
+      shift 2
+      ;;
+    --lang)
+      [[ $# -ge 2 ]] || { echo "git-commit-ai: --lang 需要参数" >&2; exit 2; }
+      LANG_PREF="$2"
+      shift 2
+      ;;
+    --chinese)
+      LANG_PREF="zh"
+      shift
+      ;;
+    --wrap-subject)
+      [[ $# -ge 2 ]] || { echo "git-commit-ai: --wrap-subject 需要参数" >&2; exit 2; }
+      SUBJECT_STYLE="$2"
+      shift 2
+      ;;
+    --bracket-title)
+      SUBJECT_STYLE="brackets"
+      shift
+      ;;
+    --bracket-title-cn)
+      SUBJECT_STYLE="cn-brackets"
+      shift
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    --)
+      shift
+      GIT_ARGS=("${@}")
+      break
+      ;;
+    *)
+      GIT_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# 确保在 Git 仓库内
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "git-commit-ai: 当前目录不是 Git 仓库" >&2
+  exit 1
+fi
+
+# 查找 Codex CLI
+if ! command -v "$CLI_COMMAND" >/dev/null 2>&1; then
+  if [[ -d "$HOME/.local/share/mise/shims" ]]; then
+    PATH="$HOME/.local/share/mise/shims:$PATH"
+  fi
+fi
+
+if ! command -v "$CLI_COMMAND" >/dev/null 2>&1; then
+  if [[ -x "/opt/homebrew/bin/$CLI_COMMAND" ]]; then
+    PATH="/opt/homebrew/bin:$PATH"
+  elif [[ -x "/home/linuxbrew/.linuxbrew/bin/$CLI_COMMAND" ]]; then
+    PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+  elif [[ -x "$HOME/.local/bin/$CLI_COMMAND" ]]; then
+    PATH="$HOME/.local/bin:$PATH"
+  fi
+fi
+
+if ! command -v "$CLI_COMMAND" >/dev/null 2>&1; then
+  echo "git-commit-ai: 找不到 $CLI_COMMAND，可设置 GIT_COMMIT_AI_COMMAND 自定义" >&2
+  exit 127
+fi
+
+STATUS_OUTPUT=$(git status --short --branch 2>/dev/null || true)
+DIFF_STAT=$(git diff --cached --stat 2>/dev/null || true)
+DIFF_OUTPUT=$(git diff --cached --patch 2>/dev/null || true)
+
+trimmed_diff=$(printf '%s' "$DIFF_OUTPUT" | tr -d '\r\n\t ')
+trimmed_stat=$(printf '%s' "$DIFF_STAT" | tr -d '\r\n\t ')
+if [[ -z "$trimmed_diff" && -z "$trimmed_stat" ]]; then
+  DIFF_STAT=$(git diff --stat 2>/dev/null || true)
+  DIFF_OUTPUT=$(git diff --patch 2>/dev/null || true)
+  trimmed_diff=$(printf '%s' "$DIFF_OUTPUT" | tr -d '\r\n\t ')
+  trimmed_stat=$(printf '%s' "$DIFF_STAT" | tr -d '\r\n\t ')
+fi
+
+if [[ -z "$trimmed_diff" && -z "$trimmed_stat" ]]; then
+  echo "git-commit-ai: 没有检测到改动，退出" >&2
+  exit 1
+fi
+
+TRUNCATED_FLAG=""
+if (( MAX_BYTES > 0 )); then
+  DIFF_BYTES=$(printf '%s' "$DIFF_OUTPUT" | wc -c | tr -d ' ')
+  if (( DIFF_BYTES > MAX_BYTES )); then
+    DIFF_OUTPUT=$(printf '%s' "$DIFF_OUTPUT" | head -c "$MAX_BYTES")
+    TRUNCATED_FLAG=$'\n\n[Diff truncated to '
+    TRUNCATED_FLAG+="$MAX_BYTES"
+    TRUNCATED_FLAG+=$' bytes for AI prompt.]'
+  fi
+fi
+
+BASE_PROMPT_EN=$'You are an expert developer creating high-quality commit messages for Git repositories.\nGuidelines:\n- Provide a concise subject line (<= 72 characters).\n- Optionally add bullet list after a blank line explaining key changes.\n- No code fences or surrounding quotes.\n- Prioritise the most impactful changes if the diff is long.\n- Use sentence case for the subject.\n'
+BASE_PROMPT="$BASE_PROMPT_EN"
+
+if [[ -n "$LANG_PREF" ]]; then
+  case "$LANG_PREF" in
+    zh|zh-CN|zh-cn|cn|中文|简体中文)
+      BASE_PROMPT=$'你是一名资深开发者，需要为 Git 仓库撰写高质量的提交信息。\n规范：\n- 提交标题不超过 72 个字符，使用简洁的陈述语气。\n- 可以在空行后列出关键要点，采用破折号或项目符号开头。\n- 不要在输出外层添加引号或代码块。\n- 若改动较多，请突出最重要的影响。\n- 所有内容必须使用简体中文撰写；如模型生成了非中文，请立即用简体中文重新表述。\n'
+      ;;
+    *)
+      BASE_PROMPT="${BASE_PROMPT_EN}Please write the subject line and bullet list in ${LANG_PREF}.\n"
+      ;;
+  esac
+fi
+
+if [[ -n "$SUBJECT_STYLE" ]]; then
+  case "$SUBJECT_STYLE" in
+    brackets)
+      if [[ -n "$LANG_PREF" ]]; then
+        case "$LANG_PREF" in
+          zh|zh-CN|zh-cn|cn|中文|简体中文)
+            BASE_PROMPT+=$'\n请将提交标题整体放在半角方括号内，例如：[新增功能]。\n'
+            ;;
+          *)
+            BASE_PROMPT+=$'\nWrap the subject line in square brackets, e.g. [Subject Title].\n'
+            ;;
+        esac
+      else
+        BASE_PROMPT+=$'\nWrap the subject line in square brackets, e.g. [Subject Title].\n'
+      fi
+      ;;
+    cn-brackets)
+      if [[ -n "$LANG_PREF" && $LANG_PREF =~ ^(zh|zh-CN|zh-cn|cn|中文|简体中文)$ ]]; then
+        BASE_PROMPT+=$'\n请将提交标题整体放在全角方括号内，例如：【新增功能】。\n'
+      else
+        BASE_PROMPT+=$'\nWrap the subject line in full-width brackets, e.g. 【Subject Title】.\n'
+      fi
+      ;;
+    *)
+      ;;
+  esac
+fi
+
+if [[ -n "$EXTRA_PROMPT" ]]; then
+  BASE_PROMPT+=$'\nAdditional preferences:\n'
+  BASE_PROMPT+="$EXTRA_PROMPT"
+  BASE_PROMPT+=$'\n'
+fi
+
+if [[ -n "$EXTRA_RUNTIME_PROMPT" ]]; then
+  BASE_PROMPT+=$'\nReal-time instructions:\n'
+  BASE_PROMPT+="$EXTRA_RUNTIME_PROMPT"
+  BASE_PROMPT+=$'\n'
+fi
+
+PROMPT_BODY=$'\nRepository status (git status --short --branch):\n'
+PROMPT_BODY+="$STATUS_OUTPUT"
+PROMPT_BODY+=$'\n\nDiff summary (git diff --stat):\n'
+PROMPT_BODY+="$DIFF_STAT"
+PROMPT_BODY+=$'\n\nDiff (git diff --patch):\n'
+PROMPT_BODY+="$DIFF_OUTPUT"
+PROMPT_BODY+="$TRUNCATED_FLAG"
+
+FINAL_PROMPT="$BASE_PROMPT$PROMPT_BODY"
+
+if (( SHOW_PROMPT )); then
+  echo "===== AI PROMPT BEGIN ====="
+  printf '%s\n' "$FINAL_PROMPT"
+  echo "===== AI PROMPT END ====="
+fi
+
+TMP_STDOUT=$(mktemp "${TMPDIR:-/tmp}/git-codex-stdout-XXXXXX")
+TMP_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/git-codex-output-XXXXXX")
+MSG_FILE=""
+cleanup() {
+  [[ -n "$TMP_STDOUT" && -f "$TMP_STDOUT" ]] && rm -f "$TMP_STDOUT"
+  [[ -n "$TMP_OUTPUT" && -f "$TMP_OUTPUT" ]] && rm -f "$TMP_OUTPUT"
+  [[ -n "$MSG_FILE" && -f "$MSG_FILE" ]] && rm -f "$MSG_FILE"
+}
+trap cleanup EXIT
+
+CLI_ARGS=("$CLI_COMMAND" "exec" "--skip-git-repo-check" "--output-last-message" "$TMP_OUTPUT")
+[[ -n "$MODEL" ]] && CLI_ARGS+=("--model" "$MODEL")
+CLI_ARGS+=("--json")
+
+if [[ -n "${GIT_COMMIT_AI_CLI_ARGS:-}" ]]; then
+  # shellcheck disable=SC2206
+  EXTRA_CLI_ARGS=(${GIT_COMMIT_AI_CLI_ARGS})
+  CLI_ARGS+=("${EXTRA_CLI_ARGS[@]}")
+fi
+
+[[ -n "$DEBUG" ]] && {
+  echo "[git-commit-ai] 调用命令: ${CLI_ARGS[*]}" >&2
+}
+
+set +e
+"${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
+CLI_STATUS=$?
+set -e
+
+if (( CLI_STATUS != 0 )); then
+  echo "git-commit-ai: $CLI_COMMAND exec 失败 (exit $CLI_STATUS)" >&2
+  cat "$TMP_STDOUT" >&2 || true
+  exit "$CLI_STATUS"
+fi
+
+RAW_RESPONSE_PATH="$TMP_OUTPUT"
+RAW_STDOUT_PATH="$TMP_STDOUT"
+
+extract_message() {
+  python3 - <<'PY'
+import json
+import os
+import re
+import sys
+
+ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+JSON_DECODER = json.JSONDecoder()
+
+response_path = os.environ.get("RAW_RESPONSE_PATH")
+stdout_path = os.environ.get("RAW_STDOUT_PATH")
+
+candidates = []
+for path in [response_path, stdout_path]:
+    if path and os.path.exists(path):
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            data = fh.read()
+            if data:
+                data = data.replace("\r", "\n")
+                data = ANSI_RE.sub("", data)
+                candidates.append(data)
+
+def clean(text: str) -> str:
+    text = text.replace('\r', '\n')
+    text = ANSI_RE.sub('', text)
+    cleaned_lines = []
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        if stripped.startswith('{') and stripped.endswith('}'):
+            if '"_context_window"' in stripped:
+                continue
+            if '"provider"' in stripped and '"model"' in stripped:
+                continue
+            if '"prompt"' in stripped:
+                continue
+        if stripped.startswith('[') and stripped.endswith(']'):
+            continue
+        cleaned_lines.append(stripped)
+    return "\n".join(cleaned_lines).strip()
+
+
+def iter_json_stream(text: str):
+    idx = 0
+    length = len(text)
+    while idx < length:
+        while idx < length and text[idx].isspace():
+            idx += 1
+        if idx >= length:
+            break
+        try:
+            obj, end = JSON_DECODER.raw_decode(text, idx)
+        except json.JSONDecodeError:
+            next_brace = text.find('{', idx + 1)
+            next_bracket = text.find('[', idx + 1)
+            candidates = [pos for pos in (next_brace, next_bracket) if pos != -1]
+            if candidates:
+                idx = min(candidates)
+            else:
+                idx += 1
+            continue
+        yield obj
+        idx = end
+
+def from_struct(obj):
+    if isinstance(obj, str):
+        return clean(obj)
+    if isinstance(obj, dict):
+        if 'msg' in obj:
+            msg = obj['msg']
+            if isinstance(msg, dict):
+                msg_type = msg.get('type')
+                if msg_type and msg_type != 'agent_message':
+                    return ''
+            cand = from_struct(msg)
+            if cand:
+                return cand
+        if obj.get("event") in {"info", "log", "status", "debug"}:
+            payload = obj.get("data") or obj.get("content") or obj.get("text")
+            return from_struct(payload)
+        if obj.get("role") == "assistant":
+            return from_struct(obj.get("content"))
+        for key in ("content", "text", "message", "output", "result", "response", "value", "data", "messages"):
+            if key in obj:
+                val = from_struct(obj[key])
+                if val:
+                    return val
+        return ""
+    if isinstance(obj, (list, tuple)):
+        for item in obj:
+            val = from_struct(item)
+            if val:
+                return val
+    return ""
+
+def parse_json_blob(text: str) -> str:
+    try:
+        data = json.loads(text)
+    except Exception:
+        data = None
+    if data is not None:
+        val = from_struct(data)
+        if val:
+            return val
+    for obj in iter_json_stream(text):
+        val = from_struct(obj)
+        if val:
+            return val
+    return ""
+
+def parse_json_lines(text: str) -> str:
+    for line in reversed(text.splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+        except Exception:
+            continue
+        val = from_struct(data)
+        if val:
+            return val
+    return ""
+
+
+def strip_meta_blocks(message: str) -> str:
+    if not message:
+        return message
+    lines = []
+    for raw in message.splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            lines.append('')
+            continue
+        if stripped.startswith('{') and ':' in stripped:
+            continue
+        if stripped.startswith('[') and ':' in stripped:
+            continue
+        if stripped.startswith('"') and ':' in stripped:
+            continue
+        lines.append(stripped)
+    while lines and not lines[0]:
+        lines.pop(0)
+    while lines and not lines[-1]:
+        lines.pop()
+    return "\n".join(lines).strip()
+
+
+message = ""
+fallback_candidates = []
+for data in candidates:
+    stripped = data.strip()
+    if not stripped:
+        continue
+    message = parse_json_blob(stripped)
+    if message:
+        break
+    message = parse_json_lines(stripped)
+    if message:
+        break
+    fallback = clean(stripped)
+    if fallback:
+        fallback_candidates.append(fallback)
+if not message:
+    for fallback in fallback_candidates:
+        if fallback:
+            message = fallback
+            break
+
+message = strip_meta_blocks(message)
+
+if not message:
+    for fallback in fallback_candidates:
+        candidate = strip_meta_blocks(fallback)
+        if candidate:
+            message = candidate
+            break
+
+print(message.strip())
+PY
+}
+
+COMMIT_MESSAGE=$(RAW_RESPONSE_PATH="$RAW_RESPONSE_PATH" RAW_STDOUT_PATH="$RAW_STDOUT_PATH" extract_message)
+
+if [[ -z "$COMMIT_MESSAGE" ]]; then
+  echo "git-commit-ai: 模型未返回内容" >&2
+  [[ -z "$DEBUG" ]] && echo "(可设置 GIT_COMMIT_AI_DEBUG=1 查看原始输出)" >&2
+  exit 1
+fi
+
+[[ -n "$DEBUG" ]] && {
+  echo "[git-commit-ai] 提交信息如下:" >&2
+  printf '%s\n' "$COMMIT_MESSAGE" >&2
+}
+
+MSG_FILE=$(mktemp "${TMPDIR:-/tmp}/git-commit-msg-XXXXXX")
+printf '%s\n' "$COMMIT_MESSAGE" >"$MSG_FILE"
+
+if (( PREVIEW_ONLY )); then
+  echo "生成的提交信息:" >&2
+  echo "----------------------------------------" >&2
+  cat "$MSG_FILE"
+  echo "----------------------------------------" >&2
+  exit 0
+fi
+
+echo "生成的提交信息:" >&2
+echo "----------------------------------------" >&2
+cat "$MSG_FILE" >&2
+echo "----------------------------------------" >&2
+
+run_commit() {
+  local commit_msg
+  commit_msg=$(cat "$MSG_FILE")
+  if (( ${#GIT_ARGS[@]} )); then
+    git commit --message "$commit_msg" "${GIT_ARGS[@]}"
+  else
+    git commit --message "$commit_msg"
+  fi
+}
+
+if (( AUTO_COMMIT )); then
+  run_commit
+  exit 0
+fi
+
+if (( ASSUME_YES )); then
+  run_commit
+  exit 0
+fi
+
+read -r -p "是否使用该提交信息? [y/N] " REPLY
+case "$REPLY" in
+  [yY][eE][sS]|[yY])
+    run_commit
+    ;;
+  *)
+    echo "git-commit-ai: 已放弃提交，消息已输出供参考" >&2
+    cat "$MSG_FILE"
+    ;;
+esac

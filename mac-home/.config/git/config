@@ -159,6 +159,7 @@
         c = commit -m
         cm = commit -m
         ca = commit -am
+        cai = "!f(){ \"$HOME/_env/stow/mac-home/.local/bin/git-cai\" \"$@\"; }; f"
         cam ="!f(){ git a . && git cm $1;}; f"
         ci = commit
         amend = commit --amend
@@ -245,3 +246,4 @@
         # 其他
         contributors = shortlog --summary --numbered --email
         mt = mergetool
+        #cai = "!f() { msg=$(JJ_COMMIT_AI_LANG=zh JJ_COMMIT_AI_WRAP_SUBJECT=cn-brackets jj-commit-ai --preview); [ -n \"$msg\" ] && git commit -m \"$msg\" \"$@\"; }; f"
