@@ -1,12 +1,13 @@
-# Git & JJ 智能补全（分组版）
+# Git/JJ 智能补全（分组版）+ report-kit CLI
 
-本配置为 zsh + fzf-tab 定制的 Git/JJ 命令智能补全，核心特性：
+本配置为 zsh + fzf-tab 定制的 Git/JJ 命令智能补全，并追加 report-kit CLI 懒加载注册，核心特性：
 
 - Git 别名按 8 个任务域分组显示（可选隐藏系统命令组）
 - JJ 别名按 8 个任务域分组显示（commands/command 置于最后）
 - 分组顺序与候选顺序稳定一致（禁用排序、一次性发射）
 - 组内按别名名称字母序稳定展示
 - 提供调试工具，便于排查分组与排序问题
+- report-kit CLI 补全按需注册（`report-kit completion zsh` 延后执行）
 
 ---
 
@@ -16,11 +17,13 @@
   - Git 补全增强（只输出 8 个别名分组，可选隐藏系统命令组）
 - `~/.config/zsh/jj-completion-enhanced.zsh`
   - JJ 补全增强（输出 8 个别名分组，内建 commands 在最后）
+- `~/.config/zsh/report-kit-completion.zsh`
+  - report-kit CLI 补全（懒加载，首次 Tab 后注册）
 - `~/.config/zsh/zshrc`
   - fzf-tab 主题与行为（`--no-sort`）、completion 基础样式（`menu no`、`[ %d ]` 组名）
   - 注意：git/jj 增强补全脚本已改为懒加载，不再在 zshrc 中直接 `source`
 - `~/.config/zsh/lazyload.zsh`
-  - 负责懒加载：首次 Tab 时按需 `source` 上述两个增强脚本，并在 `compinit` 之后挂接生效
+  - 负责懒加载：首次 Tab 时按需 `source` 上述脚本，并在 `compinit` 之后挂接生效
 - `~/.config/zsh/functions/ftb-debug-{on,off}`、`ftb-debug-dump`
   - fzf-tab 调试工具：捕获本次补全的分组与候选顺序到临时文件
 
@@ -39,6 +42,12 @@ exec zsh -l
 ```
 
 ---
+
+## report-kit：一次性注册
+
+- 首次 Tab 前由懒加载架构捕获 `compdef`，待 `compinit` 完成后执行 `report-kit completion zsh` 并注册 `_shtab_report_kit`。
+- 可通过 `print -r -- $REPORT_KIT_COMPLETION_READY` 验证脚本是否被捕获；`type -a report-kit` 确认可执行。
+- 若未安装 report-kit，脚本会跳过注册且不影响其他补全；安装后重新 `exec zsh -l` 即可。
 
 ## Git：8 组别名（系统命令可隐藏/可恢复）
 

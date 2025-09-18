@@ -17,6 +17,7 @@ if [[ $- == *i* ]]; then
     # 这些脚本会定义 __ami_after_compinit 钩子，稍后在 compinit 之后触发
     source ~/.config/zsh/git-completion-enhanced.zsh
     source ~/.config/zsh/jj-completion-enhanced.zsh
+    source ~/.config/zsh/report-kit-completion.zsh
     __AMI_COMPLETIONS_SOURCED=1
   }
 
