@@ -31,6 +31,8 @@ Options:
   GIT_COMMIT_AI_LANG         默认输出语言（如 zh、en；默认 zh）
   GIT_COMMIT_AI_WRAP_SUBJECT 默认标题包装样式（默认 cn-brackets）
   GIT_COMMIT_AI_DEBUG        非空时打印调试信息
+  GIT_COMMIT_AI_KEEP_HISTORY 非空时保留 Codex CLI 历史目录（默认使用隔离目录）
+  GIT_COMMIT_AI_CODEX_HOME   自定义隔离目录根路径（默认：$HOME/.codex/git-commit-ai）
 USAGE
 }
 
@@ -253,6 +255,31 @@ if (( SHOW_PROMPT )); then
   echo "===== AI PROMPT END ====="
 fi
 
+KEEP_HISTORY=${GIT_COMMIT_AI_KEEP_HISTORY:-}
+SOURCE_CODEX_HOME=${CODEX_HOME:-$HOME/.codex}
+CUSTOM_CODEX_HOME=${GIT_COMMIT_AI_CODEX_HOME:-$SOURCE_CODEX_HOME/git-commit-ai}
+USE_ISOLATED_CODEX_HOME=0
+
+if [[ -z "$KEEP_HISTORY" && -z "${CODEX_HOME+x}" ]]; then
+  USE_ISOLATED_CODEX_HOME=1
+  CODEX_ENV_HOME="$CUSTOM_CODEX_HOME"
+  mkdir -p "$CODEX_ENV_HOME"
+  if [[ -d "$SOURCE_CODEX_HOME" ]]; then
+    for file in config.toml auth.json internal_storage.json; do
+      if [[ -e "$SOURCE_CODEX_HOME/$file" && ! -e "$CODEX_ENV_HOME/$file" ]]; then
+        cp -p "$SOURCE_CODEX_HOME/$file" "$CODEX_ENV_HOME/$file" 2>/dev/null || true
+      fi
+    done
+    if [[ -d "$SOURCE_CODEX_HOME/sessions" && ! -d "$CODEX_ENV_HOME/sessions" ]]; then
+      mkdir -p "$CODEX_ENV_HOME/sessions"
+      cp -Rp "$SOURCE_CODEX_HOME/sessions/." "$CODEX_ENV_HOME/sessions/" 2>/dev/null || true
+    fi
+  fi
+  rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
+else
+  CODEX_ENV_HOME="$SOURCE_CODEX_HOME"
+fi
+
 TMP_STDOUT=$(mktemp "${TMPDIR:-/tmp}/git-codex-stdout-XXXXXX")
 TMP_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/git-codex-output-XXXXXX")
 MSG_FILE=""
@@ -275,12 +302,23 @@ fi
 
 [[ -n "$DEBUG" ]] && {
   echo "[git-commit-ai] 调用命令: ${CLI_ARGS[*]}" >&2
+  if (( USE_ISOLATED_CODEX_HOME )); then
+    echo "[git-commit-ai] 使用隔离 CODEX_HOME: $CODEX_ENV_HOME" >&2
+  fi
 }
 
 set +e
-"${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
+if (( USE_ISOLATED_CODEX_HOME )); then
+  CODEX_HOME="$CODEX_ENV_HOME" "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
+else
+  "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
+fi
 CLI_STATUS=$?
 set -e
+
+if (( USE_ISOLATED_CODEX_HOME )); then
+  rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
+fi
 
 if (( CLI_STATUS != 0 )); then
   echo "git-commit-ai: $CLI_COMMAND exec 失败 (exit $CLI_STATUS)" >&2

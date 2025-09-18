@@ -1,0 +1,313 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+show_help() {
+  cat <<'USAGE'
+Usage: git-commit-aider [options] [-- <git commit args>]
+
+基于 Aider 生成提交信息（适用于 Git 仓库），并可选直接 `git commit`。
+
+Options:
+  --model NAME         指定 Aider 模型名称（默认：$GIT_COMMIT_AIDER_MODEL）
+  --preview            仅打印生成结果，不提交
+  --commit             直接提交（不再询问）
+  --yes                等同 --commit
+  --show-prompt        打印发送给 Aider 的完整提示词
+  --extra TEXT         追加一段实时指令到提示词
+  --lang CODE          指定输出语言，如 zh、en（默认：$GIT_COMMIT_AIDER_LANG 或 zh）
+  --wrap-subject STYLE 自定义标题包装（例如 brackets、cn-brackets；默认 cn-brackets）
+  --bracket-title      标题使用半角方括号 []
+  --bracket-title-cn   标题使用全角方括号 【】
+  -h, --help           查看帮助
+
+环境变量：
+  GIT_COMMIT_AIDER_MODEL        默认模型名称
+  GIT_COMMIT_AIDER_COMMAND      调用命令（默认：aider）
+  GIT_COMMIT_AIDER_LANG         默认输出语言（如 zh、en；默认 zh）
+  GIT_COMMIT_AIDER_WRAP_SUBJECT 默认标题包装样式（默认 cn-brackets）
+  GIT_COMMIT_AIDER_EXTRA_PROMPT 额外固定提示词
+  GIT_COMMIT_AIDER_EXTRA_ARGS   追加的 aider 命令行参数（以空格分隔）
+USAGE
+}
+
+MODEL=${GIT_COMMIT_AIDER_MODEL:-}
+AIDER_COMMAND=${GIT_COMMIT_AIDER_COMMAND:-aider}
+LANG_PREF=${GIT_COMMIT_AIDER_LANG:-zh}
+SUBJECT_STYLE=${GIT_COMMIT_AIDER_WRAP_SUBJECT:-cn-brackets}
+EXTRA_PROMPT=${GIT_COMMIT_AIDER_EXTRA_PROMPT:-}
+EXTRA_ARGS_ENV=${GIT_COMMIT_AIDER_EXTRA_ARGS:-}
+
+AUTO_COMMIT=0
+ASSUME_YES=0
+PREVIEW_ONLY=0
+SHOW_PROMPT=0
+EXTRA_RUNTIME_PROMPT=""
+GIT_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)
+      [[ $# -ge 2 ]] || { echo "git-commit-aider: --model 需要参数" >&2; exit 2; }
+      MODEL="$2"
+      shift 2
+      ;;
+    --preview|--dry-run|--message-only)
+      PREVIEW_ONLY=1
+      shift
+      ;;
+    --commit)
+      AUTO_COMMIT=1
+      shift
+      ;;
+    --yes|-y)
+      AUTO_COMMIT=1
+      ASSUME_YES=1
+      shift
+      ;;
+    --show-prompt)
+      SHOW_PROMPT=1
+      shift
+      ;;
+    --extra)
+      [[ $# -ge 2 ]] || { echo "git-commit-aider: --extra 需要参数" >&2; exit 2; }
+      EXTRA_RUNTIME_PROMPT="$2"
+      shift 2
+      ;;
+    --lang)
+      [[ $# -ge 2 ]] || { echo "git-commit-aider: --lang 需要参数" >&2; exit 2; }
+      LANG_PREF="$2"
+      shift 2
+      ;;
+    --wrap-subject)
+      [[ $# -ge 2 ]] || { echo "git-commit-aider: --wrap-subject 需要参数" >&2; exit 2; }
+      SUBJECT_STYLE="$2"
+      shift 2
+      ;;
+    --bracket-title)
+      SUBJECT_STYLE="brackets"
+      shift
+      ;;
+    --bracket-title-cn)
+      SUBJECT_STYLE="cn-brackets"
+      shift
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    --)
+      shift
+      GIT_ARGS=("${@}")
+      break
+      ;;
+    *)
+      GIT_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "git-commit-aider: 当前目录不是 Git 仓库" >&2
+  exit 1
+fi
+
+if ! command -v "$AIDER_COMMAND" >/dev/null 2>&1; then
+  echo "git-commit-aider: 找不到 $AIDER_COMMAND" >&2
+  exit 127
+fi
+
+STATUS_OUTPUT=$(git status --short --branch 2>/dev/null || true)
+DIFF_STAT=$(git diff --cached --stat 2>/dev/null || true)
+DIFF_OUTPUT=$(git diff --cached --patch 2>/dev/null || true)
+
+trimmed_diff=$(printf '%s' "$DIFF_OUTPUT" | tr -d '\r\n\t ')
+trimmed_stat=$(printf '%s' "$DIFF_STAT" | tr -d '\r\n\t ')
+
+if [[ -z "$trimmed_diff" && -z "$trimmed_stat" ]]; then
+  DIFF_STAT=$(git diff --stat 2>/dev/null || true)
+  DIFF_OUTPUT=$(git diff --patch 2>/dev/null || true)
+  trimmed_diff=$(printf '%s' "$DIFF_OUTPUT" | tr -d '\r\n\t ')
+  trimmed_stat=$(printf '%s' "$DIFF_STAT" | tr -d '\r\n\t ')
+fi
+
+if [[ -z "$trimmed_diff" && -z "$trimmed_stat" ]]; then
+  echo "git-commit-aider: 没有检测到改动，退出" >&2
+  exit 1
+fi
+
+BASE_PROMPT_EN=$'You are an expert developer creating high-quality commit messages for Git repositories.\nGuidelines:\n- Provide a concise subject line (<= 72 characters).\n- Optionally add bullet list after a blank line explaining key changes.\n- No code fences or surrounding quotes.\n- Prioritise the most impactful changes if the diff is long.\n- Use sentence case for the subject.\n'
+BASE_PROMPT="$BASE_PROMPT_EN"
+
+case "$LANG_PREF" in
+  zh|zh-CN|zh-cn|cn|中文|简体中文)
+    BASE_PROMPT=$'你是一名资深开发者，需要为 Git 仓库撰写高质量的提交信息。\n规范：\n- 提交标题不超过 72 个字符，使用简洁的陈述语气。\n- 可以在空行后列出关键要点，采用破折号或项目符号开头。\n- 不要在输出外层添加引号或代码块。\n- 若改动较多，请突出最重要的影响。\n- 所有内容必须使用简体中文撰写；如模型生成了非中文，请立即用简体中文重新表述。\n'
+    ;;
+  "")
+    ;;
+  *)
+    BASE_PROMPT="${BASE_PROMPT_EN}Please write the subject line and bullet list in ${LANG_PREF}.\n"
+    ;;
+esac
+
+case "$SUBJECT_STYLE" in
+  brackets)
+    if [[ "$LANG_PREF" =~ ^(zh|zh-CN|zh-cn|cn|中文|简体中文)$ ]]; then
+      BASE_PROMPT+=$'\n请将提交标题整体放在半角方括号内，例如：[新增功能]。\n'
+    else
+      BASE_PROMPT+=$'\nWrap the subject line in square brackets, e.g. [Subject Title].\n'
+    fi
+    ;;
+  cn-brackets)
+    if [[ "$LANG_PREF" =~ ^(zh|zh-CN|zh-cn|cn|中文|简体中文)$ ]]; then
+      BASE_PROMPT+=$'\n请将提交标题整体放在全角方括号内，例如：【新增功能】。\n'
+    else
+      BASE_PROMPT+=$'\nWrap the subject line in full-width brackets, e.g. 【Subject Title】.\n'
+    fi
+    ;;
+  *)
+    ;;
+esac
+
+if [[ -n "$EXTRA_PROMPT" ]]; then
+  BASE_PROMPT+=$'\nAdditional preferences:\n'
+  BASE_PROMPT+="$EXTRA_PROMPT"
+  BASE_PROMPT+=$'\n'
+fi
+
+if [[ -n "$EXTRA_RUNTIME_PROMPT" ]]; then
+  BASE_PROMPT+=$'\nReal-time instructions:\n'
+  BASE_PROMPT+="$EXTRA_RUNTIME_PROMPT"
+  BASE_PROMPT+=$'\n'
+fi
+
+PROMPT_BODY=$'\nRepository status (git status --short --branch):\n'
+PROMPT_BODY+="$STATUS_OUTPUT"
+PROMPT_BODY+=$'\n\nDiff summary (git diff --stat):\n'
+PROMPT_BODY+="$DIFF_STAT"
+PROMPT_BODY+=$'\n\nDiff (git diff --patch):\n'
+PROMPT_BODY+="$DIFF_OUTPUT"
+
+FINAL_PROMPT="$BASE_PROMPT$PROMPT_BODY"
+
+if (( SHOW_PROMPT )); then
+  echo "===== AIDER PROMPT BEGIN ====="
+  printf '%s\n' "$FINAL_PROMPT"
+  echo "===== AIDER PROMPT END ====="
+fi
+
+PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/git-aider-prompt-XXXXXX")
+OUTPUT_CAPTURE=$(mktemp "${TMPDIR:-/tmp}/git-aider-output-XXXXXX")
+MSG_FILE=""
+
+cleanup() {
+  [[ -n "$PROMPT_FILE" && -f "$PROMPT_FILE" ]] && rm -f "$PROMPT_FILE"
+  [[ -n "$OUTPUT_CAPTURE" && -f "$OUTPUT_CAPTURE" ]] && rm -f "$OUTPUT_CAPTURE"
+  [[ -n "$MSG_FILE" && -f "$MSG_FILE" ]] && rm -f "$MSG_FILE"
+}
+trap cleanup EXIT
+
+printf '%s\n' "$FINAL_PROMPT" >"$PROMPT_FILE"
+
+CLI_ARGS=("$AIDER_COMMAND" "--no-git" "--no-pretty" "--no-stream" "--message-file" "$PROMPT_FILE")
+[[ -n "$MODEL" ]] && CLI_ARGS+=("--model" "$MODEL")
+
+if [[ -n "$EXTRA_ARGS_ENV" ]]; then
+  # shellcheck disable=SC2206
+  EXTRA_ARGS_ARRAY=(${EXTRA_ARGS_ENV})
+  CLI_ARGS+=("${EXTRA_ARGS_ARRAY[@]}")
+fi
+
+set +e
+"${CLI_ARGS[@]}" >"$OUTPUT_CAPTURE" 2>&1
+CLI_STATUS=$?
+set -e
+
+if (( CLI_STATUS != 0 )); then
+  echo "git-commit-aider: $AIDER_COMMAND 调用失败 (exit $CLI_STATUS)" >&2
+  cat "$OUTPUT_CAPTURE" >&2 || true
+  exit "$CLI_STATUS"
+fi
+
+extract_message() {
+  python3 - <<'PY'
+import os
+import re
+
+PATH = os.environ["AIDER_OUTPUT_CAPTURE"]
+
+with open(PATH, "r", encoding="utf-8", errors="replace") as fh:
+    raw = fh.read()
+
+ansi_re = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+cleaned = ansi_re.sub("", raw)
+
+lines = []
+for line in cleaned.splitlines():
+    stripped = line.strip()
+    if not stripped:
+        continue
+    if stripped.startswith("```"):
+        continue
+    if stripped.startswith("生成的提交信息") or stripped.startswith("使用的提交信息"):
+        continue
+    lines.append(stripped)
+
+message = "\n".join(lines).strip()
+print(message)
+PY
+}
+
+COMMIT_MESSAGE=$(AIDER_OUTPUT_CAPTURE="$OUTPUT_CAPTURE" extract_message)
+
+if [[ -z "$COMMIT_MESSAGE" ]]; then
+  echo "git-commit-aider: 未能从 Aider 输出提取提交信息" >&2
+  cat "$OUTPUT_CAPTURE" >&2 || true
+  exit 1
+fi
+
+MSG_FILE=$(mktemp "${TMPDIR:-/tmp}/git-aider-msg-XXXXXX")
+printf '%s\n' "$COMMIT_MESSAGE" >"$MSG_FILE"
+
+if (( PREVIEW_ONLY )); then
+  cat "$MSG_FILE"
+  exit 0
+fi
+
+echo "生成的提交信息:" >&2
+echo "----------------------------------------" >&2
+cat "$MSG_FILE" >&2
+echo "----------------------------------------" >&2
+
+if (( AUTO_COMMIT )); then
+  if (( ${#GIT_ARGS[@]} )); then
+    git commit -F "$MSG_FILE" "${GIT_ARGS[@]}"
+  else
+    git commit -F "$MSG_FILE"
+  fi
+  exit 0
+fi
+
+if (( ASSUME_YES )); then
+  if (( ${#GIT_ARGS[@]} )); then
+    git commit -F "$MSG_FILE" "${GIT_ARGS[@]}"
+  else
+    git commit -F "$MSG_FILE"
+  fi
+  exit 0
+fi
+
+read -r -p "是否使用该提交信息? [y/N] " REPLY
+case "$REPLY" in
+  [yY][eE][sS]|[yY])
+    if (( ${#GIT_ARGS[@]} )); then
+      git commit -F "$MSG_FILE" "${GIT_ARGS[@]}"
+    else
+      git commit -F "$MSG_FILE"
+    fi
+    ;;
+  *)
+    echo "git-commit-aider: 已放弃提交，消息已输出供参考" >&2
+    cat "$MSG_FILE"
+    ;;
+esac

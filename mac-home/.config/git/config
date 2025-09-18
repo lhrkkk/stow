@@ -160,6 +160,7 @@
         cm = commit -m
         ca = commit -am
         cai = "!f(){ \"$HOME/_env/stow/mac-home/.local/bin/git-cai\" \"$@\"; }; f"
+        caider = "!f(){ \"$HOME/_env/stow/mac-home/.local/bin/git-commit-aider\" \"$@\"; }; f"
         cam ="!f(){ git a . && git cm $1;}; f"
         ci = commit
         amend = commit --amend
