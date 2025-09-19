@@ -22,39 +22,7 @@ source ~/.config/zsh/emacs.zsh
 source ~/.config/zsh/fzf.zsh
 source ~/.config/zsh/mappings.zsh
 source ~/.config/zsh/tmux.zsh
-
-# fzf-tab theme colors (Selenized Light - Gogh)
-zstyle ':fzf-tab:*' fzf-flags '--ansi' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
-zstyle ':fzf-tab:*' show-group yes
-# Keep git candidate list order matching header order
-zstyle ':fzf-tab:complete:git:*' fzf-flags '--ansi' '--no-sort' '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
-# Completion behavior for fzf-tab integration
-zstyle ':completion:*' menu no
-zstyle ':completion:*:descriptions' format '[%d]'
-# Git fzf-tab display
-zstyle ':fzf-tab:complete:git:*' descriptions yes
-
-zstyle ':completion:*:*:report-kit:*' verbose yes
-zstyle ':fzf-tab:complete:report-kit:*' descriptions yes
-zstyle ':completion:*:*:rk:*' verbose yes
-zstyle ':fzf-tab:complete:rk:*' descriptions yes
-
-zstyle ':completion:*:*:(report-kit|rk):*' verbose yes
-zstyle ':completion:*:*:(report-kit|rk):*:descriptions' format '%F{244}%d%f'
-zstyle ':completion:*:*:(report-kit|rk):*' menuselect
-
-  zstyle ':completion:*:report-kit:*' verbose yes
-  zstyle ':completion:*:report-kit:*:descriptions' format '%F{244}%d%f'
-  zstyle ':completion:complete:report-kit:*:values' verbose yes
-  zstyle ':completion:complete:report-kit:*:values' format '%F{244}%d%f'
-  zstyle ':fzf-tab:complete:report-kit:*' descriptions yes
-
-# JJ group order for fzf-tab (expanded, commands last)
-zstyle ':fzf-tab:complete:jj:*' group-order \
-  'essential-aliases' 'repo-aliases' 'status-aliases' 'view-aliases' \
-  'commit-aliases' 'rebase-aliases' 'bookmark-aliases' \
-  'remote-aliases' 'workspace-aliases' 'file-aliases' 'absorb-aliases' \
-  'ops-aliases' 'ui-aliases' 'other-aliases' 'commands' 'command'
+[[ -r ~/.config/zsh/zstyles.zsh ]] && source ~/.config/zsh/zstyles.zsh
 # fpath 由 lazyload.zsh 在 compinit 前统一处理，这里无需重复设置
  fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
  fpath=(/usr/share/zsh/5.9/functions $fpath)

@@ -213,7 +213,7 @@
   - JJ：`mac-home/.config/zsh/jj-completion-enhanced.zsh`
   - report-kit：`mac-home/.config/zsh/report-kit-completion.zsh`
   - stowx：`mac-home/.config/zsh/stowx-completion.zsh`
-  - fzf-tab/样式：`mac-home/.config/zsh/zshrc`
+  - fzf-tab/样式：`mac-home/.config/zsh/zstyles.zsh`
  - 加载方式：由 `mac-home/.config/zsh/lazyload.zsh` 懒加载（首次 Tab/首个提示符触发），不再在 zshrc 中直接 `source`
   - 调优：可打开一次性计时打印，用于衡量优化效果：
     

@@ -21,9 +21,10 @@
   - report-kit CLI 补全（懒加载，首次 Tab 后注册）
 - `~/.config/zsh/stowx-completion.zsh`
   - stowx CLI 补全（懒加载，解析 STOW_DIR 包列表）
-- `~/.config/zsh/zshrc`
+- `~/.config/zsh/zstyles.zsh`
   - fzf-tab 主题与行为（`--no-sort`）、completion 基础样式（`menu no`、`[ %d ]` 组名）
-  - 注意：git/jj 增强补全脚本已改为懒加载，不再在 zshrc 中直接 `source`
+- `~/.config/zsh/zshrc`
+  - 串联各模块：加载 lazyload、fzf、zstyles，并留给本地定制入口
 - `~/.config/zsh/lazyload.zsh`
   - 负责懒加载：首次 Tab 时按需 `source` 上述脚本，并在 `compinit` 之后挂接生效
 - `~/.config/zsh/functions/ftb-debug-{on,off}`、`ftb-debug-dump`
