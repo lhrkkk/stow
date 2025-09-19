@@ -52,7 +52,7 @@ exec zsh -l
 - 若未安装 report-kit，脚本会跳过注册且不影响其他补全；安装后重新 `exec zsh -l` 即可。
 - 懒加载脚本默认调用 `report-kit completion zsh --fallback`，因此首个 Tab 就会显示带描述的子命令；设 `REPORT_KIT_COMPLETION_FALLBACK=0` 可恢复上游行为，设为 auto 则按需侦测 fzf-tab/zsh-autocomplete。
 - 仍可通过 `zstyle` 控制描述显示样式；若完全不需要描述，也可禁用相关样式。
-- 如定义了指向 `report-kit` 的 alias（例如 `rk`），会自动共享同一补全函数。
+- 如定义了指向 `report-kit` 的 alias（例如 `rk`），会在懒加载阶段按别名调用 `report-kit completion zsh --fallback --prog <alias>` 生成专属补全脚本，别名与本体均首个 Tab 即带描述。
 
 ## stowx：按需注册
 

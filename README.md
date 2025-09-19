@@ -206,7 +206,7 @@
   - Git/JJ 别名按 8 个任务域分组展示（可选隐藏 Git 系统命令组）
   - 分组顺序与候选顺序稳定一致（禁排序、单次发射）
   - 提供 `ftb-debug-on/off` 抓取本次补全的分组与候选，用于排错
-  - report-kit CLI 补全按需注册，首次 Tab 延后执行 `report-kit completion zsh --fallback`，首次 Tab 即显示子命令描述（可设 `REPORT_KIT_COMPLETION_FALLBACK=0` 禁用）
+  - report-kit CLI 补全按需注册，首次 Tab 延后执行 `report-kit completion zsh --fallback`，首次 Tab 即显示子命令描述；`rk` 等 alias 会在懒加载阶段调用 `report-kit completion zsh --fallback --prog <alias>` 生成同款脚本（可设 `REPORT_KIT_COMPLETION_FALLBACK=0` 禁用）
   - stowx CLI 补全按需注册，提供子命令/包名候选（解析 STOW_DIR 目录）
 - 入口：
   - Git：`mac-home/.config/zsh/git-completion-enhanced.zsh`
