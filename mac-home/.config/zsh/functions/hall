@@ -1,0 +1,88 @@
+### 历史记录去重
+hall() {
+  local HF
+  HF="${HISTFILE:-}"
+  if [ -z "$HF" ]; then
+    HF=$(ls -1 "$HOME/.zsh_history" "$HOME/.zhistory" "$HOME/.histfile" "$HOME/.bash_history" 2>/dev/null | head -n1)
+  fi
+
+  if [ -n "$ZSH_VERSION" ] && [ ! -f "$HF" ]; then
+    fc -W
+    HF="${HISTFILE:-$HOME/.zsh_history}"
+  elif [ -n "$BASH_VERSION" ] && [ ! -f "$HF" ]; then
+    history -w
+    HF="${HISTFILE:-$HOME/.bash_history}"
+  fi
+
+  local _hall_lcctype
+  _hall_lcctype="${LC_CTYPE:-${LANG:-}}"
+  case ${_hall_lcctype:-} in
+    (""|C|POSIX)
+      if command -v locale >/dev/null 2>&1; then
+        _hall_lcctype=$(LC_ALL=C locale -a 2>/dev/null | grep -Ei 'utf-?8' | head -n1)
+      fi
+      if [ -z "$_hall_lcctype" ]; then
+        _hall_lcctype="en_US.UTF-8"
+      fi
+      ;;
+  esac
+
+  local _hall_has_iconv=0
+  if command -v iconv >/dev/null 2>&1; then
+    _hall_has_iconv=1
+  fi
+
+  local -a _hall_decode_cmd=()
+  local _hall_use_decode=0
+  local _hall_python_code
+  if command -v perl >/dev/null 2>&1; then
+    _hall_decode_cmd=(env LC_CTYPE="$_hall_lcctype" perl -pe 's/\x83(.)/chr(ord($1)^32)/eg')
+    _hall_use_decode=1
+  elif command -v python3 >/dev/null 2>&1; then
+    _hall_python_code=$'import sys\nbuf = sys.stdin.buffer.read()\nout = bytearray()\ni = 0\nn = len(buf)\nwhile i < n:\n    b = buf[i]\n    if b == 0x83 and i + 1 < n:\n        out.append(buf[i + 1] ^ 0x20)\n        i += 2\n    else:\n        out.append(b)\n        i += 1\nsys.stdout.buffer.write(out)\n'
+    _hall_decode_cmd=(env LC_CTYPE="$_hall_lcctype" python3 -c "$_hall_python_code")
+    _hall_use_decode=1
+  fi
+
+  local -a _hall_iconv_cmd=()
+  if [ $_hall_has_iconv -eq 1 ]; then
+    _hall_iconv_cmd=(iconv -f UTF-8 -t UTF-8//IGNORE)
+  fi
+
+  local _hall_awk_strip
+  _hall_awk_strip='{ line = $0; if (line ~ /^: [0-9]+:[0-9]+;/) sub(/^: [0-9]+:[0-9]+;/, "", line); if (!seen[line]++) print line }'
+  local _hall_awk_history
+  _hall_awk_history='{ line = $0; sub(/^[[:space:]]*[0-9]+[[:space:]]+/, "", line); if (!seen[line]++) print line }'
+
+  # Run the decode/iconv stack once then dedup via awk.
+  _hall_filter_stream() {
+    local awk_prog=$1
+    if [ $_hall_use_decode -eq 1 ]; then
+      if [ ${#_hall_iconv_cmd[@]} -gt 0 ]; then
+        "${_hall_decode_cmd[@]}" | "${_hall_iconv_cmd[@]}" | env LC_COLLATE=C LC_NUMERIC=C LC_CTYPE="$_hall_lcctype" awk "$awk_prog"
+      else
+        "${_hall_decode_cmd[@]}" | env LC_COLLATE=C LC_NUMERIC=C LC_CTYPE="$_hall_lcctype" awk "$awk_prog"
+      fi
+    else
+      if [ ${#_hall_iconv_cmd[@]} -gt 0 ]; then
+        "${_hall_iconv_cmd[@]}" | env LC_COLLATE=C LC_NUMERIC=C LC_CTYPE="$_hall_lcctype" awk "$awk_prog"
+      else
+        env LC_COLLATE=C LC_NUMERIC=C LC_CTYPE="$_hall_lcctype" awk "$awk_prog"
+      fi
+    fi
+  }
+
+  if [ -n "$ZSH_VERSION" ]; then
+    if [ -f "$HF" ]; then
+      cat "$HF" | _hall_filter_stream "$_hall_awk_strip"
+    else
+      fc -l -n | _hall_filter_stream "$_hall_awk_strip"
+    fi
+  else
+    if [ -f "$HF" ]; then
+      cat "$HF" | _hall_filter_stream "$_hall_awk_strip"
+    else
+      history | _hall_filter_stream "$_hall_awk_history"
+    fi
+  fi
+}
