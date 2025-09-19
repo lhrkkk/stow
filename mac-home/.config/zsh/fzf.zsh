@@ -1,4 +1,15 @@
-export FZF_DEFAULT_OPTS='--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100 --bind=ctrl-t:top,change:top --bind=ctrl-j:down,ctrl-k:up'
+typeset -g _ami_fzf_color_flag='--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
+
+typeset -ga _ami_fzf_default_opts=(
+  '--ansi'
+  "$_ami_fzf_color_flag"
+  '--bind=ctrl-t:top,change:top'
+  '--bind=ctrl-j:down,ctrl-k:up'
+)
+
+typeset -gx FZF_DEFAULT_OPTS="${(j: :)_ami_fzf_default_opts}"
+unset _ami_fzf_default_opts
+
 # export FZF_DEFAULT_OPTS='--bind=ctrl-t:top,change:top --bind ctrl-e:down,ctrl-u:up'
 
 #export FZF_DEFAULT_OPTS='--bind ctrl-j:down,ctrl-k:up --preview "[[ $(file --mime {}) =~ binary ]] && echo {} is a binary file || (ccat --color=always {} || highlight -O ansi -l {} || cat {}) 2> /dev/null | head -500"'
@@ -90,4 +101,3 @@ find-in-file() {
 }
 zle -N find-in-file
 bindkey '^f' find-in-file
-

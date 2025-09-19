@@ -5,10 +5,11 @@
 zstyle ':completion:*' menu no
 zstyle ':completion:*:descriptions' format '[%d]'
 
-# fzf-tab theme (Selenized Light - Gogh).
+# fzf-tab reuses the standalone fzf color setup.
+typeset _ami_fzf_tab_color=${_ami_fzf_color_flag:-'--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'}
 typeset -a _ami_fzf_tab_theme=(
   --ansi
-  '--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
+  "$_ami_fzf_tab_color"
 )
 zstyle ':fzf-tab:*' fzf-flags ${_ami_fzf_tab_theme[@]}
 zstyle ':fzf-tab:*' show-group yes
@@ -16,6 +17,8 @@ zstyle ':fzf-tab:*' show-group yes
 # --- git 专用（fzf-tab） ---
 zstyle ':fzf-tab:complete:git:*' fzf-flags ${_ami_fzf_tab_theme[@]} --no-sort
 zstyle ':fzf-tab:complete:git:*' descriptions yes
+
+unset _ami_fzf_tab_theme _ami_fzf_tab_color
 
 # --- report-kit / rk ---
 zstyle ':completion:*:*:(report-kit|rk):*' verbose yes

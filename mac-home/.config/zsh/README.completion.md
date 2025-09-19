@@ -22,7 +22,7 @@
 - `~/.config/zsh/stowx-completion.zsh`
   - stowx CLI 补全（懒加载，解析 STOW_DIR 包列表）
 - `~/.config/zsh/zstyles.zsh`
-  - fzf-tab 主题与行为（`--no-sort`）、completion 基础样式（`menu no`、`[ %d ]` 组名）
+  - fzf-tab 主题与行为（`--no-sort`）、completion 基础样式（`menu no`、`[ %d ]` 组名）；与 `~/.config/zsh/fzf.zsh` 共用 `--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100` 配色与按键绑定
 - `~/.config/zsh/zshrc`
   - 串联各模块：加载 lazyload、fzf、zstyles，并留给本地定制入口
 - `~/.config/zsh/lazyload.zsh`
@@ -43,8 +43,6 @@
 ```zsh
 exec zsh -l
 ```
-
----
 
 ## report-kit：一次性注册
 
