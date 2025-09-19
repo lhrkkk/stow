@@ -18,6 +18,7 @@ if [[ $- == *i* ]]; then
     source ~/.config/zsh/git-completion-enhanced.zsh
     source ~/.config/zsh/jj-completion-enhanced.zsh
     source ~/.config/zsh/report-kit-completion.zsh
+    source ~/.config/zsh/stowx-completion.zsh
     __AMI_COMPLETIONS_SOURCED=1
   }
 

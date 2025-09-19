@@ -206,11 +206,13 @@
   - Git/JJ 别名按 8 个任务域分组展示（可选隐藏 Git 系统命令组）
   - 分组顺序与候选顺序稳定一致（禁排序、单次发射）
   - 提供 `ftb-debug-on/off` 抓取本次补全的分组与候选，用于排错
-  - report-kit CLI 补全按需注册，首次 Tab 延后执行 `report-kit completion zsh`
+  - report-kit CLI 补全按需注册，首次 Tab 延后执行 `report-kit completion zsh --fallback`，首次 Tab 即显示子命令描述（可设 `REPORT_KIT_COMPLETION_FALLBACK=0` 禁用）
+  - stowx CLI 补全按需注册，提供子命令/包名候选（解析 STOW_DIR 目录）
 - 入口：
   - Git：`mac-home/.config/zsh/git-completion-enhanced.zsh`
   - JJ：`mac-home/.config/zsh/jj-completion-enhanced.zsh`
   - report-kit：`mac-home/.config/zsh/report-kit-completion.zsh`
+  - stowx：`mac-home/.config/zsh/stowx-completion.zsh`
   - fzf-tab/样式：`mac-home/.config/zsh/zshrc`
  - 加载方式：由 `mac-home/.config/zsh/lazyload.zsh` 懒加载（首次 Tab/首个提示符触发），不再在 zshrc 中直接 `source`
   - 调优：可打开一次性计时打印，用于衡量优化效果：

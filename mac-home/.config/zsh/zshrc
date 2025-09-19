@@ -2,8 +2,7 @@
 export LANG=zh_CN.UTF-8
 export LC_CTYPE=zh_CN.UTF-8
 unset LC_ALL
-
-
+#
 
 # common
 source ~/.config/env/common/all.zsh
@@ -35,13 +34,27 @@ zstyle ':completion:*:descriptions' format '[%d]'
 # Git fzf-tab display
 zstyle ':fzf-tab:complete:git:*' descriptions yes
 
+zstyle ':completion:*:*:report-kit:*' verbose yes
+zstyle ':fzf-tab:complete:report-kit:*' descriptions yes
+zstyle ':completion:*:*:rk:*' verbose yes
+zstyle ':fzf-tab:complete:rk:*' descriptions yes
+
+zstyle ':completion:*:*:(report-kit|rk):*' verbose yes
+zstyle ':completion:*:*:(report-kit|rk):*:descriptions' format '%F{244}%d%f'
+zstyle ':completion:*:*:(report-kit|rk):*' menuselect
+
+  zstyle ':completion:*:report-kit:*' verbose yes
+  zstyle ':completion:*:report-kit:*:descriptions' format '%F{244}%d%f'
+  zstyle ':completion:complete:report-kit:*:values' verbose yes
+  zstyle ':completion:complete:report-kit:*:values' format '%F{244}%d%f'
+  zstyle ':fzf-tab:complete:report-kit:*' descriptions yes
+
 # JJ group order for fzf-tab (expanded, commands last)
 zstyle ':fzf-tab:complete:jj:*' group-order \
   'essential-aliases' 'repo-aliases' 'status-aliases' 'view-aliases' \
   'commit-aliases' 'rebase-aliases' 'bookmark-aliases' \
   'remote-aliases' 'workspace-aliases' 'file-aliases' 'absorb-aliases' \
   'ops-aliases' 'ui-aliases' 'other-aliases' 'commands' 'command'
-
 # fpath 由 lazyload.zsh 在 compinit 前统一处理，这里无需重复设置
  fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
  fpath=(/usr/share/zsh/5.9/functions $fpath)

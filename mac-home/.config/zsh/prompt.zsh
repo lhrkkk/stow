@@ -17,7 +17,7 @@ if [[ $- == *i* ]]; then
     local _orig_prompt="$PROMPT"
     # First line = original prompt (unchanged)
     # Second line = ultra-short input indicator
-    PROMPT="${_orig_prompt}"$'\n'"%(?.%F{green}❯%f.%F{red}❯%f) "
+    PROMPT="${_orig_prompt}"$''"%(?.%F{green}❯%f.%F{red}❯%f) "
     __AMI_PROMPT_DECORATED=1
   fi
 fi

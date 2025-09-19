@@ -19,6 +19,8 @@
   - JJ 补全增强（输出 8 个别名分组，内建 commands 在最后）
 - `~/.config/zsh/report-kit-completion.zsh`
   - report-kit CLI 补全（懒加载，首次 Tab 后注册）
+- `~/.config/zsh/stowx-completion.zsh`
+  - stowx CLI 补全（懒加载，解析 STOW_DIR 包列表）
 - `~/.config/zsh/zshrc`
   - fzf-tab 主题与行为（`--no-sort`）、completion 基础样式（`menu no`、`[ %d ]` 组名）
   - 注意：git/jj 增强补全脚本已改为懒加载，不再在 zshrc 中直接 `source`
@@ -45,9 +47,19 @@ exec zsh -l
 
 ## report-kit：一次性注册
 
-- 首次 Tab 前由懒加载架构捕获 `compdef`，待 `compinit` 完成后执行 `report-kit completion zsh` 并注册 `_shtab_report_kit`。
+- 首次 Tab 前由懒加载架构捕获 `compdef`，待 `compinit` 完成后执行 `report-kit completion zsh --fallback` 并注册 `_shtab_report_kit`。
 - 可通过 `print -r -- $REPORT_KIT_COMPLETION_READY` 验证脚本是否被捕获；`type -a report-kit` 确认可执行。
 - 若未安装 report-kit，脚本会跳过注册且不影响其他补全；安装后重新 `exec zsh -l` 即可。
+- 懒加载脚本默认调用 `report-kit completion zsh --fallback`，因此首个 Tab 就会显示带描述的子命令；设 `REPORT_KIT_COMPLETION_FALLBACK=0` 可恢复上游行为，设为 auto 则按需侦测 fzf-tab/zsh-autocomplete。
+- 仍可通过 `zstyle` 控制描述显示样式；若完全不需要描述，也可禁用相关样式。
+- 如定义了指向 `report-kit` 的 alias（例如 `rk`），会自动共享同一补全函数。
+
+## stowx：按需注册
+
+- 懒加载流程捕获 `compdef`，`compinit` 之后执行内置 `_stowx` 注册；`print -r -- $STOWX_COMPLETION_READY` 可验证脚本已装入。
+- 支持子命令与包名提示：`preview/apply/adopt/unstow/restow` 等会读取 `STOW_DIR`（可被 `-d/--dir` 覆盖）列出台下的包。
+- `grab` 子命令保持 `_files` 行为补齐抓取路径；若输入 `--` 之后则回落到默认补全以便继续传递给 GNU Stow。
+- `stowx` 未安装时脚本自动跳过，不影响其它补全；安装后重新开启登录 shell 即可生效。
 
 ## Git：8 组别名（系统命令可隐藏/可恢复）
 
