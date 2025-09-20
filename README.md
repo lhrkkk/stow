@@ -214,6 +214,8 @@
   - report-kit：`mac-home/.config/zsh/report-kit-completion.zsh`
   - stowx：`mac-home/.config/zsh/stowx-completion.zsh`
   - fzf-tab/样式：`mac-home/.config/zsh/zstyles.zsh`（与 `~/.config/zsh/fzf.zsh` 共用配色 + ANSI；首次 Tab/`ctrl+R`/直接 `fzf` 时若存在 `~/.local/bin/check_term_theme.py` 会自动探测浅/深色，任何时候执行 `ami-fzf-apply-theme dark|light` 都会同步刷新 fzf 与 fzf-tab）
+  - zoxide 集成：`zi` 命令（交互式目录选择）首次触发时自动设置 fzf 主题，确保候选列表颜色与系统主题保持一致
+  - g 函数补全：`g` 命令（git 别名）现在支持完整的 git 子命令和参数补全
  - 加载方式：由 `mac-home/.config/zsh/lazyload.zsh` 懒加载（首次 Tab/首个提示符触发），不再在 zshrc 中直接 `source`
   - 调优：可打开一次性计时打印，用于衡量优化效果：
     

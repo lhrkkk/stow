@@ -363,10 +363,15 @@ __git_complete_with_aliases() {
 
 # Install wrapper mapping now and ensure it persists after compinit
 compdef __git_complete_with_aliases=git 2>/dev/null || compdef __git_complete_with_aliases git 2>/dev/null || true
+# 为 g 函数添加 git 补全（加在此处也可以）
+# compdef g=git 2>/dev/null || true
 if [[ $- == *i* ]]; then
   autoload -Uz add-zsh-hook 2>/dev/null || true
   # 轻量兜底：每次 precmd 重新保证 git 的 compdef 指向我们
-  __git_compdef_always() { compdef __git_complete_with_aliases=git }
+  __git_compdef_always() {
+    compdef __git_complete_with_aliases=git
+    # compdef g=git 2>/dev/null || true
+  }
   add-zsh-hook -Uz precmd __git_compdef_always 2>/dev/null || true
 fi
 
@@ -419,6 +424,8 @@ __git_set_user_commands() {
 # Integrate with our lazy compinit flow: run after compinit on first Tab
 __ami_after_compinit() {
   compdef __git_complete_with_aliases=git 2>/dev/null || compdef __git_complete_with_aliases git 2>/dev/null || true
+  # 为 g 函数添加 git 补全（此处的是有用的）
+  compdef g=git 2>/dev/null || true
   __git_load_and_override
   __git_apply_styles
   # Do not inject user-commands via zstyle to avoid one big group

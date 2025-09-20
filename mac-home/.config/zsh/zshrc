@@ -23,9 +23,10 @@ source ~/.config/zsh/fzf.zsh
 source ~/.config/zsh/mappings.zsh
 source ~/.config/zsh/tmux.zsh
 # [[ -r ~/.config/zsh/zstyles.zsh ]] && source ~/.config/zsh/zstyles.zsh
-# fpath 由 lazyload.zsh 在 compinit 前统一处理，这里无需重复设置
- fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
- fpath=(/usr/share/zsh/5.9/functions $fpath)
+# source ~/.config/zsh/completion.zsh
+# fpath=($HOME/.config/zsh/completions $fpath)
+fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
+fpath=(/usr/share/zsh/5.9/functions $fpath)
 
 # source ~/.config/zsh/git-alias-descriptions.zsh
 

@@ -8,15 +8,24 @@ alias et='emacsclient -t -a ""'
 alias e=ew
 alias h=hx
 
+alias ee='subl ~/_env/stow'
+alias ec='cursor ~/_env/stow'
 
 alias gtc='gitui -t catppuccin-macchiato.ron'
 alias lj='lazyjj'
 alias lg='gitui -t latte.ron'
 alias j='jj'
-alias gg='git'
-alias g='git sf'
-alias ee='subl ~/_env/stow'
-alias ec='cursor ~/_env/stow'
+# alias g='git'
+# alias gg='git sf'
+
+g() {
+  if [ $# -eq 0 ]; then
+    git sf
+  else
+    git "$@"
+  fi
+}
+alias gg='g'
 
 alias rk='report-kit'
 alias jc='jj-commit-ai --commit --chinese --bracket-title-cn'

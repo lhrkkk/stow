@@ -166,6 +166,15 @@ _zoxide_init_once() {
   else
     eval "$(zoxide init "$_zx_shell")"
   fi
+  
+  # 在 zoxide 初始化后，为 zi 命令添加 fzf 主题设置
+  if [ -n "${ZSH_VERSION-}" ] && typeset -f __zoxide_zi >/dev/null 2>&1; then
+    zi() {
+      (( $+functions[ami-fzf-theme-once] )) && ami-fzf-theme-once
+      __zoxide_zi "$@"
+    }
+  fi
+  
   _ami_precmd_unregister _zoxide_init_once
   unset -f _zoxide_init_once 2>/dev/null || true
 }
