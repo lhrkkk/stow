@@ -1,7 +1,7 @@
 # Migrated from WezTerm by Agent Mode on 2025-08-15
 # Theme: closest light theme to "Selenized Light (Gogh)"
 # You can run: ghostty +list-themes to explore others.
-
+theme="catppuccin-mocha"
 # Selenized Light - custom palette
 # # Applied from user-provided values
 # palette = 0=#ece3cc

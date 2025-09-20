@@ -1,11 +1,15 @@
 typeset -gA _ami_fzf_color_flags=(
+	# 有背景，有侧边
   # light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,query:#57666c'
+  # dark  '--color=dark,fg:#dce2f1,bg:#1b1f28,hl:#4f9cff,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a,query:#cfd6f1'
+
+  # 无背景，有侧边
   light '--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
   dark  '--color=dark,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a'
 
-  # light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,gutter:#fbf3db'
-  # dark  '--color=dark,fg:#dce2f1,bg:#1b1f28,hl:#4f9cff,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a,gutter:#1b1f28'
-
+	# 有背景，隐藏侧边
+  # light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,gutter:#fbf3db,query:#57666c'
+  # dark  '--color=dark,fg:#dce2f1,bg:#1b1f28,hl:#4f9cff,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a,gutter:#1b1f28,query:#cfd6f1'
 )
 
 typeset -ga _ami_fzf_default_bindings=(
@@ -13,8 +17,30 @@ typeset -ga _ami_fzf_default_bindings=(
   '--bind=ctrl-j:down,ctrl-k:up'
 )
 
+ami-fzf-resolve-theme() {
+  local requested=${1:-}
+  local variant
+
+  if [[ -n $requested ]]; then
+    variant=${requested:l}
+  elif [[ -n ${AMI_FZF_THEME_OVERRIDE:-} ]]; then
+    variant=${AMI_FZF_THEME_OVERRIDE:l}
+  elif [[ -n ${AMI_FZF_THEME_VARIANT:-} ]]; then
+    variant=${AMI_FZF_THEME_VARIANT:l}
+  else
+    local script="$HOME/.local/bin/check_term_theme.py"
+    if [[ -x $script ]]; then
+      variant=$($script --quiet --fallback light 2>/dev/null | tr -d '[:space:]')
+    fi
+  fi
+
+  [[ -n $variant ]] || variant=light
+  print -r -- ${variant:l}
+}
+
 ami-fzf-apply-theme() {
-  local variant=${1:-${AMI_FZF_THEME_OVERRIDE:-${AMI_FZF_THEME_VARIANT:-light}}}
+  local variant
+  variant=$(ami-fzf-resolve-theme "$1")
   [[ -n ${_ami_fzf_color_flags[$variant]:-} ]] || variant=light
   typeset -gx AMI_FZF_THEME_VARIANT=$variant
 
