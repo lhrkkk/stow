@@ -64,7 +64,15 @@ ami-fzf-apply-theme() {
 }
 
 ami-fzf-ensure-theme() {
-  (( _ami_fzf_theme_ready )) && return 0
+  if (( _ami_fzf_theme_ready )); then
+    return 0
+  fi
+
+  if [[ ${FZF_DEFAULT_OPTS:-} == *"--color=light,"* || ${FZF_DEFAULT_OPTS:-} == *"--color=dark,"* ]]; then
+    _ami_fzf_theme_ready=1
+    return 0
+  fi
+
   ami-fzf-apply-theme "$@"
 }
 
@@ -73,7 +81,7 @@ typeset -gx FZF_DEFAULT_OPTS='--ansi --bind=ctrl-t:top,change:top --bind=ctrl-j:
 
 if ! (( $+functions[fzf] )); then
   fzf() {
-    ami-fzf-theme-once
+    # ami-fzf-theme-once
     command fzf "$@"
   }
 fi
