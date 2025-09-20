@@ -6,7 +6,7 @@ zstyle ':completion:*' menu no
 zstyle ':completion:*:descriptions' format '[%d]'
 
 # fzf-tab reuses the standalone fzf color setup.
-typeset _ami_fzf_tab_color=${_ami_fzf_color_flag:-'--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'}
+typeset _ami_fzf_tab_color=${_ami_fzf_current_color_flag:-${_ami_fzf_color_flags[${AMI_FZF_THEME_OVERRIDE:-${AMI_FZF_THEME_VARIANT:-light}}]:-'--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'}}
 typeset -a _ami_fzf_tab_theme=(
   --ansi
   "$_ami_fzf_tab_color"

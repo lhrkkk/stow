@@ -111,7 +111,8 @@ fi
 local header sel
 header="选择要删除的历史（Tab 多选，Enter 确认；Ctrl-C 取消）"
 sel=$(printf "%s\n" "$list" | \
-  FZF_DEFAULT_OPTS="" fzf --multi -n2..,.. --tiebreak=index \
+  # FZF_DEFAULT_OPTS=""
+  fzf --multi -n2..,.. --tiebreak=index \
     --height=80% --layout=reverse --info=inline \
     --prompt='删除历史> ' --header="$header" \
     --bind='ctrl-a:toggle-all,tab:toggle+down,shift-tab:toggle+up' \

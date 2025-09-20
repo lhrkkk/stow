@@ -1,14 +1,41 @@
-typeset -g _ami_fzf_color_flag='--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
+typeset -gA _ami_fzf_color_flags=(
+  # light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,query:#57666c'
+  light '--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
+  dark  '--color=dark,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a'
 
-typeset -ga _ami_fzf_default_opts=(
-  '--ansi'
-  "$_ami_fzf_color_flag"
+  # light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,gutter:#fbf3db'
+  # dark  '--color=dark,fg:#dce2f1,bg:#1b1f28,hl:#4f9cff,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a,gutter:#1b1f28'
+
+)
+
+typeset -ga _ami_fzf_default_bindings=(
   '--bind=ctrl-t:top,change:top'
   '--bind=ctrl-j:down,ctrl-k:up'
 )
 
-typeset -gx FZF_DEFAULT_OPTS="${(j: :)_ami_fzf_default_opts}"
-unset _ami_fzf_default_opts
+ami-fzf-apply-theme() {
+  local variant=${1:-${AMI_FZF_THEME_OVERRIDE:-${AMI_FZF_THEME_VARIANT:-light}}}
+  [[ -n ${_ami_fzf_color_flags[$variant]:-} ]] || variant=light
+  typeset -gx AMI_FZF_THEME_VARIANT=$variant
+
+  local color_flag=${_ami_fzf_color_flags[$variant]}
+  typeset -ga _ami_fzf_default_opts=(
+    '--ansi'
+    "$color_flag"
+    ${_ami_fzf_default_bindings[@]}
+  )
+  typeset -gx FZF_DEFAULT_OPTS="${(j: :)_ami_fzf_default_opts}"
+
+  if [[ ${+_ami_fzf_color_flags} -gt 0 ]]; then
+    typeset -gx _ami_fzf_current_color_flag=$color_flag
+    local -a _ami_fzf_tab_flags=(--ansi "$color_flag")
+    zstyle ':fzf-tab:*' fzf-flags ${_ami_fzf_tab_flags[@]}
+    zstyle ':fzf-tab:complete:git:*' fzf-flags ${_ami_fzf_tab_flags[@]} --no-sort
+    unset _ami_fzf_tab_flags
+  fi
+}
+
+ami-fzf-apply-theme
 
 # export FZF_DEFAULT_OPTS='--bind=ctrl-t:top,change:top --bind ctrl-e:down,ctrl-u:up'
 
