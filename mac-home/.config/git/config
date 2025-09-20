@@ -140,6 +140,7 @@
 
         # add / stash
         a = add
+        aa = !git add .
         chunkyadd = add --patch
         ss = stash
         sl = stash list
@@ -159,8 +160,8 @@
         c = commit -m
         cm = commit -m
         ca = commit -am
-        cai = "!f(){ \"$HOME/_env/stow/mac-home/.local/bin/git-cai\" \"$@\"; }; f"
-        caider = "!f(){ \"$HOME/_env/stow/mac-home/.local/bin/git-commit-aider\" \"$@\"; }; f"
+        cc = "!f(){ git-commit-ai --api gemini; }; f"
+
         cam ="!f(){ git a . && git cm $1;}; f"
         ci = commit
         amend = commit --amend
@@ -247,4 +248,3 @@
         # 其他
         contributors = shortlog --summary --numbered --email
         mt = mergetool
-        #cai = "!f() { msg=$(JJ_COMMIT_AI_LANG=zh JJ_COMMIT_AI_WRAP_SUBJECT=cn-brackets jj-commit-ai --preview); [ -n \"$msg\" ] && git commit -m \"$msg\" \"$@\"; }; f"

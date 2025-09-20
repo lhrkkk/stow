@@ -8,7 +8,7 @@ Usage: git-commit-ai [options] [-- <git commit args>]
 生成提交信息（基于 Git 仓库）并可选直接 `git commit`。
 
 Options:
-  --model NAME         指定 Codex 模型（默认：$GIT_COMMIT_AI_MODEL 或 gpt-5-codex）
+  --model NAME         指定 AI 模型（默认：$GIT_COMMIT_AI_MODEL 或 gpt-5-codex）
   --max-bytes N        发送给模型的 diff 最大字节数（默认：$GIT_COMMIT_AI_MAX_BYTES 或 120000）
   --preview            仅打印生成结果，不提交
   --commit             直接提交（不再询问）
@@ -20,9 +20,12 @@ Options:
   --wrap-subject STYLE 自定义标题包装（例如 brackets、cn-brackets；默认：cn-brackets）
   --bracket-title      标题使用半角方括号 []
   --bracket-title-cn   标题使用全角方括号 【】
+  --api NAME           指定使用的 API 后端 (默认: codex, 可选: gemini)
   -h, --help           查看帮助
 
 环境变量：
+  GEMINI_API_KEY            使用 gemini 后端时的 API Key
+  GIT_COMMIT_AI_BACKEND      默认的 API 后端 (codex 或 gemini)
   GIT_COMMIT_AI_MODEL        默认模型名称
   GIT_COMMIT_AI_MAX_BYTES    diff 上限
   GIT_COMMIT_AI_EXTRA_PROMPT 额外固定提示词
@@ -44,6 +47,7 @@ DEFAULT_CLI_ARGS=""
 LANG_PREF=${GIT_COMMIT_AI_LANG:-zh}
 SUBJECT_STYLE=${GIT_COMMIT_AI_WRAP_SUBJECT:-cn-brackets}
 DEBUG=${GIT_COMMIT_AI_DEBUG:-}
+API_BACKEND=${GIT_COMMIT_AI_BACKEND:-codex}
 
 AUTO_COMMIT=0
 PREVIEW_ONLY=0
@@ -54,12 +58,12 @@ GIT_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --model)
+    --model) 
       [[ $# -ge 2 ]] || { echo "git-commit-ai: --model 需要参数" >&2; exit 2; }
       MODEL="$2"
       shift 2
       ;;
-    --max-bytes)
+    --max-bytes) 
       [[ $# -ge 2 ]] || { echo "git-commit-ai: --max-bytes 需要参数" >&2; exit 2; }
       if ! [[ "$2" =~ ^[0-9]+$ ]]; then
         echo "git-commit-ai: --max-bytes 必须为整数" >&2
@@ -68,55 +72,60 @@ while [[ $# -gt 0 ]]; do
       MAX_BYTES="$2"
       shift 2
       ;;
-    --preview|--dry-run|--message-only)
+    --preview|--dry-run|--message-only) 
       PREVIEW_ONLY=1
       shift
       ;;
-    --commit)
+    --commit) 
       AUTO_COMMIT=1
       shift
       ;;
-    --yes|-y)
+    --yes|-y) 
       AUTO_COMMIT=1
       ASSUME_YES=1
       shift
       ;;
-    --show-prompt)
+    --show-prompt) 
       SHOW_PROMPT=1
       shift
       ;;
-    --extra)
+    --extra) 
       [[ $# -ge 2 ]] || { echo "git-commit-ai: --extra 需要参数" >&2; exit 2; }
       EXTRA_RUNTIME_PROMPT="$2"
       shift 2
       ;;
-    --lang)
+    --api) 
+      [[ $# -ge 2 ]] || { echo "git-commit-ai: --api 需要参数" >&2; exit 2; }
+      API_BACKEND="$2"
+      shift 2
+      ;;
+    --lang) 
       [[ $# -ge 2 ]] || { echo "git-commit-ai: --lang 需要参数" >&2; exit 2; }
       LANG_PREF="$2"
       shift 2
       ;;
-    --chinese)
+    --chinese) 
       LANG_PREF="zh"
       shift
       ;;
-    --wrap-subject)
+    --wrap-subject) 
       [[ $# -ge 2 ]] || { echo "git-commit-ai: --wrap-subject 需要参数" >&2; exit 2; }
       SUBJECT_STYLE="$2"
       shift 2
       ;;
-    --bracket-title)
+    --bracket-title) 
       SUBJECT_STYLE="brackets"
       shift
       ;;
-    --bracket-title-cn)
+    --bracket-title-cn) 
       SUBJECT_STYLE="cn-brackets"
       shift
       ;;
-    -h|--help)
+    -h|--help) 
       show_help
       exit 0
       ;;
-    --)
+    --) 
       shift
       GIT_ARGS=("${@}")
       break
@@ -157,20 +166,12 @@ if ! command -v "$CLI_COMMAND" >/dev/null 2>&1; then
 fi
 
 STATUS_OUTPUT=$(git status --short --branch 2>/dev/null || true)
+# 只检查暂存区的改动
 DIFF_STAT=$(git diff --cached --stat 2>/dev/null || true)
 DIFF_OUTPUT=$(git diff --cached --patch 2>/dev/null || true)
 
-trimmed_diff=$(printf '%s' "$DIFF_OUTPUT" | tr -d '\r\n\t ')
-trimmed_stat=$(printf '%s' "$DIFF_STAT" | tr -d '\r\n\t ')
-if [[ -z "$trimmed_diff" && -z "$trimmed_stat" ]]; then
-  DIFF_STAT=$(git diff --stat 2>/dev/null || true)
-  DIFF_OUTPUT=$(git diff --patch 2>/dev/null || true)
-  trimmed_diff=$(printf '%s' "$DIFF_OUTPUT" | tr -d '\r\n\t ')
-  trimmed_stat=$(printf '%s' "$DIFF_STAT" | tr -d '\r\n\t ')
-fi
-
-if [[ -z "$trimmed_diff" && -z "$trimmed_stat" ]]; then
-  echo "git-commit-ai: 没有检测到改动，退出" >&2
+if [[ -z "$DIFF_STAT" && -z "$DIFF_OUTPUT" ]]; then
+  echo "git-commit-ai: 没有检测到暂存的改动 (no staged changes)。请先使用 'git add' 命令添加文件。" >&2
   exit 1
 fi
 
@@ -190,10 +191,10 @@ BASE_PROMPT="$BASE_PROMPT_EN"
 
 if [[ -n "$LANG_PREF" ]]; then
   case "$LANG_PREF" in
-    zh|zh-CN|zh-cn|cn|中文|简体中文)
+    zh|zh-CN|zh-cn|cn|中文|简体中文) 
       BASE_PROMPT=$'你是一名资深开发者，需要为 Git 仓库撰写高质量的提交信息。\n规范：\n- 提交标题不超过 72 个字符，使用简洁的陈述语气。\n- 可以在空行后列出关键要点，采用破折号或项目符号开头。\n- 不要在输出外层添加引号或代码块。\n- 若改动较多，请突出最重要的影响。\n- 所有内容必须使用简体中文撰写；如模型生成了非中文，请立即用简体中文重新表述。\n'
       ;;
-    *)
+    *) 
       BASE_PROMPT="${BASE_PROMPT_EN}Please write the subject line and bullet list in ${LANG_PREF}.\n"
       ;;
   esac
@@ -201,10 +202,10 @@ fi
 
 if [[ -n "$SUBJECT_STYLE" ]]; then
   case "$SUBJECT_STYLE" in
-    brackets)
+    brackets) 
       if [[ -n "$LANG_PREF" ]]; then
         case "$LANG_PREF" in
-          zh|zh-CN|zh-cn|cn|中文|简体中文)
+          zh|zh-CN|zh-cn|cn|中文|简体中文) 
             BASE_PROMPT+=$'\n请将提交标题整体放在半角方括号内，例如：[新增功能]。\n'
             ;;
           *)
@@ -215,7 +216,7 @@ if [[ -n "$SUBJECT_STYLE" ]]; then
         BASE_PROMPT+=$'\nWrap the subject line in square brackets, e.g. [Subject Title].\n'
       fi
       ;;
-    cn-brackets)
+    cn-brackets) 
       if [[ -n "$LANG_PREF" && $LANG_PREF =~ ^(zh|zh-CN|zh-cn|cn|中文|简体中文)$ ]]; then
         BASE_PROMPT+=$'\n请将提交标题整体放在全角方括号内，例如：【新增功能】。\n'
       else
@@ -255,82 +256,163 @@ if (( SHOW_PROMPT )); then
   echo "===== AI PROMPT END ====="
 fi
 
-KEEP_HISTORY=${GIT_COMMIT_AI_KEEP_HISTORY:-}
-SOURCE_CODEX_HOME=${CODEX_HOME:-$HOME/.codex}
-CUSTOM_CODEX_HOME=${GIT_COMMIT_AI_CODEX_HOME:-$SOURCE_CODEX_HOME/git-commit-ai}
-USE_ISOLATED_CODEX_HOME=0
+COMMIT_MESSAGE=""
+USING_FALLBACK=0
+CLI_STATUS=0
 
-if [[ -z "$KEEP_HISTORY" && -z "${CODEX_HOME+x}" ]]; then
-  USE_ISOLATED_CODEX_HOME=1
-  CODEX_ENV_HOME="$CUSTOM_CODEX_HOME"
-  mkdir -p "$CODEX_ENV_HOME"
-  if [[ -d "$SOURCE_CODEX_HOME" ]]; then
-    for file in config.toml auth.json internal_storage.json; do
-      if [[ -e "$SOURCE_CODEX_HOME/$file" && ! -e "$CODEX_ENV_HOME/$file" ]]; then
-        cp -p "$SOURCE_CODEX_HOME/$file" "$CODEX_ENV_HOME/$file" 2>/dev/null || true
-      fi
-    done
-    if [[ -d "$SOURCE_CODEX_HOME/sessions" && ! -d "$CODEX_ENV_HOME/sessions" ]]; then
-      mkdir -p "$CODEX_ENV_HOME/sessions"
-      cp -Rp "$SOURCE_CODEX_HOME/sessions/." "$CODEX_ENV_HOME/sessions/" 2>/dev/null || true
+if [[ "$API_BACKEND" == "gemini" ]]; then
+    if [[ -z "${GEMINI_API_KEY:-}" ]]; then
+        echo "git-commit-ai: 使用 gemini 后端时，必须设置 GEMINI_API_KEY 环境变量" >&2
+        exit 1
     fi
-  fi
-  rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
-else
-  CODEX_ENV_HOME="$SOURCE_CODEX_HOME"
-fi
 
-TMP_STDOUT=$(mktemp "${TMPDIR:-/tmp}/git-codex-stdout-XXXXXX")
-TMP_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/git-codex-output-XXXXXX")
-MSG_FILE=""
-cleanup() {
-  [[ -n "$TMP_STDOUT" && -f "$TMP_STDOUT" ]] && rm -f "$TMP_STDOUT"
-  [[ -n "$TMP_OUTPUT" && -f "$TMP_OUTPUT" ]] && rm -f "$TMP_OUTPUT"
-  [[ -n "$MSG_FILE" && -f "$MSG_FILE" ]] && rm -f "$MSG_FILE"
-}
-trap cleanup EXIT
+    set +e
+    COMMIT_MESSAGE=$(GIT_COMMIT_AI_PROMPT="$FINAL_PROMPT" \
+                     GEMINI_API_KEY="${GEMINI_API_KEY}" \
+                     python3 - <<'PY_GEMINI'
+import os
+import sys
+import json
+import urllib.request
 
-CLI_ARGS=("$CLI_COMMAND" "exec" "--skip-git-repo-check" "--output-last-message" "$TMP_OUTPUT")
-[[ -n "$MODEL" ]] && CLI_ARGS+=("--model" "$MODEL")
-CLI_ARGS+=("--json")
+def main():
+    prompt = os.environ.get('GIT_COMMIT_AI_PROMPT')
+    api_key = os.environ.get('GEMINI_API_KEY')
+    model = os.environ.get('GIT_COMMIT_AI_GEMINI_MODEL', 'gemini-1.5-flash-latest')
 
-if [[ -n "${GIT_COMMIT_AI_CLI_ARGS:-}" ]]; then
-  # shellcheck disable=SC2206
-  EXTRA_CLI_ARGS=(${GIT_COMMIT_AI_CLI_ARGS})
-  CLI_ARGS+=("${EXTRA_CLI_ARGS[@]}")
-fi
+    if not prompt:
+        print("Error: Prompt is empty.", file=sys.stderr)
+        sys.exit(1)
+    if not api_key:
+        print("Error: GEMINI_API_KEY is not set.", file=sys.stderr)
+        sys.exit(1)
 
-[[ -n "$DEBUG" ]] && {
-  echo "[git-commit-ai] 调用命令: ${CLI_ARGS[*]}" >&2
-  if (( USE_ISOLATED_CODEX_HOME )); then
-    echo "[git-commit-ai] 使用隔离 CODEX_HOME: $CODEX_ENV_HOME" >&2
-  fi
-}
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.4,
+            "topK": 32,
+            "topP": 1,
+            "maxOutputTokens": 4096,
+            "stopSequences": []
+        },
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+        ]
+    }
 
-set +e
-if (( USE_ISOLATED_CODEX_HOME )); then
-  CODEX_HOME="$CODEX_ENV_HOME" "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
-else
-  "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
-fi
-CLI_STATUS=$?
-set -e
+    req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            if response.status == 200:
+                response_body = json.loads(response.read().decode('utf-8'))
+                candidates = response_body.get('candidates', [])
+                if candidates:
+                    content = candidates[0].get('content', {})
+                    parts = content.get('parts', [])
+                    if parts:
+                        message = parts[0].get('text', '')
+                        print(message.strip())
+                    else:
+                        print(f"Error: Gemini API response is missing 'parts'. Full response: {response_body}", file=sys.stderr)
+                        sys.exit(1)
+                else:
+                    print(f"Error: Gemini API response has no candidates. Full response: {response_body}", file=sys.stderr)
+                    sys.exit(1)
+            else:
+                error_body = response.read().decode('utf-8')
+                print(f"Error: Gemini API request failed with status {response.status}: {error_body}", file=sys.stderr)
+                sys.exit(1)
+    except urllib.error.URLError as e:
+        print(f"Error: Failed to reach Gemini API: {e.reason}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}", file=sys.stderr)
+        sys.exit(1)
 
-if (( USE_ISOLATED_CODEX_HOME )); then
-  rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
-fi
+if __name__ == "__main__":
+    main()
+PY_GEMINI
+    )
+    CLI_STATUS=$?
+    set -e
 
-if (( CLI_STATUS != 0 )); then
-  echo "git-commit-ai: $CLI_COMMAND exec 失败 (exit $CLI_STATUS)" >&2
-  cat "$TMP_STDOUT" >&2 || true
-  exit "$CLI_STATUS"
-fi
+elif [[ "$API_BACKEND" == "codex" ]]; then
+    KEEP_HISTORY=${GIT_COMMIT_AI_KEEP_HISTORY:-}
+    SOURCE_CODEX_HOME=${CODEX_HOME:-$HOME/.codex}
+    CUSTOM_CODEX_HOME=${GIT_COMMIT_AI_CODEX_HOME:-$SOURCE_CODEX_HOME/git-commit-ai}
+    USE_ISOLATED_CODEX_HOME=0
 
-RAW_RESPONSE_PATH="$TMP_OUTPUT"
-RAW_STDOUT_PATH="$TMP_STDOUT"
+    if [[ -z "$KEEP_HISTORY" && -z "${CODEX_HOME+x}" ]]; then
+      USE_ISOLATED_CODEX_HOME=1
+      CODEX_ENV_HOME="$CUSTOM_CODEX_HOME"
+      mkdir -p "$CODEX_ENV_HOME"
+      if [[ -d "$SOURCE_CODEX_HOME" ]]; then
+        for file in config.toml auth.json internal_storage.json; do
+          if [[ -e "$SOURCE_CODEX_HOME/$file" && ! -e "$CODEX_ENV_HOME/$file" ]]; then
+            cp -p "$SOURCE_CODEX_HOME/$file" "$CODEX_ENV_HOME/$file" 2>/dev/null || true
+          fi
+        done
+        if [[ -d "$SOURCE_CODEX_HOME/sessions" && ! -d "$CODEX_ENV_HOME/sessions" ]]; then
+          mkdir -p "$CODEX_ENV_HOME/sessions"
+          cp -Rp "$SOURCE_CODEX_HOME/sessions/." "$CODEX_ENV_HOME/sessions/" 2>/dev/null || true
+        fi
+      fi
+      rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
+    else
+      CODEX_ENV_HOME="$SOURCE_CODEX_HOME"
+    fi
 
-extract_message() {
-  python3 - <<'PY'
+    TMP_STDOUT=$(mktemp "${TMPDIR:-/tmp}/git-codex-stdout-XXXXXX")
+    TMP_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/git-codex-output-XXXXXX")
+    MSG_FILE=""
+    cleanup() {
+      [[ -n "$TMP_STDOUT" && -f "$TMP_STDOUT" ]] && rm -f "$TMP_STDOUT"
+      [[ -n "$TMP_OUTPUT" && -f "$TMP_OUTPUT" ]] && rm -f "$TMP_OUTPUT"
+      [[ -n "$MSG_FILE" && -f "$MSG_FILE" ]] && rm -f "$MSG_FILE"
+    }
+    trap cleanup EXIT
+
+    CLI_ARGS=("$CLI_COMMAND" "exec" "--skip-git-repo-check" "--output-last-message" "$TMP_OUTPUT")
+    [[ -n "$MODEL" ]] && CLI_ARGS+=("--model" "$MODEL")
+    CLI_ARGS+=("--json")
+
+    if [[ -n "${GIT_COMMIT_AI_CLI_ARGS:-}" ]]; then
+      # shellcheck disable=SC2206
+      EXTRA_CLI_ARGS=("${GIT_COMMIT_AI_CLI_ARGS[@]}")
+      CLI_ARGS+=("${EXTRA_CLI_ARGS[@]}")
+    fi
+
+    [[ -n "$DEBUG" ]] && {
+      echo "[git-commit-ai] 调用命令: ${CLI_ARGS[*]}" >&2
+      if (( USE_ISOLATED_CODEX_HOME )); then
+        echo "[git-commit-ai] 使用隔离 CODEX_HOME: $CODEX_ENV_HOME" >&2
+      fi
+    }
+
+    set +e
+    if (( USE_ISOLATED_CODEX_HOME )); then
+      CODEX_HOME="$CODEX_ENV_HOME" "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
+    else
+      "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
+    fi
+    CLI_STATUS=$?
+    set -e
+
+    if (( USE_ISOLATED_CODEX_HOME )); then
+      rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
+    fi
+
+    if (( CLI_STATUS == 0 )); then
+        export RAW_RESPONSE_PATH="$TMP_OUTPUT"
+        export RAW_STDOUT_PATH="$TMP_STDOUT"
+        COMMIT_MESSAGE=$(python3 - <<'PY'
 import json
 import os
 import re
@@ -339,18 +421,11 @@ import sys
 ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 JSON_DECODER = json.JSONDecoder()
 
-response_path = os.environ.get("RAW_RESPONSE_PATH")
-stdout_path = os.environ.get("RAW_STDOUT_PATH")
-
-candidates = []
-for path in [response_path, stdout_path]:
-    if path and os.path.exists(path):
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
-            data = fh.read()
-            if data:
-                data = data.replace("\r", "\n")
-                data = ANSI_RE.sub("", data)
-                candidates.append(data)
+def read_text(path: str) -> str:
+    if not path or not os.path.exists(path):
+        return ""
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        return fh.read()
 
 def clean(text: str) -> str:
     text = text.replace('\r', '\n')
@@ -361,163 +436,216 @@ def clean(text: str) -> str:
         if not stripped:
             continue
         if stripped.startswith('{') and stripped.endswith('}'):
-            if '"_context_window"' in stripped:
-                continue
-            if '"provider"' in stripped and '"model"' in stripped:
-                continue
-            if '"prompt"' in stripped:
+            if '"_context_window"' in stripped or '"provider"' in stripped or '"prompt"' in stripped:
                 continue
         if stripped.startswith('[') and stripped.endswith(']'):
             continue
         cleaned_lines.append(stripped)
     return "\n".join(cleaned_lines).strip()
 
-
-def iter_json_stream(text: str):
-    idx = 0
-    length = len(text)
-    while idx < length:
-        while idx < length and text[idx].isspace():
-            idx += 1
-        if idx >= length:
-            break
-        try:
-            obj, end = JSON_DECODER.raw_decode(text, idx)
-        except json.JSONDecodeError:
-            next_brace = text.find('{', idx + 1)
-            next_bracket = text.find('[', idx + 1)
-            candidates = [pos for pos in (next_brace, next_bracket) if pos != -1]
-            if candidates:
-                idx = min(candidates)
-            else:
-                idx += 1
-            continue
-        yield obj
-        idx = end
-
 def from_struct(obj):
     if isinstance(obj, str):
         return clean(obj)
     if isinstance(obj, dict):
         if 'msg' in obj:
-            msg = obj['msg']
-            if isinstance(msg, dict):
-                msg_type = msg.get('type')
-                if msg_type and msg_type != 'agent_message':
-                    return ''
-            cand = from_struct(msg)
-            if cand:
-                return cand
+            cand = from_struct(obj['msg'])
+            if cand: return cand
         if obj.get("event") in {"info", "log", "status", "debug"}:
-            payload = obj.get("data") or obj.get("content") or obj.get("text")
-            return from_struct(payload)
+            return from_struct(obj.get("data") or obj.get("content") or obj.get("text"))
         if obj.get("role") == "assistant":
             return from_struct(obj.get("content"))
         for key in ("content", "text", "message", "output", "result", "response", "value", "data", "messages"):
             if key in obj:
                 val = from_struct(obj[key])
-                if val:
-                    return val
+                if val: return val
         return ""
     if isinstance(obj, (list, tuple)):
         for item in obj:
             val = from_struct(item)
-            if val:
-                return val
+            if val: return val
     return ""
 
+def iter_json_stream(text: str):
+    idx = 0
+    length = len(text)
+    while idx < length:
+        while idx < length and text[idx].isspace(): idx += 1
+        if idx >= length: break
+        try:
+            obj, end = JSON_DECODER.raw_decode(text, idx)
+            yield obj
+            idx = end
+        except json.JSONDecodeError:
+            idx += 1
+
 def parse_json_blob(text: str) -> str:
-    try:
-        data = json.loads(text)
-    except Exception:
-        data = None
+    try: data = json.loads(text)
+    except Exception: data = None
     if data is not None:
         val = from_struct(data)
-        if val:
-            return val
+        if val: return val
     for obj in iter_json_stream(text):
         val = from_struct(obj)
-        if val:
-            return val
+        if val: return val
     return ""
 
 def parse_json_lines(text: str) -> str:
     for line in reversed(text.splitlines()):
         line = line.strip()
-        if not line:
-            continue
-        try:
-            data = json.loads(line)
-        except Exception:
-            continue
+        if not line: continue
+        try: data = json.loads(line)
+        except Exception: continue
         val = from_struct(data)
-        if val:
-            return val
+        if val: return val
     return ""
 
-
 def strip_meta_blocks(message: str) -> str:
-    if not message:
-        return message
-    lines = []
-    for raw in message.splitlines():
-        stripped = raw.strip()
-        if not stripped:
-            lines.append('')
-            continue
-        if stripped.startswith('{') and ':' in stripped:
-            continue
-        if stripped.startswith('[') and ':' in stripped:
-            continue
-        if stripped.startswith('"') and ':' in stripped:
-            continue
-        lines.append(stripped)
-    while lines and not lines[0]:
-        lines.pop(0)
-    while lines and not lines[-1]:
-        lines.pop()
+    lines = [s.strip() for s in message.splitlines() if s.strip() and not (s.strip().startswith('{') and ':' in s.strip())]
     return "\n".join(lines).strip()
 
 
+candidates = [read_text(os.environ.get("RAW_RESPONSE_PATH")), read_text(os.environ.get("RAW_STDOUT_PATH"))]
 message = ""
-fallback_candidates = []
-for data in candidates:
-    stripped = data.strip()
-    if not stripped:
-        continue
-    message = parse_json_blob(stripped)
-    if message:
-        break
-    message = parse_json_lines(stripped)
-    if message:
-        break
-    fallback = clean(stripped)
-    if fallback:
-        fallback_candidates.append(fallback)
-if not message:
-    for fallback in fallback_candidates:
-        if fallback:
-            message = fallback
-            break
+fallbacks = []
+for data in filter(None, candidates):
+    message = parse_json_blob(data) or parse_json_lines(data)
+    if message: break
+    fallback = clean(data)
+    if fallback: fallbacks.append(fallback)
 
+if not message: message = next(iter(fallbacks), "")
 message = strip_meta_blocks(message)
-
-if not message:
-    for fallback in fallback_candidates:
-        candidate = strip_meta_blocks(fallback)
-        if candidate:
-            message = candidate
-            break
+if not message: message = next(iter(fallbacks), "")
 
 print(message.strip())
 PY
-}
+        )
+    fi
+fi
 
-COMMIT_MESSAGE=$(RAW_RESPONSE_PATH="$RAW_RESPONSE_PATH" RAW_STDOUT_PATH="$RAW_STDOUT_PATH" extract_message)
+if (( CLI_STATUS != 0 )); then
+  FALLBACK_MESSAGE=$(GIT_COMMIT_AI_DIFF_STAT="$DIFF_STAT" \
+    GIT_COMMIT_AI_DIFF_OUTPUT="$DIFF_OUTPUT" \
+    GIT_COMMIT_AI_LANG="$LANG_PREF" \
+    GIT_COMMIT_AI_SUBJECT_STYLE="$SUBJECT_STYLE" \
+    python3 - <<'PY'
+import os
+import re
+import sys
+
+stat = os.environ.get('GIT_COMMIT_AI_DIFF_STAT', '')
+diff = os.environ.get('GIT_COMMIT_AI_DIFF_OUTPUT', '')
+lang = os.environ.get('GIT_COMMIT_AI_LANG', '').lower()
+style = os.environ.get('GIT_COMMIT_AI_SUBJECT_STYLE', '')
+
+if not stat.strip() and not diff.strip():
+    sys.exit(0)
+
+locale = 'zh'
+if lang and not any(token in lang for token in ('zh', 'cn', 'chinese', '中文')):
+    locale = 'en'
+
+diff_blocks = []
+current_block = None
+for line in diff.splitlines():
+    if line.startswith('diff --git '):
+        if current_block: diff_blocks.append(current_block)
+        parts = line.split()
+        current_block = {'a': parts[2][2:], 'b': parts[3][2:], 'lines': []}
+    if current_block: current_block['lines'].append(line)
+if current_block: diff_blocks.append(current_block)
+
+if not diff_blocks and stat:
+    for line in stat.splitlines():
+        if '|' in line:
+            path = line.split('|', 1)[0].strip()
+            if path: diff_blocks.append({'a': path, 'b': path, 'lines': [], 'type': 'modify'})
+
+def detect_kind(block):
+    if any(line.startswith('new file mode') for line in block['lines']): return 'add'
+    if any(line.startswith('deleted file mode') for line in block['lines']): return 'delete'
+    if any(line.startswith('rename from') for line in block['lines']): return 'rename'
+    return 'modify'
+
+for block in diff_blocks: block['type'] = detect_kind(block)
+
+stat_counts = {}
+for line in stat.splitlines():
+    if '|' in line:
+        path, rest = line.split('|', 1)
+        key = path.strip()
+        if not key: continue
+        pluses = rest.count('+')
+        minuses = rest.count('-')
+        num_match = re.search(r'(\d+)', rest)
+        stat_counts[key] = {'plus': pluses, 'minus': minuses, 'total': int(num_match.group(1)) if num_match else 0}
+
+def shorten(path):
+    return path if len(path) <= 40 else os.path.basename(path)
+
+def wrap_subject(text, style_name):
+    return f'[{text}]' if style_name == 'brackets' else f'【{text}】' if style_name == 'cn-brackets' else text
+
+labels = {
+    'zh': {'add': '新增', 'delete': '移除', 'rename': '重命名', 'modify': '调整', 'add_many': '新增多个文件', 'delete_many': '移除多个文件', 'modify_many': '批量调整文件', 'mixed': '同步多项改动', 'to': '到', 'file': '文件'},
+    'en': {'add': 'Add', 'delete': 'Remove', 'rename': 'Rename', 'modify': 'Update', 'add_many': 'Add multiple files', 'delete_many': 'Remove multiple files', 'modify_many': 'Update multiple files', 'mixed': 'Synchronize changes', 'to': 'to', 'file': 'file'}
+}
+L = labels.get(locale, labels['en'])
+
+def get_subject(blocks):
+    if not blocks: return ""
+    if len(blocks) == 1:
+        b = blocks[0]
+        path = b.get('b', b['a']) or L['file']
+        item = shorten(path)
+        if b['type'] == 'rename':
+            src = shorten(next((l.split(' ', 2)[2] for l in b['lines' if b['lines'] else [] if 'lines' in b else []] if l.startswith('rename from')), b['a']))
+            dst = shorten(next((l.split(' ', 2)[2] for l in b['lines' if b['lines'] else [] if 'lines' in b else []] if l.startswith('rename to')), b['b']))
+            return f"{L['rename']} {src} {L['to']} {dst}"
+        return f"{L[b['type']]} {item}"
+    
+    counts = {k: sum(1 for b in blocks if b['type'] == k) for k in ['add', 'delete', 'modify', 'rename']}
+    if counts['add'] == len(blocks): return L['add_many']
+    if counts['delete'] == len(blocks): return L['delete_many']
+    if counts['modify'] == len(blocks): return L['modify_many']
+    return L['mixed']
+
+subject = wrap_subject(get_subject(diff_blocks), style)
+if len(subject) > 72: subject = subject[:71] + '…'
+
+body = []
+if len(diff_blocks) > 1:
+    for b in diff_blocks[:5]:
+        line = f"- {get_subject([b])}"
+        stats = stat_counts.get(b.get('b', b['a']))
+        if stats:
+            stat_parts = []
+            if stats['plus']: stat_parts.append(f"+{stats['plus']}")
+            if stats['minus']: stat_parts.append(f"-{stats['minus']}")
+            if stat_parts: line += f" （{'/'.join(stat_parts)}）"
+        body.append(line)
+
+if subject:
+    print(subject)
+    if body:
+        print("\n" + "\n".join(body))
+PY
+  )
+  if [[ -n "$FALLBACK_MESSAGE" ]]; then
+    USING_FALLBACK=1
+    COMMIT_MESSAGE="$FALLBACK_MESSAGE"
+    echo "git-commit-ai: API 调用失败 (exit $CLI_STATUS)，已回退到本地摘要" >&2
+  else
+    echo "git-commit-ai: API 调用失败 (exit $CLI_STATUS)，且本地摘要生成失败" >&2
+    exit "$CLI_STATUS"
+  fi
+fi
 
 if [[ -z "$COMMIT_MESSAGE" ]]; then
   echo "git-commit-ai: 模型未返回内容" >&2
-  [[ -z "$DEBUG" ]] && echo "(可设置 GIT_COMMIT_AI_DEBUG=1 查看原始输出)" >&2
+  if [[ -z "$DEBUG" ]]; then
+    echo "(可设置 GIT_COMMIT_AI_DEBUG=1 查看原始输出)" >&2
+  fi
   exit 1
 fi
 

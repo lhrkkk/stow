@@ -20,9 +20,12 @@ Options:
   --wrap-subject STYLE 自定义标题包装（例如 brackets、cn-brackets；默认：cn-brackets）
   --bracket-title      快捷方式，标题使用半角方括号[]
   --bracket-title-cn   快捷方式，标题使用全角方括号【】
+  --api NAME           指定使用的 API 后端 (默认: codex, 可选: gemini)
   -h, --help           查看帮助
 
 环境变量：
+  GEMINI_API_KEY            使用 gemini 后端时的 API Key
+  JJ_COMMIT_AI_BACKEND      默认的 API 后端 (codex 或 gemini)
   JJ_COMMIT_AI_MODEL        默认模型名称
   JJ_COMMIT_AI_MAX_BYTES    diff 上限
   JJ_COMMIT_AI_EXTRA_PROMPT 额外固定提示词
@@ -45,6 +48,7 @@ DEFAULT_CLI_ARGS=""
 LANG_PREF=${JJ_COMMIT_AI_LANG:-zh}
 SUBJECT_STYLE=${JJ_COMMIT_AI_WRAP_SUBJECT:-cn-brackets}
 DEBUG=${JJ_COMMIT_AI_DEBUG:-}
+API_BACKEND=${JJ_COMMIT_AI_BACKEND:-codex}
 
 AUTO_COMMIT=0
 PREVIEW_ONLY=0
@@ -55,12 +59,12 @@ JJ_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --model)
+    --model) 
       [[ $# -ge 2 ]] || { echo "jj-commit-ai: --model 需要参数" >&2; exit 2; }
       MODEL="$2"
       shift 2
-      ;;
-    --max-bytes)
+      ;; 
+    --max-bytes) 
       [[ $# -ge 2 ]] || { echo "jj-commit-ai: --max-bytes 需要参数" >&2; exit 2; }
       if ! [[ "$2" =~ ^[0-9]+$ ]]; then
         echo "jj-commit-ai: --max-bytes 必须为整数" >&2
@@ -68,64 +72,69 @@ while [[ $# -gt 0 ]]; do
       fi
       MAX_BYTES="$2"
       shift 2
-      ;;
-    --preview|--dry-run|--message-only)
+      ;; 
+    --preview|--dry-run|--message-only) 
       PREVIEW_ONLY=1
       shift
-      ;;
-    --commit)
+      ;; 
+    --commit) 
       AUTO_COMMIT=1
       shift
-      ;;
-    --yes|-y)
+      ;; 
+    --yes|-y) 
       AUTO_COMMIT=1
       ASSUME_YES=1
       shift
-      ;;
-    --show-prompt)
+      ;; 
+    --show-prompt) 
       SHOW_PROMPT=1
       shift
-      ;;
-    --extra)
+      ;; 
+    --extra) 
       [[ $# -ge 2 ]] || { echo "jj-commit-ai: --extra 需要参数" >&2; exit 2; }
       EXTRA_RUNTIME_PROMPT="$2"
       shift 2
-      ;;
-    --lang)
+      ;; 
+    --api) 
+      [[ $# -ge 2 ]] || { echo "jj-commit-ai: --api 需要参数" >&2; exit 2; }
+      API_BACKEND="$2"
+      shift 2
+      ;; 
+    --lang) 
       [[ $# -ge 2 ]] || { echo "jj-commit-ai: --lang 需要参数" >&2; exit 2; }
       LANG_PREF="$2"
       shift 2
-      ;;
-    --chinese)
+      ;; 
+    --chinese) 
       LANG_PREF="zh"
       shift
-      ;;
-    --wrap-subject)
+      ;; 
+    --wrap-subject) 
       [[ $# -ge 2 ]] || { echo "jj-commit-ai: --wrap-subject 需要参数" >&2; exit 2; }
       SUBJECT_STYLE="$2"
       shift 2
-      ;;
-    --bracket-title)
+      ;; 
+    --bracket-title) 
       SUBJECT_STYLE="brackets"
       shift
-      ;;
-    --bracket-title-cn)
+      ;; 
+    --bracket-title-cn) 
       SUBJECT_STYLE="cn-brackets"
       shift
-      ;;
-    -h|--help)
+      ;; 
+    -h|--help) 
       show_help
       exit 0
-      ;;
-    --)
+      ;; 
+    --) 
       shift
       JJ_ARGS=("${@}")
       break
-      ;;
+      ;; 
     *)
       JJ_ARGS+=("$1")
       shift
-      ;;
+      ;; 
   esac
 done
 
@@ -178,40 +187,40 @@ BASE_PROMPT="$BASE_PROMPT_EN"
 
 if [[ -n "$LANG_PREF" ]]; then
   case "$LANG_PREF" in
-    zh|zh-CN|zh-cn|cn|中文|简体中文)
+    zh|zh-CN|zh-cn|cn|中文|简体中文) 
       BASE_PROMPT=$'你是一名资深开发者，需要为 Jujutsu (jj) 版本控制系统撰写高质量的提交信息。\n规范：\n- 提交标题不超过 72 个字符，使用简洁的陈述语气。\n- 可以在空行后列出关键要点，采用破折号或项目符号开头。\n- 不要在输出外层添加引号或代码块。\n- 若改动较多，请突出最重要的影响。\n- 所有内容必须使用简体中文撰写；如模型生成了非中文，请立即用简体中文重新表述。\n'
-      ;;
-    *)
+      ;; 
+    *) 
       BASE_PROMPT="${BASE_PROMPT_EN}Please write the subject line and bullet list in ${LANG_PREF}.\n"
-      ;;
+      ;; 
   esac
 fi
 
 if [[ -n "$SUBJECT_STYLE" ]]; then
   case "$SUBJECT_STYLE" in
-    brackets)
+    brackets) 
       if [[ -n "$LANG_PREF" ]]; then
         case "$LANG_PREF" in
-          zh|zh-CN|zh-cn|cn|中文|简体中文)
+          zh|zh-CN|zh-cn|cn|中文|简体中文) 
             BASE_PROMPT+=$'\n请将提交标题整体放在半角方括号内，例如：[新增功能]。\n'
-            ;;
+            ;; 
           *)
             BASE_PROMPT+=$'\nWrap the subject line in square brackets, e.g. [Subject Title].\n'
-            ;;
+            ;; 
         esac
       else
         BASE_PROMPT+=$'\nWrap the subject line in square brackets, e.g. [Subject Title].\n'
       fi
-      ;;
-    cn-brackets)
+      ;; 
+    cn-brackets) 
       if [[ -n "$LANG_PREF" && $LANG_PREF =~ ^(zh|zh-CN|zh-cn|cn|中文|简体中文)$ ]]; then
         BASE_PROMPT+=$'\n请将提交标题整体放在全角方括号内，例如：【新增功能】。\n'
       else
         BASE_PROMPT+=$'\nWrap the subject line in full-width brackets, e.g. 【Subject Title】.\n'
       fi
-      ;;
+      ;; 
     *)
-      ;;
+      ;; 
   esac
 fi
 
@@ -238,98 +247,396 @@ PROMPT_BODY+="$TRUNCATED_FLAG"
 FINAL_PROMPT="$BASE_PROMPT$PROMPT_BODY"
 
 if (( SHOW_PROMPT )); then
-  echo "===== AI PROMPT BEGIN ====="
+  echo "===== AI PROMPT BEGIN ===="
   printf '%s\n' "$FINAL_PROMPT"
-  echo "===== AI PROMPT END ====="
-fi
-
-KEEP_HISTORY=${JJ_COMMIT_AI_KEEP_HISTORY:-}
-SOURCE_CODEX_HOME=${CODEX_HOME:-$HOME/.codex}
-CUSTOM_CODEX_HOME=${JJ_COMMIT_AI_CODEX_HOME:-$SOURCE_CODEX_HOME/jj-commit-ai}
-USE_ISOLATED_CODEX_HOME=0
-
-if [[ -z "$KEEP_HISTORY" && -z "${CODEX_HOME+x}" ]]; then
-  USE_ISOLATED_CODEX_HOME=1
-  CODEX_ENV_HOME="$CUSTOM_CODEX_HOME"
-  if ! mkdir -p "$CODEX_ENV_HOME" 2>/dev/null; then
-    FALLBACK_CODEX_HOME=${JJ_COMMIT_AI_CODEX_FALLBACK:-${TMPDIR:-/tmp}/jj-commit-ai}
-    if ! mkdir -p "$FALLBACK_CODEX_HOME" 2>/dev/null; then
-      FALLBACK_CODEX_HOME=$(mktemp -d "${TMPDIR:-/tmp}/jj-commit-ai-XXXXXX" 2>/dev/null || true)
-    fi
-    if [[ -z "$FALLBACK_CODEX_HOME" || ! -d "$FALLBACK_CODEX_HOME" ]]; then
-      echo "jj-commit-ai: 无法创建 Codex 缓存目录" >&2
-      exit 1
-    fi
-    CODEX_ENV_HOME="$FALLBACK_CODEX_HOME"
-    [[ -n "$DEBUG" ]] && echo "[jj-commit-ai] 回退使用目录: $CODEX_ENV_HOME" >&2
-  fi
-  if [[ -d "$SOURCE_CODEX_HOME" ]]; then
-    for file in config.toml auth.json internal_storage.json; do
-      if [[ -e "$SOURCE_CODEX_HOME/$file" && ! -e "$CODEX_ENV_HOME/$file" ]]; then
-        cp -p "$SOURCE_CODEX_HOME/$file" "$CODEX_ENV_HOME/$file" 2>/dev/null || true
-      fi
-    done
-    if [[ -d "$SOURCE_CODEX_HOME/sessions" && ! -d "$CODEX_ENV_HOME/sessions" ]]; then
-      mkdir -p "$CODEX_ENV_HOME/sessions"
-      cp -Rp "$SOURCE_CODEX_HOME/sessions/." "$CODEX_ENV_HOME/sessions/" 2>/dev/null || true
-    fi
-  fi
-  rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
-else
-  CODEX_ENV_HOME="$SOURCE_CODEX_HOME"
-fi
-
-TMP_STDOUT=$(mktemp "${TMPDIR:-/tmp}/jj-codex-stdout-XXXXXX")
-TMP_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/jj-codex-output-XXXXXX")
-MSG_FILE=""
-cleanup() {
-  [[ -n "$TMP_STDOUT" && -f "$TMP_STDOUT" ]] && rm -f "$TMP_STDOUT"
-  [[ -n "$TMP_OUTPUT" && -f "$TMP_OUTPUT" ]] && rm -f "$TMP_OUTPUT"
-  [[ -n "$MSG_FILE" && -f "$MSG_FILE" ]] && rm -f "$MSG_FILE"
-}
-trap cleanup EXIT
-
-CLI_ARGS=("$CLI_COMMAND" "exec" "--skip-git-repo-check" "--output-last-message" "$TMP_OUTPUT")
-[[ -n "$MODEL" ]] && CLI_ARGS+=("--model" "$MODEL")
-CLI_ARGS+=("--json")
-
-if [[ -n "${JJ_COMMIT_AI_CLI_ARGS:-}" ]]; then
-  # shellcheck disable=SC2206
-  EXTRA_CLI_ARGS=(${JJ_COMMIT_AI_CLI_ARGS})
-  CLI_ARGS+=("${EXTRA_CLI_ARGS[@]}")
-elif [[ -n "$DEFAULT_CLI_ARGS" ]]; then
-  # shellcheck disable=SC2206
-  EXTRA_CLI_ARGS=(${DEFAULT_CLI_ARGS})
-  CLI_ARGS+=("${EXTRA_CLI_ARGS[@]}")
-fi
-
-[[ -n "$DEBUG" ]] && {
-  echo "[jj-commit-ai] 调用命令: ${CLI_ARGS[*]}" >&2
-  if (( USE_ISOLATED_CODEX_HOME )); then
-    echo "[jj-commit-ai] 使用隔离 CODEX_HOME: $CODEX_ENV_HOME" >&2
-  fi
-}
-
-set +e
-if (( USE_ISOLATED_CODEX_HOME )); then
-  CODEX_HOME="$CODEX_ENV_HOME" "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
-else
-  "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
-fi
-CLI_STATUS=$?
-set -e
-
-if (( USE_ISOLATED_CODEX_HOME )); then
-  rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
+  echo "===== AI PROMPT END ===="
 fi
 
 COMMIT_MESSAGE=""
 USING_FALLBACK=0
+CLI_STATUS=0
+
+if [[ "$API_BACKEND" == "gemini" ]]; then
+    if [[ -z "${GEMINI_API_KEY:-}" ]]; then
+        echo "jj-commit-ai: 使用 gemini 后端时，必须设置 GEMINI_API_KEY 环境变量" >&2
+        exit 1
+    fi
+
+    set +e
+    COMMIT_MESSAGE=$(JJ_COMMIT_AI_PROMPT="$FINAL_PROMPT" \
+                     GEMINI_API_KEY="${GEMINI_API_KEY}" \
+                     python3 - <<'PY_GEMINI'
+import os
+import sys
+import json
+import urllib.request
+
+def main():
+    prompt = os.environ.get('JJ_COMMIT_AI_PROMPT')
+    api_key = os.environ.get('GEMINI_API_KEY')
+    model = os.environ.get('JJ_COMMIT_AI_GEMINI_MODEL', 'gemini-1.5-flash-latest')
+
+    if not prompt:
+        print("Error: Prompt is empty.", file=sys.stderr)
+        sys.exit(1)
+    if not api_key:
+        print("Error: GEMINI_API_KEY is not set.", file=sys.stderr)
+        sys.exit(1)
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.4,
+            "topK": 32,
+            "topP": 1,
+            "maxOutputTokens": 4096,
+            "stopSequences": []
+        },
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+        ]
+    }
+
+    req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            if response.status == 200:
+                response_body = json.loads(response.read().decode('utf-8'))
+                candidates = response_body.get('candidates', [])
+                if candidates:
+                    content = candidates[0].get('content', {})
+                    parts = content.get('parts', [])
+                    if parts:
+                        message = parts[0].get('text', '')
+                        print(message.strip())
+                    else:
+                        print(f"Error: Gemini API response is missing 'parts'. Full response: {response_body}", file=sys.stderr)
+                        sys.exit(1)
+                else:
+                    print(f"Error: Gemini API response has no candidates. Full response: {response_body}", file=sys.stderr)
+                    sys.exit(1)
+            else:
+                error_body = response.read().decode('utf-8')
+                print(f"Error: Gemini API request failed with status {response.status}: {error_body}", file=sys.stderr)
+                sys.exit(1)
+    except urllib.error.URLError as e:
+        print(f"Error: Failed to reach Gemini API: {e.reason}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+PY_GEMINI
+    )
+    CLI_STATUS=$?
+    set -e
+
+elif [[ "$API_BACKEND" == "codex" ]]; then
+    KEEP_HISTORY=${JJ_COMMIT_AI_KEEP_HISTORY:-}
+    SOURCE_CODEX_HOME=${CODEX_HOME:-$HOME/.codex}
+    CUSTOM_CODEX_HOME=${JJ_COMMIT_AI_CODEX_HOME:-$SOURCE_CODEX_HOME/jj-commit-ai}
+    USE_ISOLATED_CODEX_HOME=0
+
+    if [[ -z "$KEEP_HISTORY" && -z "${CODEX_HOME+x}" ]]; then
+      USE_ISOLATED_CODEX_HOME=1
+      CODEX_ENV_HOME="$CUSTOM_CODEX_HOME"
+      if ! mkdir -p "$CODEX_ENV_HOME" 2>/dev/null; then
+        FALLBACK_CODEX_HOME=${JJ_COMMIT_AI_CODEX_FALLBACK:-${TMPDIR:-/tmp}/jj-commit-ai}
+        if ! mkdir -p "$FALLBACK_CODEX_HOME" 2>/dev/null; then
+          FALLBACK_CODEX_HOME=$(mktemp -d "${TMPDIR:-/tmp}/jj-commit-ai-XXXXXX" 2>/dev/null || true)
+        fi
+        if [[ -z "$FALLBACK_CODEX_HOME" || ! -d "$FALLBACK_CODEX_HOME" ]]; then
+          echo "jj-commit-ai: 无法创建 Codex 缓存目录" >&2
+          exit 1
+        fi
+        CODEX_ENV_HOME="$FALLBACK_CODEX_HOME"
+        [[ -n "$DEBUG" ]] && echo "[jj-commit-ai] 回退使用目录: $CODEX_ENV_HOME" >&2
+      fi
+      if [[ -d "$SOURCE_CODEX_HOME" ]]; then
+        for file in config.toml auth.json internal_storage.json; do
+          if [[ -e "$SOURCE_CODEX_HOME/$file" && ! -e "$CODEX_ENV_HOME/$file" ]]; then
+            cp -p "$SOURCE_CODEX_HOME/$file" "$CODEX_ENV_HOME/$file" 2>/dev/null || true
+          fi
+        done
+        if [[ -d "$SOURCE_CODEX_HOME/sessions" && ! -d "$CODEX_ENV_HOME/sessions" ]]; then
+          mkdir -p "$CODEX_ENV_HOME/sessions"
+          cp -Rp "$SOURCE_CODEX_HOME/sessions/." "$CODEX_ENV_HOME/sessions/" 2>/dev/null || true
+        fi
+      fi
+      rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
+    else
+      CODEX_ENV_HOME="$SOURCE_CODEX_HOME"
+    fi
+
+    TMP_STDOUT=$(mktemp "${TMPDIR:-/tmp}/jj-codex-stdout-XXXXXX")
+    TMP_OUTPUT=$(mktemp "${TMPDIR:-/tmp}/jj-codex-output-XXXXXX")
+    MSG_FILE=""
+    cleanup() {
+      [[ -n "$TMP_STDOUT" && -f "$TMP_STDOUT" ]] && rm -f "$TMP_STDOUT"
+      [[ -n "$TMP_OUTPUT" && -f "$TMP_OUTPUT" ]] && rm -f "$TMP_OUTPUT"
+      [[ -n "$MSG_FILE" && -f "$MSG_FILE" ]] && rm -f "$MSG_FILE"
+    }
+    trap cleanup EXIT
+
+    CLI_ARGS=("$CLI_COMMAND" "exec" "--skip-git-repo-check" "--output-last-message" "$TMP_OUTPUT")
+    [[ -n "$MODEL" ]] && CLI_ARGS+=("--model" "$MODEL")
+    CLI_ARGS+=("--json")
+
+    if [[ -n "${JJ_COMMIT_AI_CLI_ARGS:-}" ]]; then
+      # shellcheck disable=SC2206
+      EXTRA_CLI_ARGS=(${JJ_COMMIT_AI_CLI_ARGS})
+      CLI_ARGS+=("${EXTRA_CLI_ARGS[@]}")
+    elif [[ -n "$DEFAULT_CLI_ARGS" ]]; then
+      # shellcheck disable=SC2206
+      EXTRA_CLI_ARGS=(${DEFAULT_CLI_ARGS})
+      CLI_ARGS+=("${EXTRA_CLI_ARGS[@]}")
+    fi
+
+    [[ -n "$DEBUG" ]] && {
+      echo "[jj-commit-ai] 调用命令: ${CLI_ARGS[*]}" >&2
+      if (( USE_ISOLATED_CODEX_HOME )); then
+        echo "[jj-commit-ai] 使用隔离 CODEX_HOME: $CODEX_ENV_HOME" >&2
+      fi
+    }
+
+    set +e
+    if (( USE_ISOLATED_CODEX_HOME )); then
+      CODEX_HOME="$CODEX_ENV_HOME" "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
+    else
+      "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
+    fi
+    CLI_STATUS=$?
+    set -e
+
+    if (( USE_ISOLATED_CODEX_HOME )); then
+      rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
+    fi
+
+    if (( CLI_STATUS == 0 )); then
+        [[ -n "$DEBUG" ]] && {
+          echo "[jj-commit-ai] codex stdout:" >&2
+          cat "$TMP_STDOUT" >&2
+          echo "[jj-commit-ai] codex last message file:" >&2
+          cat "$TMP_OUTPUT" >&2 || true
+        }
+
+        export JJ_COMMIT_AI_RESPONSE_PATH="$TMP_OUTPUT"
+        export JJ_COMMIT_AI_STDOUT_PATH="$TMP_STDOUT"
+
+        COMMIT_MESSAGE=$(python3 - <<'PY'
+import json
+import os
+import re
+
+ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+JSON_DECODER = json.JSONDecoder()
+
+
+def read_text(path: str) -> str:
+    with open(path, 'r', encoding='utf-8', errors='replace') as fh:
+        return fh.read()
+
+
+def clean(text: str) -> str:
+    text = text.replace('\r', '\n')
+    text = ANSI_RE.sub('', text)
+    lines = []
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        if stripped.startswith('[') and ']' in stripped and stripped[1:5].isdigit():
+            continue
+        if stripped.startswith('--'):
+            continue
+        if stripped.startswith('{') and '"_context_window"' in stripped:
+            continue
+        if stripped.startswith('{') and '"provider"' in stripped and '"model"' in stripped:
+            continue
+        lines.append(stripped)
+    return '\n'.join(lines).strip()
+
+
+def from_struct(obj):
+    if isinstance(obj, str):
+        return clean(obj)
+    if isinstance(obj, dict):
+        if 'msg' in obj:
+            msg = obj['msg']
+            if isinstance(msg, dict):
+                msg_type = msg.get('type')
+                if msg_type and msg_type != 'agent_message':
+                    return ''
+            cand = from_struct(msg)
+            if cand:
+                return cand
+        event = obj.get('event')
+        if event in {'info', 'status', 'log', 'debug', 'warning', 'progress'}:
+            for key in ('data', 'content', 'text', 'output', 'result', 'response', 'value', 'messages'):
+                if key in obj and key != 'message':
+                    cand = from_struct(obj[key])
+                    if cand:
+                        return cand
+            return ''
+        if obj.get('role') == 'assistant':
+            cand = from_struct(obj.get('content'))
+            if cand:
+                return cand
+        for key in ('content', 'text', 'message', 'output', 'result', 'response', 'value', 'data', 'messages'):
+            if key in obj:
+                cand = from_struct(obj[key])
+                if cand:
+                    return cand
+        return ''
+    if isinstance(obj, (list, tuple)):
+        for item in obj:
+            cand = from_struct(item)
+            if cand:
+                return cand
+    return ''
+
+
+def iter_json_stream(text: str):
+    idx = 0
+    length = len(text)
+    while idx < length:
+        while idx < length and text[idx].isspace():
+            idx += 1
+        if idx >= length:
+            break
+        try:
+            obj, end = JSON_DECODER.raw_decode(text, idx)
+        except json.JSONDecodeError:
+            next_brace = text.find('{', idx + 1)
+            next_bracket = text.find('[', idx + 1)
+            candidates = [pos for pos in (next_brace, next_bracket) if pos != -1]
+            if candidates:
+                idx = min(candidates)
+            else:
+                idx += 1
+            continue
+        yield obj
+        idx = end
+
+
+def parse_json_blob(text: str) -> str:
+    try:
+        data = json.loads(text)
+    except Exception:
+        data = None
+    if data is not None:
+        cand = from_struct(data)
+        if cand:
+            return cand
+    for obj in iter_json_stream(text):
+        cand = from_struct(obj)
+        if cand:
+            return cand
+    return ''
+
+
+def parse_json_lines(text: str) -> str:
+    for line in reversed(text.splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+        except Exception:
+            continue
+        cand = from_struct(data)
+        if cand:
+            return cand
+    return ''
+
+
+def strip_meta_blocks(message: str) -> str:
+    if not message:
+        return message
+    lines = []
+    for raw in message.splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            lines.append('')
+            continue
+        if stripped.startswith('{') and ':' in stripped:
+            continue
+        if stripped.startswith('[') and ':' in stripped:
+            continue
+        if stripped.startswith('"') and ':' in stripped:
+            continue
+        lines.append(stripped)
+    while lines and not lines[0]:
+        lines.pop(0)
+    while lines and not lines[-1]:
+        lines.pop()
+    return '\n'.join(lines).strip()
+
+
+message = ''
+response_path = os.environ.get('JJ_COMMIT_AI_RESPONSE_PATH')
+stdout_path = os.environ.get('JJ_COMMIT_AI_STDOUT_PATH')
+
+candidates = []
+for path in (response_path, stdout_path):
+    if path and os.path.exists(path):
+        candidates.append(read_text(path))
+
+fallback_candidates = []
+message = ''
+for blob in candidates:
+    stripped = blob.strip()
+    if not stripped:
+        continue
+    message = parse_json_blob(stripped)
+    if message:
+        break
+    message = parse_json_lines(stripped)
+    if message:
+        break
+    fallback = clean(stripped)
+    if fallback:
+        fallback_candidates.append(fallback)
+
+if not message:
+    for fallback in fallback_candidates:
+        if fallback:
+            message = fallback
+            break
+
+message = strip_meta_blocks(message)
+
+if not message:
+    for fallback in fallback_candidates:
+        candidate = strip_meta_blocks(fallback)
+        if candidate:
+            message = candidate
+            break
+
+print(message.strip())
+PY
+        )
+    fi
+else
+    echo "jj-commit-ai: 未知的 API 后端 '$API_BACKEND'" >&2
+    exit 1
+fi
+
 
 if (( CLI_STATUS != 0 )); then
   [[ -n "$DEBUG" ]] && {
-    echo "[jj-commit-ai] codex stdout (error path):" >&2
-    cat "$TMP_STDOUT" >&2 || true
+    if [[ "$API_BACKEND" == "codex" ]]; then
+        echo "[jj-commit-ai] codex stdout (error path):" >&2
+        cat "$TMP_STDOUT" >&2 || true
+    fi
   }
   FALLBACK_MESSAGE=$(JJ_COMMIT_AI_DIFF_STAT="$DIFF_STAT" \
     JJ_COMMIT_AI_DIFF_OUTPUT="$DIFF_OUTPUT" \
@@ -552,216 +859,20 @@ PY
   if [[ -n "$FALLBACK_MESSAGE" ]]; then
     USING_FALLBACK=1
     COMMIT_MESSAGE="$FALLBACK_MESSAGE"
-    echo "jj-commit-ai: $CLI_COMMAND exec 失败 (exit $CLI_STATUS)，已回退到本地摘要" >&2
+    if [[ "$API_BACKEND" == "gemini" ]]; then
+        echo "jj-commit-ai: Gemini API 调用失败 (exit $CLI_STATUS)，已回退到本地摘要" >&2
+    else
+        echo "jj-commit-ai: $CLI_COMMAND exec 失败 (exit $CLI_STATUS)，已回退到本地摘要" >&2
+    fi
   else
-    echo "jj-commit-ai: $CLI_COMMAND exec 失败 (exit $CLI_STATUS)" >&2
-    cat "$TMP_STDOUT" >&2 || true
+    if [[ "$API_BACKEND" == "gemini" ]]; then
+        echo "jj-commit-ai: Gemini API 调用失败 (exit $CLI_STATUS)" >&2
+    else
+        echo "jj-commit-ai: $CLI_COMMAND exec 失败 (exit $CLI_STATUS)" >&2
+        cat "$TMP_STDOUT" >&2 || true
+    fi
     exit "$CLI_STATUS"
   fi
-else
-  [[ -n "$DEBUG" ]] && {
-    echo "[jj-commit-ai] codex stdout:" >&2
-    cat "$TMP_STDOUT" >&2
-    echo "[jj-commit-ai] codex last message file:" >&2
-    cat "$TMP_OUTPUT" >&2 || true
-  }
-
-  export JJ_COMMIT_AI_RESPONSE_PATH="$TMP_OUTPUT"
-  export JJ_COMMIT_AI_STDOUT_PATH="$TMP_STDOUT"
-
-  COMMIT_MESSAGE=$(python3 - <<'PY'
-import json
-import os
-import re
-
-ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
-JSON_DECODER = json.JSONDecoder()
-
-
-def read_text(path: str) -> str:
-    with open(path, 'r', encoding='utf-8', errors='replace') as fh:
-        return fh.read()
-
-
-def clean(text: str) -> str:
-    text = text.replace('\r', '\n')
-    text = ANSI_RE.sub('', text)
-    lines = []
-    for raw in text.splitlines():
-        stripped = raw.strip()
-        if not stripped:
-            continue
-        if stripped.startswith('[') and ']' in stripped and stripped[1:5].isdigit():
-            continue
-        if stripped.startswith('--'):
-            continue
-        if stripped.startswith('{') and '"_context_window"' in stripped:
-            continue
-        if stripped.startswith('{') and '"provider"' in stripped and '"model"' in stripped:
-            continue
-        lines.append(stripped)
-    return '\n'.join(lines).strip()
-
-
-def from_struct(obj):
-    if isinstance(obj, str):
-        return clean(obj)
-    if isinstance(obj, dict):
-        if 'msg' in obj:
-            msg = obj['msg']
-            if isinstance(msg, dict):
-                msg_type = msg.get('type')
-                if msg_type and msg_type != 'agent_message':
-                    return ''
-            cand = from_struct(msg)
-            if cand:
-                return cand
-        event = obj.get('event')
-        if event in {'info', 'status', 'log', 'debug', 'warning', 'progress'}:
-            for key in ('data', 'content', 'text', 'output', 'result', 'response', 'value', 'messages'):
-                if key in obj and key != 'message':
-                    cand = from_struct(obj[key])
-                    if cand:
-                        return cand
-            return ''
-        if obj.get('role') == 'assistant':
-            cand = from_struct(obj.get('content'))
-            if cand:
-                return cand
-        for key in ('content', 'text', 'message', 'output', 'result', 'response', 'value', 'data', 'messages'):
-            if key in obj:
-                cand = from_struct(obj[key])
-                if cand:
-                    return cand
-        return ''
-    if isinstance(obj, (list, tuple)):
-        for item in obj:
-            cand = from_struct(item)
-            if cand:
-                return cand
-    return ''
-
-
-def iter_json_stream(text: str):
-    idx = 0
-    length = len(text)
-    while idx < length:
-        while idx < length and text[idx].isspace():
-            idx += 1
-        if idx >= length:
-            break
-        try:
-            obj, end = JSON_DECODER.raw_decode(text, idx)
-        except json.JSONDecodeError:
-            next_brace = text.find('{', idx + 1)
-            next_bracket = text.find('[', idx + 1)
-            candidates = [pos for pos in (next_brace, next_bracket) if pos != -1]
-            if candidates:
-                idx = min(candidates)
-            else:
-                idx += 1
-            continue
-        yield obj
-        idx = end
-
-
-def parse_json_blob(text: str) -> str:
-    try:
-        data = json.loads(text)
-    except Exception:
-        data = None
-    if data is not None:
-        cand = from_struct(data)
-        if cand:
-            return cand
-    for obj in iter_json_stream(text):
-        cand = from_struct(obj)
-        if cand:
-            return cand
-    return ''
-
-
-def parse_json_lines(text: str) -> str:
-    for line in reversed(text.splitlines()):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            data = json.loads(line)
-        except Exception:
-            continue
-        cand = from_struct(data)
-        if cand:
-            return cand
-    return ''
-
-
-def strip_meta_blocks(message: str) -> str:
-    if not message:
-        return message
-    lines = []
-    for raw in message.splitlines():
-        stripped = raw.strip()
-        if not stripped:
-            lines.append('')
-            continue
-        if stripped.startswith('{') and ':' in stripped:
-            continue
-        if stripped.startswith('[') and ':' in stripped:
-            continue
-        if stripped.startswith('"') and ':' in stripped:
-            continue
-        lines.append(stripped)
-    while lines and not lines[0]:
-        lines.pop(0)
-    while lines and not lines[-1]:
-        lines.pop()
-    return '\n'.join(lines).strip()
-
-
-message = ''
-response_path = os.environ.get('JJ_COMMIT_AI_RESPONSE_PATH')
-stdout_path = os.environ.get('JJ_COMMIT_AI_STDOUT_PATH')
-
-candidates = []
-for path in (response_path, stdout_path):
-    if path and os.path.exists(path):
-        candidates.append(read_text(path))
-
-fallback_candidates = []
-message = ''
-for blob in candidates:
-    stripped = blob.strip()
-    if not stripped:
-        continue
-    message = parse_json_blob(stripped)
-    if message:
-        break
-    message = parse_json_lines(stripped)
-    if message:
-        break
-    fallback = clean(stripped)
-    if fallback:
-        fallback_candidates.append(fallback)
-
-if not message:
-    for fallback in fallback_candidates:
-        if fallback:
-            message = fallback
-            break
-
-message = strip_meta_blocks(message)
-
-if not message:
-    for fallback in fallback_candidates:
-        candidate = strip_meta_blocks(fallback)
-        if candidate:
-            message = candidate
-            break
-
-print(message.strip())
-PY
-)
 fi
 
 if [[ -z "$COMMIT_MESSAGE" ]]; then
@@ -817,9 +928,9 @@ read -r -p "是否使用该提交信息? [y/N] " REPLY
 case "$REPLY" in
   [yY][eE][sS]|[yY])
     run_commit
-    ;;
+    ;; 
   *)
     echo "jj-commit-ai: 已放弃提交，消息已输出供参考" >&2
     cat "$MSG_FILE"
-    ;;
+    ;; 
 esac

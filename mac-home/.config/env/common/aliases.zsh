@@ -6,12 +6,15 @@ alias ek="pkill -f 'Emacs.app/Contents/MacOS/Emacs-arm64-11 --bg-daemon='"  #不
 alias et='emacsclient -t -a ""'
 # alias es='emacsclient -n '   # send to the latest acitive client
 alias e=ew
+alias h=hx
+
 
 alias gtc='gitui -t catppuccin-macchiato.ron'
 alias lj='lazyjj'
-alias gg='gitui -t latte.ron'
+alias lg='gitui -t latte.ron'
 alias j='jj'
-alias g='git'
+alias gg='git'
+alias g='git sf'
 alias ee='subl ~/_env/stow'
 alias ec='cursor ~/_env/stow'
 
@@ -35,7 +38,7 @@ alias dv='deactivate'
 # alias gg='git clone'
 alias ipy='ipython'
 alias l='ls -la'
-alias lg='lazygit'
+# alias lg='lazygit'
 alias ms='mailsync'
 alias mt='neomutt'
 alias r='echo $RANGER_LEVEL'

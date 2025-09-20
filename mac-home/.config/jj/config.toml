@@ -171,8 +171,8 @@ dem = ['describe', '-m']
 ci = ['commit', '-i']
 cm = ['commit', '-m']
 cim = ['commit', '-i', '-m']
-cai = ['util', 'exec', '--', 'jj-commit-ai']
-caic = ['util', 'exec', '--', 'jj-commit-ai', '--commit']
+cc = ['util', 'exec', '--', 'jj-commit-ai','--api','gemini']
+caic = ['util', 'exec', '--', 'jj-commit-ai', '--commit','--api','gemini']
 
 # show
 w = ['show']
