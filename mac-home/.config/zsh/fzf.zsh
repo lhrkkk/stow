@@ -1,8 +1,15 @@
 typeset -gA _ami_fzf_color_flags=(
-  # 默认（浅色）
-  light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,gutter:#fbf3db'
-  # 深色
-  dark  '--color=dark,fg:#dce2f1,bg:#1b1f28,hl:#4f9cff,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a,gutter:#1b1f28'
+  # 有背景，有侧边
+  # light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,query:#57666c'
+  # dark  '--color=dark,fg:#dce2f1,bg:#1b1f28,hl:#4f9cff,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a,query:#cfd6f1'
+
+  # 无背景，有侧边
+  light '--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
+  dark  '--color=dark,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a'
+
+  # 有背景，隐藏侧边
+  # light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,gutter:#fbf3db,query:#57666c'
+  # dark  '--color=dark,fg:#dce2f1,bg:#1b1f28,hl:#4f9cff,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a,gutter:#1b1f28,query:#cfd6f1'
 )
 
 typeset -ga _ami_fzf_default_bindings=(
