@@ -213,7 +213,7 @@
   - JJ：`mac-home/.config/zsh/jj-completion-enhanced.zsh`
   - report-kit：`mac-home/.config/zsh/report-kit-completion.zsh`
   - stowx：`mac-home/.config/zsh/stowx-completion.zsh`
-  - fzf-tab/样式：`mac-home/.config/zsh/zstyles.zsh`（与 `~/.config/zsh/fzf.zsh` 共用 `--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,gutter:#fbf3db` 配色 + ANSI；加载时若存在 `~/.local/bin/check_term_theme.py` 会自动探测浅/深色，任何时候执行 `ami-fzf-apply-theme dark|light` 都会同步刷新 fzf 与 fzf-tab）
+  - fzf-tab/样式：`mac-home/.config/zsh/zstyles.zsh`（与 `~/.config/zsh/fzf.zsh` 共用 `--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,gutter:#fbf3db` 配色 + ANSI；首次 Tab/`ctrl+R`/直接 `fzf` 时若存在 `~/.local/bin/check_term_theme.py` 会自动探测浅/深色，任何时候执行 `ami-fzf-apply-theme dark|light` 都会同步刷新 fzf 与 fzf-tab）
  - 加载方式：由 `mac-home/.config/zsh/lazyload.zsh` 懒加载（首次 Tab/首个提示符触发），不再在 zshrc 中直接 `source`
   - 调优：可打开一次性计时打印，用于衡量优化效果：
     

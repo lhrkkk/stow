@@ -22,7 +22,7 @@
 - `~/.config/zsh/stowx-completion.zsh`
   - stowx CLI 补全（懒加载，解析 STOW_DIR 包列表）
 - `~/.config/zsh/zstyles.zsh`
-  - fzf-tab 主题与行为（`--no-sort`）、completion 基础样式（`menu no`、`[ %d ]` 组名）；与 `~/.config/zsh/fzf.zsh` 共用配色与按键绑定；若存在 `~/.local/bin/check_term_theme.py` 会在加载时自动侦测终端主题，也可随时执行 `ami-fzf-apply-theme dark|light` 手动切换并同步 fzf-tab
+  - fzf-tab 主题与行为（`--no-sort`）、completion 基础样式（`menu no`、`[ %d ]` 组名）；与 `~/.config/zsh/fzf.zsh` 共用 `--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,gutter:#fbf3db` 配色与按键绑定；若存在 `~/.local/bin/check_term_theme.py` 会在首次 Tab/`ctrl+R`/`fzf` 时自动侦测终端主题，也可随时执行 `ami-fzf-apply-theme dark|light` 手动切换并同步 fzf-tab
 - `~/.config/zsh/zshrc`
   - 串联各模块：加载 lazyload、fzf、zstyles，并留给本地定制入口
 - `~/.config/zsh/lazyload.zsh`

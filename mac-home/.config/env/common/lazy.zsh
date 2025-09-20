@@ -1,3 +1,41 @@
+# ### 1. **首次提示符加载**（precmd/PROMPT_COMMAND 钩子）
+# ```bash
+# # 这些在首次提示符出现时就已经初始化完成
+# _lazy_direnv_once()    # 第一个提示符时执行
+# _mise_hook_once()      # 第一个提示符时执行
+# _zoxide_init_once()    # 第一个提示符时执行
+# ```
+#
+# ### 2. **首次命令调用时加载**（占位函数）
+# ```bash
+# # 这些只有在你实际敲命令时才初始化
+# conda() { /* 初始化后调用真正的 conda */ }
+# brew() { /* 初始化后调用真正的 brew */ }
+# fuck() { /* 检查并调用 thefuck */ }
+# x() { /* 初始化 x-cmd 后调用 */ }
+# ```
+#
+# ## 1. 首次提示符加载（precmd 钩子）
+# - 工具：direnv, mise, zoxide
+# - 时机：第一个提示符显示时通过 precmd/PROMPT_COMMAND 钩子自动执行
+# ```bash
+# _mise_hook_once() {
+#   eval "$(mise hook-env -q)"           # 真实初始化
+#   _ami_precmd_unregister _mise_hook_once  # 自我移除
+# }
+# ```
+#
+# ## 2. 首次命令调用加载（占位函数）
+# - 工具：conda, brew, x-cmd, thefuck
+# - 时机：用户实际敲命令时才通过占位函数触发初始化
+# ```bash
+# conda() {
+#   unset -f conda                    # 移除占位函数
+#   eval "$($CONDA_BIN shell.$local_shell hook)"  # 真实初始化
+#   command conda "$@"                # 执行命令
+# }
+# ```
+
 
 # ==== Lazy-load Conda (bash/zsh 通用，POSIX 语法) ====
 conda() {

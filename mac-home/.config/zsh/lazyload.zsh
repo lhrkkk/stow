@@ -85,6 +85,9 @@ if [[ $- == *i* ]]; then
         zle -M "[ami-timing] first Tab init: ${_ms} ms"
       fi
     fi
+    if (( $+functions[ami-fzf-ensure-theme] )); then
+      ami-fzf-ensure-theme
+    fi
     zle expand-or-complete
   }
   bindkey '^I' _ami_expand_or_complete

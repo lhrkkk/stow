@@ -1,21 +1,21 @@
 typeset -gA _ami_fzf_color_flags=(
-	# 有背景，有侧边
-  # light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,query:#57666c'
-  # dark  '--color=dark,fg:#dce2f1,bg:#1b1f28,hl:#4f9cff,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a,query:#cfd6f1'
-
-  # 无背景，有侧边
-  light '--color=light,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100'
-  dark  '--color=dark,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a'
-
-	# 有背景，隐藏侧边
-  # light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,gutter:#fbf3db,query:#57666c'
-  # dark  '--color=dark,fg:#dce2f1,bg:#1b1f28,hl:#4f9cff,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a,gutter:#1b1f28,query:#cfd6f1'
+  # 默认（浅色）
+  light '--color=light,fg:#3a4d53,bg:#fbf3db,hl:#0072d4,fg+:#3a4d53,bg+:#e9e4d4,hl+:#0072d4,info:#009c8f,prompt:#c25d1e,spinner:#ca4898,pointer:#0072d4,marker:#ad8900,header:#489100,gutter:#fbf3db'
+  # 深色
+  dark  '--color=dark,fg:#dce2f1,bg:#1b1f28,hl:#4f9cff,fg+:#dce2f1,bg+:#2a3240,hl+:#4f9cff,info:#36c2b2,prompt:#fbc02d,spinner:#f06292,pointer:#4f9cff,marker:#ffb300,header:#8bc34a,gutter:#1b1f28'
 )
 
 typeset -ga _ami_fzf_default_bindings=(
   '--bind=ctrl-t:top,change:top'
   '--bind=ctrl-j:down,ctrl-k:up'
 )
+
+typeset -gi _ami_fzf_theme_ready=0
+
+ami-fzf-theme-once() {
+  (( $+functions[ami-fzf-ensure-theme] )) || return 0
+  ami-fzf-ensure-theme
+}
 
 ami-fzf-resolve-theme() {
   local requested=${1:-}
@@ -59,9 +59,24 @@ ami-fzf-apply-theme() {
     zstyle ':fzf-tab:complete:git:*' fzf-flags ${_ami_fzf_tab_flags[@]} --no-sort
     unset _ami_fzf_tab_flags
   fi
+
+  _ami_fzf_theme_ready=1
 }
 
-ami-fzf-apply-theme
+ami-fzf-ensure-theme() {
+  (( _ami_fzf_theme_ready )) && return 0
+  ami-fzf-apply-theme "$@"
+}
+
+# 在首次 Tab（lazyload）触发之前，先提供一个中性的默认值。
+typeset -gx FZF_DEFAULT_OPTS='--ansi --bind=ctrl-t:top,change:top --bind=ctrl-j:down,ctrl-k:up'
+
+if ! (( $+functions[fzf] )); then
+  fzf() {
+    ami-fzf-theme-once
+    command fzf "$@"
+  }
+fi
 
 # export FZF_DEFAULT_OPTS='--bind=ctrl-t:top,change:top --bind ctrl-e:down,ctrl-u:up'
 
@@ -100,6 +115,7 @@ zle -N fzf-find-widget
 bindkey '^p' fzf-find-widget
 
 fzf-cd-widget() {
+	ami-fzf-theme-once
 	local tokens=(${(z)LBUFFER})
 	if (( $#tokens <= 1 )); then
 		zle fzf-find-widget 'only_dir'
@@ -116,6 +132,7 @@ zle -N fzf-cd-widget
 bindkey '^t' fzf-cd-widget
 
 fzf-history-widget() {
+	ami-fzf-theme-once
 	local num had_fhistory=0
 	if whence -w fhistory >/dev/null 2>&1; then
 		had_fhistory=1
@@ -145,11 +162,13 @@ bindkey '^R' fzf-history-widget
 
 
 fif() {
+  ami-fzf-theme-once
   if [ ! "$#" -gt 0 ]; then echo "Need a string to search for!"; return 1; fi
   rg --files-with-matches --no-messages "$1" | fzf --preview "highlight -O ansi -l {} 2> /dev/null | rg --colors 'match:bg:yellow' --ignore-case --pretty --context 10 '$1' || rg --ignore-case --pretty --context 10 '$1' {}"
 }
 
 find-in-file() {
+	ami-fzf-theme-once
 	grep --line-buffered --color=never -r "" * | fzf
 }
 zle -N find-in-file
