@@ -104,11 +104,31 @@ if [ "$_lazy_is_interactive" -eq 1 ] && command -v direnv >/dev/null 2>&1; then
     _lazy_shell="sh"
     [ -n "${ZSH_VERSION-}" ] && _lazy_shell="zsh"
     [ -n "${BASH_VERSION-}" ] && _lazy_shell="bash"
-    eval "$(direnv hook "$_lazy_shell")"
-    # 同步当前目录环境，避免错过初始目录的 .envrc
-    if command -v _direnv_hook >/dev/null 2>&1; then
-      _direnv_hook
+    
+    # 自定义 direnv hook，主目录静默加载
+    _direnv_hook() {
+      local previous_exit_status=$?;
+      if [[ "$PWD" == "$HOME" ]]; then
+        eval "$(DIRENV_LOG_FORMAT= direnv export "$_lazy_shell" 2>/dev/null)"
+      else
+        eval "$(direnv export "$_lazy_shell")"
+      fi
+      return $previous_exit_status;
+    }
+    
+    # 注册钩子
+    if [ -n "${ZSH_VERSION-}" ]; then
+      typeset -ag precmd_functions chpwd_functions;
+      if [[ -z ${precmd_functions[(r)_direnv_hook]} ]]; then
+        precmd_functions=( _direnv_hook ${precmd_functions[@]} )
+      fi
+      if [[ -z ${chpwd_functions[(r)_direnv_hook]} ]]; then
+        chpwd_functions=( _direnv_hook ${chpwd_functions[@]} )
+      fi
     fi
+    
+    # 同步当前目录环境，避免错过初始目录的 .envrc
+    _direnv_hook
     _LAZY_DIRENV_INITIALIZED=1
   }
   _lazy_direnv_once() {
