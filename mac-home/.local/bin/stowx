@@ -292,12 +292,12 @@ build_opts() {
   
   # Add defer patterns
   for pattern in "${DEFER_PATTERNS[@]}"; do
-    STOW_OPTS=( "${STOW_OPTS[@]}" "--defer=$pattern" )
+    STOW_OPTS=( "${STOW_OPTS[@]}" "--defer" "$pattern" )
   done
   
   # Add override patterns  
   for pattern in "${OVERRIDE_PATTERNS[@]}"; do
-    STOW_OPTS=( "${STOW_OPTS[@]}" "--override=$pattern" )
+    STOW_OPTS=( "${STOW_OPTS[@]}" "--override" "$pattern" )
   done
   
   # Debug output if verbose
@@ -352,12 +352,12 @@ run_stow() {
       
       # Add defer patterns for nested packages too
       for pattern in "${DEFER_PATTERNS[@]}"; do
-        opts=( "${opts[@]}" "--defer=$pattern" )
+        opts=( "${opts[@]}" "--defer" "$pattern" )
       done
       
       # Add override patterns for nested packages too
       for pattern in "${OVERRIDE_PATTERNS[@]}"; do
-        opts=( "${opts[@]}" "--override=$pattern" )
+        opts=( "${opts[@]}" "--override" "$pattern" )
       done
       
       log "stow ${opts[*]} ${subopts[*]} ${name}"
