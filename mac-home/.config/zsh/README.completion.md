@@ -68,6 +68,20 @@ exec zsh -l
 
 > Git 别名描述/分组维护在 `~/.config/zsh/git-completion-enhanced.zsh` 的 `__git_build_user_commands` 中；下方“Git 别名详解（按组）”同步摘录主要信息，便于快速检索。
 
+### 显示样式与可调参数
+
+- 列表每项默认显示为：`别名列（左对齐） -- 用途 | 展开式`；分隔符可改：
+  - `AMI_GIT_ALIAS_SEP1`（默认 ` -- `）：别名列 和 用途 之间
+  - `AMI_GIT_ALIAS_SEP2`（默认 ` | `）：用途 和 展开式 之间
+- 展开式显示策略（默认 `full`）：
+  - `AMI_GIT_ALIAS_EXPANSION=full` 所有分组展示展开式
+  - `AMI_GIT_ALIAS_EXPANSION=auto` 仅 Status/Log 隐藏展开式（其余展示）
+  - `AMI_GIT_ALIAS_EXPANSION=none` 全部不展示展开式
+- 展开式截断宽度：`AMI_GIT_ALIAS_EXP_WIDTH`（默认 `64`，单位字符，超长以 `…` 结尾）。
+- Core 组可自定义（默认 `s l`）：`AMI_GIT_CORE_ALIASES='s l lg default sf'`。
+
+> 注：补全过程已做静音与 trace 关闭处理，避免“顶部打印泄露”。
+
 分组实现要点：
 
 - blame（fn/fnr）→ 归入“查看/差异”；
@@ -115,7 +129,7 @@ exec zsh -l
   - lg: 全量图形化日志（`--decorate --abbrev-commit --date=relative --pretty=jj --all`）
   - changes: 提交变更列表（`log --pretty=… --name-status`）
   - short/simple/shortnocolor: 精简日志视图（不同 `--pretty` 模板）
-  - filelog: 单文件级历史（`git log -u -- <file>`）
+  - filelog: 单文件级历史（`git log -u -- <file>`；已在分组中归到“查看/差异”）
   - default: 快速总览（先 `sf` 再 `lg -n 20`）
   - ol: 操作日志（`git reflog`）
   - contributors: 贡献者统计（`git shortlog --summary --numbered --email`）

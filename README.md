@@ -244,6 +244,10 @@
   - fzf-tab/样式：`mac-home/.config/zsh/zstyles.zsh`（与 `~/.config/zsh/fzf.zsh` 共用配色 + ANSI；首次 Tab/`ctrl+R`/直接 `fzf` 时若存在 `~/.local/bin/check_term_theme.py` 会自动探测浅/深色，任何时候执行 `ami-fzf-apply-theme dark|light` 都会同步刷新 fzf 与 fzf-tab）
   - zoxide 集成：`zi` 命令（交互式目录选择）首次触发时自动设置 fzf 主题，确保候选列表颜色与系统主题保持一致
   - g 函数补全：`g` 命令（git 别名）现在支持完整的 git 子命令和参数补全
+  - Git 别名显示参数：
+    - `AMI_GIT_ALIAS_EXPANSION=full|auto|none`（默认 `full`）
+    - `AMI_GIT_ALIAS_EXP_WIDTH=64`（展开式截断宽度）
+    - `AMI_GIT_ALIAS_SEP1` / `AMI_GIT_ALIAS_SEP2`（分隔符，默认 ` -- ` / ` | `）
  - 加载方式：由 `mac-home/.config/zsh/lazyload.zsh` 懒加载（首次 Tab/首个提示符触发），不再在 zshrc 中直接 `source`
   - 调优：可打开一次性计时打印，用于衡量优化效果：
     
@@ -265,7 +269,24 @@
  
  ---
 
-## 7. 验证与常见应用
+## 7. AI 提交助手（git / jj）
+
+- 工具：`git-commit-ai`、`jj-commit-ai` 默认调用 **Codex** 后端，模型为 `gpt-5`。
+- 切换后端：`--api gemini` 可改用 Gemini；也可通过 `GIT_COMMIT_AI_BACKEND` / `JJ_COMMIT_AI_BACKEND` 环境变量。
+- 推理强度：`--reasoning-effort`, `-r`（或环境变量 `GIT_COMMIT_AI_REASONING_EFFORT`、`JJ_COMMIT_AI_REASONING_EFFORT`）会透传为 `model_reasoning_effort`，可选 `minimal / low / medium / high`。
+- 语言兜底：若偏好中文但 Codex 仅返回英文，脚本会打印原始结果并回退到本地摘要；设置 `GIT_COMMIT_AI_ALLOW_ENGLISH=1`（或 JJ 对应变量）可放行英文输出。
+- 常见示例：
+  
+  ```sh
+   git-commit-ai --preview               # 默认 Codex + gpt-5
+   git-commit-ai --api gemini --preview  # 切换到 Gemini
+   git-commit-ai --api codex -r medium   # 指定推理强度
+   JJ_COMMIT_AI_ALLOW_ENGLISH=1 jj-commit-ai --api codex --preview
+  ```
+
+---
+
+## 8. 验证与常见应用
 
 - WezTerm：保存 `~/.config/wezterm/wezterm.lua` 后自动热重载；偏好“浅色标题栏”已在配置中处理。
 - Yazi：
@@ -296,7 +317,7 @@
 
 ---
 
-## 8. 故障排查与回滚
+## 9. 故障排查与回滚
 
 - 预览输出包含 LINK/CONFLICT/REMOVE 等关键字时，请先停止执行并确认方案。
 - 冲突（目标存在非链接同名文件）：优先选择 adopt；若不想保留现状，可走“覆盖式部署”（谨慎）。
@@ -321,7 +342,7 @@
 
 ---
 
-## 9. 版本控制建议
+## 10. 版本控制建议
 
 - 小步提交：每次变更（尤其是 adopt/抓取）后，及时 `git add/commit`。
 - 推送前再次 `stowx preview`，确保没有意外路径。
@@ -329,7 +350,7 @@
 
 ---
 
-## 10. Warp 会话日志（可选）
+## 11. Warp 会话日志（可选）
 
 若你在 Warp 中使用日志脚本（例如 `warp-log` 系列），可参考：
 
@@ -350,7 +371,7 @@
 
 ---
 
-## 11. 速查表
+## 12. 速查表
 
 - 预览 → 应用：
   
