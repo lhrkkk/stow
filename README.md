@@ -316,12 +316,12 @@
 
 - 工具：`git-commit-ai`、`jj-commit-ai` 默认调用 **Codex** 后端，模型为 `gpt-5`。
 - 切换后端：`--api gemini` 可改用 Gemini；也可通过 `GIT_COMMIT_AI_BACKEND` / `JJ_COMMIT_AI_BACKEND` 环境变量。
-- 推理强度：`--reasoning-effort`, `-r`（或环境变量 `GIT_COMMIT_AI_REASONING_EFFORT`、`JJ_COMMIT_AI_REASONING_EFFORT`）会透传为 `model_reasoning_effort`，可选 `minimal / low / medium / high`。
+ - 推理强度：`--reasoning-effort`, `-r`（或环境变量 `GIT_COMMIT_AI_REASONING_EFFORT`、`JJ_COMMIT_AI_REASONING_EFFORT`）会透传为 `model_reasoning_effort`，可选 `minimal / low / medium / high`（默认 `minimal`）。
 - 语言兜底：若偏好中文但 Codex 仅返回英文，脚本会打印原始结果并回退到本地摘要；设置 `GIT_COMMIT_AI_ALLOW_ENGLISH=1`（或 JJ 对应变量）可放行英文输出。
 - 常见示例：
   
   ```sh
-   git-commit-ai --preview               # 默认 Codex + gpt-5
+   git-commit-ai --preview               # 默认 Codex + gpt-5（-r minimal）
    git-commit-ai --api gemini --preview  # 切换到 Gemini
    git-commit-ai --api codex -r medium   # 指定推理强度
    JJ_COMMIT_AI_ALLOW_ENGLISH=1 jj-commit-ai --api codex --preview

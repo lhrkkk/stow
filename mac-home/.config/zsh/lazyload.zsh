@@ -9,7 +9,10 @@ if [[ $- == *i* ]]; then
   : ${AMI_TIMING:=0}
   # 捕获启动期对 compdef 的调用，避免模块在 compinit 前报错
   typeset -ga __compdef_queue
-  compdef() { __compdef_queue+=("$*"); }
+  # 仅在尚未定义 compdef（即未运行 compinit）时注入占位函数
+  if ! typeset -f compdef >/dev/null; then
+    compdef() { __compdef_queue+=("$*"); }
+  fi
 
   # 一次性按需加载 Git/JJ 增强补全脚本（避免启动时立即 source）
   __ami_source_completions_once() {
