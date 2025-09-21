@@ -31,6 +31,7 @@ alias rk='report-kit'
 alias jc='jj-commit-ai --commit --chinese --bracket-title-cn'
 alias gc='git-commit-ai --commit --chinese --bracket-title-cn'
 
+alias d='delta'
 
 alias f='fuck'
 alias fk='fuck'
@@ -40,7 +41,7 @@ alias c='specstory run'
 alias cl='claude-code-log --tui'
 alias clf='claude-code-log --clear-html && claude-code-log --open-browser'
 alias cs='bunx ccusage'
-alias cdiff='colordiff'
+# alias cdiff='colordiff'
 # alias cs='calcurse'
 alias dv='deactivate'
 # alias gc='git config credential.helper store'
@@ -77,6 +78,9 @@ alias lo='lsof -p $(fps) +w'
 alias py="python"
 # alias cl="claude --dangerously-skip-permissions"
 alias co="codex --sandbox danger-full-access"
+# Codex helpers
+alias ca="codex --model gpt-5-codex --full-auto"
+alias cf="codex --model gpt-5-codex --dangerously-bypass-approvals-and-sandbox"
 
 # ---- Migrated from Bash ----
 # Mosh shortcuts

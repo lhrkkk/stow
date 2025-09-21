@@ -8,7 +8,7 @@ Usage: git-commit-ai [options] [-- <git commit args>]
 生成提交信息（基于 Git 仓库）并可选直接 `git commit`。
 
 Options:
-  --model NAME         指定 AI 模型（默认：$GIT_COMMIT_AI_MODEL 或 gpt-5-codex）
+  --model NAME         指定 AI 模型（默认：$GIT_COMMIT_AI_MODEL 或 gpt-5）
   --max-bytes N        发送给模型的 diff 最大字节数（默认：$GIT_COMMIT_AI_MAX_BYTES 或 120000）
   --preview            仅打印生成结果，不提交
   --commit             直接提交（不再询问）
@@ -20,12 +20,13 @@ Options:
   --wrap-subject STYLE 自定义标题包装（例如 brackets、cn-brackets；默认：cn-brackets）
   --bracket-title      标题使用半角方括号 []
   --bracket-title-cn   标题使用全角方括号 【】
-  --api NAME           指定使用的 API 后端 (默认: gemini，可选: codex)
+  --reasoning-effort, -r V 设置 Codex 推理强度（默认读取配置，可选：minimal/low/medium/high）
+  --api NAME           指定使用的 API 后端 (默认: codex，可选: gemini)
   -h, --help           查看帮助
 
 环境变量：
   GEMINI_API_KEY            使用 gemini 后端时的 API Key
-  GIT_COMMIT_AI_BACKEND      默认的 API 后端（默认 gemini，可选 codex）
+  GIT_COMMIT_AI_BACKEND      默认的 API 后端（默认 codex，可选 gemini）
   GIT_COMMIT_AI_MODEL        默认模型名称
   GIT_COMMIT_AI_MAX_BYTES    diff 上限
   GIT_COMMIT_AI_EXTRA_PROMPT 额外固定提示词
@@ -39,7 +40,7 @@ Options:
 USAGE
 }
 
-MODEL=${GIT_COMMIT_AI_MODEL:-gpt-5-codex}
+MODEL=${GIT_COMMIT_AI_MODEL:-gpt-5}
 MAX_BYTES=${GIT_COMMIT_AI_MAX_BYTES:-120000}
 EXTRA_PROMPT=${GIT_COMMIT_AI_EXTRA_PROMPT:-}
 CLI_COMMAND=${GIT_COMMIT_AI_COMMAND:-codex}
@@ -50,8 +51,9 @@ fi
 DEFAULT_CLI_ARGS=""
 LANG_PREF=${GIT_COMMIT_AI_LANG:-zh}
 SUBJECT_STYLE=${GIT_COMMIT_AI_WRAP_SUBJECT:-cn-brackets}
+REASONING_EFFORT=${GIT_COMMIT_AI_REASONING_EFFORT:-}
 DEBUG=${GIT_COMMIT_AI_DEBUG:-}
-API_BACKEND=${GIT_COMMIT_AI_BACKEND:-gemini}
+API_BACKEND=${GIT_COMMIT_AI_BACKEND:-codex}
 
 AUTO_COMMIT=0
 PREVIEW_ONLY=0
@@ -124,6 +126,11 @@ while [[ $# -gt 0 ]]; do
     --bracket-title-cn) 
       SUBJECT_STYLE="cn-brackets"
       shift
+      ;;
+    -r|--reason|--reasoning|--reasoning-effort)
+      [[ $# -ge 2 ]] || { echo "git-commit-ai: $1 需要参数" >&2; exit 2; }
+      REASONING_EFFORT="$2"
+      shift 2
       ;;
     -h|--help) 
       show_help
@@ -415,6 +422,9 @@ elif [[ "$API_BACKEND" == "codex" ]]; then
 
     CLI_ARGS=("$CLI_COMMAND" "exec" "--skip-git-repo-check" "--output-last-message" "$TMP_OUTPUT")
     [[ -n "$MODEL" ]] && CLI_ARGS+=("--model" "$MODEL")
+    if [[ -n "$REASONING_EFFORT" ]]; then
+      CLI_ARGS+=("-c" "model_reasoning_effort=\"$REASONING_EFFORT\"")
+    fi
     CLI_ARGS+=("--json")
 
     if [[ -n "${GIT_COMMIT_AI_CLI_ARGS:-}" ]]; then
@@ -607,7 +617,9 @@ def first_non_empty_line(s: str) -> str:
 subject = first_non_empty_line(msg)
 low = subject.lower()
 
-if any(t in lang for t in ('zh','cn','中文')) and not re.search(r'[\u4e00-\u9fff]', msg):
+allow_english = bool(os.environ.get('GIT_COMMIT_AI_ALLOW_ENGLISH'))
+
+if (not allow_english) and any(t in lang for t in ('zh','cn','中文')) and not re.search(r'[\u4e00-\u9fff]', msg):
     print('BAD'); sys.exit(0)
 
 meta_tokens = (
@@ -621,11 +633,19 @@ print('OK')
 PY
 )
   if [[ "$QUALITY_CHECK" == "BAD" ]]; then
+    QUALITY_REJECTION=1
+    REJECTED_MESSAGE="$COMMIT_MESSAGE"
     CLI_STATUS=1
   fi
 fi
 
 if (( CLI_STATUS != 0 )); then
+  if [[ -n "${QUALITY_REJECTION:-}" ]]; then
+    echo "git-commit-ai: 模型输出未通过质量检查，原始结果如下（已过滤）：" >&2
+    echo "----------------------------------------" >&2
+    printf '%s\n' "$REJECTED_MESSAGE" >&2
+    echo "----------------------------------------" >&2
+  fi
   FALLBACK_MESSAGE=$(GIT_COMMIT_AI_DIFF_STAT="$DIFF_STAT" \
     GIT_COMMIT_AI_DIFF_OUTPUT="$DIFF_OUTPUT" \
     GIT_COMMIT_AI_LANG="$LANG_PREF" \

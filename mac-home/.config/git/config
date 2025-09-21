@@ -160,7 +160,7 @@
         c = commit -m
         cm = commit -m
         ca = commit -am
-        cc = "!f(){ git-commit-ai --api gemini; }; f"
+	cc = "!f(){ git-commit-ai \"$@\"; }; f"
 
         cam ="!f(){ git a . && git cm $1;}; f"
         ci = commit
