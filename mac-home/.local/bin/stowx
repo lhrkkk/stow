@@ -134,7 +134,14 @@ EOF
 ensure_local_ignore_file() {
   local pkg_dir="$1"
   local file="$pkg_dir/.stow-local-ignore"
+  local ensure_pattern='(^|/)_env(/|$)'
   if [[ -f "$file" ]]; then
+    if ! grep -Eq "$ensure_pattern" "$file"; then
+      printf '%s\n' "$ensure_pattern" >>"$file"
+      local rel="${pkg_dir#$STOW_DIR/}"
+      rel=${rel:-${pkg_dir}}
+      log "已向 $rel/.stow-local-ignore 追加: $ensure_pattern"
+    fi
     return 0
   fi
   mkdir -p "$pkg_dir"
@@ -160,6 +167,8 @@ ensure_local_ignore_file() {
 (^|/)\.aider(/|$)
 (^|/)\.claude(/|$)
 (^|/)#detach(/|$)
+# avoid capturing STOW_DIR 本体
+(^|/)_env(/|$)
 # third-party git content
 (^|/)tmux/plugins(/|$)
 (^|/)tpm(/|$)
