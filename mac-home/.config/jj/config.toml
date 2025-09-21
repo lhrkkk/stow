@@ -310,13 +310,13 @@ wa1 = ['workspace', 'add', '--name', 'one', '.jj/workspace-one']
 wa2 = ['workspace', 'add', '--name', 'two', '.jj/workspace-two']
 wa3 = ['workspace', 'add', '--name', 'three', '.jj/workspace-three']
 wo1 = ["util", "exec", "--", "bash", "-c",
-       'root=$(jj workspace root 2>/dev/null) || { echo >&2 "[wo1] not in jj repo"; exit 1; }; dir="$root/.jj/workspace-one"; [ -d "$dir" ] || { echo >&2 "[wo1] skip: missing workspace"; exit 1; }; export WO_RETURN_DIR="$root"; cd -- "$dir" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',
+       'root=$(jj workspace root 2>/dev/null) || { echo >&2 "[wo1] not in jj repo"; exit 1; }; dir="$root/.jj/workspace-one"; [ -d "$dir" ] || { echo >&2 "[wo1] skip: missing workspace"; exit 0; }; export WO_RETURN_DIR="$root"; cd -- "$dir" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',
        ""]
 wo2 = ["util", "exec", "--", "bash", "-c",
-       'root=$(jj workspace root 2>/dev/null) || { echo >&2 "[wo2] not in jj repo"; exit 1; }; dir="$root/.jj/workspace-two"; [ -d "$dir" ] || { echo >&2 "[wo2] skip: missing workspace"; exit 1; }; export WO_RETURN_DIR="$root"; cd -- "$dir" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',
+       'root=$(jj workspace root 2>/dev/null) || { echo >&2 "[wo2] not in jj repo"; exit 1; }; dir="$root/.jj/workspace-two"; [ -d "$dir" ] || { echo >&2 "[wo2] skip: missing workspace"; exit 0; }; export WO_RETURN_DIR="$root"; cd -- "$dir" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',
        ""]
 wo3 = ["util", "exec", "--", "bash", "-c",
-       'root=$(jj workspace root 2>/dev/null) || { echo >&2 "[wo3] not in jj repo"; exit 1; }; dir="$root/.jj/workspace-three"; [ -d "$dir" ] || { echo >&2 "[wo3] skip: missing workspace"; exit 1; }; export WO_RETURN_DIR="$root"; cd -- "$dir" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',
+       'root=$(jj workspace root 2>/dev/null) || { echo >&2 "[wo3] not in jj repo"; exit 1; }; dir="$root/.jj/workspace-three"; [ -d "$dir" ] || { echo >&2 "[wo3] skip: missing workspace"; exit 0; }; export WO_RETURN_DIR="$root"; cd -- "$dir" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',
        ""]
 wf = ['workspace', 'forget']
 wf1 = ['workspace', 'forget', 'one']
@@ -470,20 +470,21 @@ wms3 = ["util", "exec", "--", "bash", "-c","jj wm3 && jj wsa"]
 # -------------- 0.7s wnsa  0.23s wmsa 0.9 wmsa
 ### v4.5, 并行性能的 @- 版本，依赖 main 标签和one@, two@, three@，  wnsa 则是 new 版本。work well
 # 同步所有工作区分支
-ws1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@ -d main "]
-ws2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@ -d main "]
-ws3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@ -d main "]
+ws1 = ["util", "exec", "--", "bash", "-c",'jj log -r one@ -n 1 >/dev/null 2>&1 || { echo "[ws1] skip head missing"; exit 0; }; out=$(jj rb -b one@ -d main 2>&1); st=$?; if [ $st -eq 0 ]; then info=$(jj log -r one@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws1] $info"; else first=$(printf "%s" "$out" | head -n1); echo "[ws1] fail: $first"; exit 1; fi']
+ws2 = ["util", "exec", "--", "bash", "-c",'jj log -r two@ -n 1 >/dev/null 2>&1 || { echo "[ws2] skip head missing"; exit 0; }; out=$(jj rb -b two@ -d main 2>&1); st=$?; if [ $st -eq 0 ]; then info=$(jj log -r two@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws2] $info"; else first=$(printf "%s" "$out" | head -n1); echo "[ws2] fail: $first"; exit 1; fi']
+ws3 = ["util", "exec", "--", "bash", "-c",'jj log -r three@ -n 1 >/dev/null 2>&1 || { echo "[ws3] skip head missing"; exit 0; }; out=$(jj rb -b three@ -d main 2>&1); st=$?; if [ $st -eq 0 ]; then info=$(jj log -r three@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws3] $info"; else first=$(printf "%s" "$out" | head -n1); echo "[ws3] fail: $first"; exit 1; fi']
 
-wsa = ["util", "exec", "--", "bash", "-c","jj ws1 & jj ws2 & jj ws3& wait"]
+wsa = ["util", "exec", "--", "bash", "-c",'echo "[wsa] jj 同步所有分支："; if jj log -r one@ -n 1 >/dev/null 2>&1; then echo "[wsa] -> [ws1] rb one@ -d main"; out=$(jj rb -b one@ -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wsa] -> [ws1] fail: $first"; exit 1; fi; else echo "[wsa] -> [ws1] skip: head missing"; fi; if jj log -r two@ -n 1 >/dev/null 2>&1; then echo "[wsa] -> [ws2] rb two@ -d main"; out=$(jj rb -b two@ -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wsa] -> [ws2] fail: $first"; exit 1; fi; else echo "[wsa] -> [ws2] skip: head missing"; fi; if jj log -r three@ -n 1 >/dev/null 2>&1; then echo "[wsa] -> [ws3] rb three@ -d main"; out=$(jj rb -b three@ -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wsa] -> [ws3] fail: $first"; exit 1; fi; else echo "[wsa] -> [ws3] skip: head missing"; fi']
 wo = ["util", "exec", "--", "bash", "-c",'root=${WO_RETURN_DIR:-$(jj workspace root 2>/dev/null)}; if [ -z "$root" ] || [ ! -d "$root" ]; then echo >&2 "[wo] not in jj repo"; exit 1; fi; cd -- "$root" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',""]
+wsl = ["util", "exec", "--", "bash", "-c",'root=$(jj workspace root 2>/dev/null) || { echo "[wsl] not in jj repo"; exit 1; }; for n in one two three; do dir="$root/.jj/workspace-$n"; if [ ! -d "$dir" ]; then echo "[wsl] $n: dir=missing head=unknown"; continue; fi; if jj log -r "${n}@" -n 1 >/dev/null 2>&1; then echo "[wsl] $n: dir=ok head=ok"; else echo "[wsl] $n: dir=ok head=missing"; fi; done',""]
 
 ### 合并所有工作区分支，先 sa 同步
-wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@- -d main && jj bs main -r one@- "]
-wm2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@- -d main && jj bs main -r two@- "]
-wm3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@- -d main && jj bs main -r three@- "]
+wm1 = ["util", "exec", "--", "bash", "-c",'jj log -r one@ -n 1 >/dev/null 2>&1 || { echo "[wm1] skip: head missing"; exit 0; }; out=$(jj rb -b one@- -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm1] fail: $first"; exit 1; fi; out2=$(jj bs main -r one@- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm1] fail: $first"; exit 1; fi; echo "[wm1] main <- one@-"']
+wm2 = ["util", "exec", "--", "bash", "-c",'jj log -r two@ -n 1 >/dev/null 2>&1 || { echo "[wm2] skip: head missing"; exit 0; }; out=$(jj rb -b two@- -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm2] fail: $first"; exit 1; fi; out2=$(jj bs main -r two@- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm2] fail: $first"; exit 1; fi; echo "[wm2] main <- two@-"']
+wm3 = ["util", "exec", "--", "bash", "-c",'jj log -r three@ -n 1 >/dev/null 2>&1 || { echo "[wm3] skip: head missing"; exit 0; }; out=$(jj rb -b three@- -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm3] fail: $first"; exit 1; fi; out2=$(jj bs main -r three@- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm3] fail: $first"; exit 1; fi; echo "[wm3] main <- three@-"']
 
-wma = ["util", "exec", "--", "bash", "-c","jj wm1 && jj wm2 && jj wm3"]
-wmsa = ["util", "exec", "--", "bash", "-c","jj wma && jj wsa && jj e main"]
+wma = ["util", "exec", "--", "bash", "-c",'echo "[wma] jj 合并所有分支："; jj wm1 && jj wm2 && jj wm3']
+wmsa = ["util", "exec", "--", "bash", "-c",'echo "[wmsa] jj: wma + wsa: 合并和同步所有分支"; jj wma && jj wsa && jj e main >/dev/null 2>&1']
 
 
 # 立即合并所有分支当前的 @ ，创建 new 节点。适合清空分支，建立新工作区。
