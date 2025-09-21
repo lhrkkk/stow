@@ -485,7 +485,7 @@ wma = ["util", "exec", "--", "bash", "-c","jj wm1 && jj wm2 && jj wm3"]
 wmsa = ["util", "exec", "--", "bash", "-c","jj wma && jj wsa && jj e main"]
 
 
-# 立即合并所有分支当前的 @ ，创建 new 节点
+# 立即合并所有分支当前的 @ ，创建 new 节点。适合清空分支，建立新工作区。
 wna = ["util", "exec", "--", "bash", "-c","jj wn1 & jj wn2 & jj wn3& wait"]
 wnsa = ["util", "exec", "--", "bash", "-c","jj wna && jj wma && jj wsa && jj e main"]
 
