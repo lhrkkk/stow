@@ -426,3 +426,46 @@
     ```sh
      zimfw doctor
     ```
+
+---
+
+## 13. Git/JJ 工作区工作流（wo / ws / wm / wsa / wma / wmsa）
+
+- 目录与约定
+  - Git 工作区：`$REPO/.jj/git-1|git-2|git-3`
+  - JJ 工作区：`$REPO/.jj/workspace-one|two|three`
+  - 统一“返回根目录”函数：`wo`（zsh 函数，进入 `wo1/wo2/wo3` 时会导出 `WO_RETURN_DIR`，在子 shell 内执行 `wo` 可直接回到仓库根）
+
+- 进入工作区（带存在性校验）
+  - Git：`git wo1|wo2|wo3`（不存在时提示一次并返回非 0；无参进入登录 shell，有参在该目录执行）
+  - JJ：`jj wo1|wo2|wo3`（不存在时提示一次并返回 0 跳过；无参进入登录 shell，有参在该目录执行）
+  - 统一：`git wo` / `jj wo` / `wo` 在根目录开登录 shell；传参则在根目录执行参数命令
+
+- 同步与合并（输出风格统一）
+  - 成功：仅显示成功结果（不带冒号）
+    - 例（JJ 同步某分支）：`[ws1] a1b2c3 Update deps`
+    - 例（Git 合并标记）：`[wm1] main <- git-1`
+  - 失败：仅提示失败原因，使用冒号
+    - 例：`[wm2] fail: Rebase aborted: conflicts ...`
+    - JJ：`skip: head missing`
+    - Git：`skip: missing workspace`
+
+- 组合命令（含工具前缀提示）
+  - JJ：
+    - `jj wmsa` →
+      - `[wmsa] jj: wma + wsa: 合并和同步所有分支`
+      - `[wma] jj 合并所有分支：`
+      - `[wm1] main <- one@-` / `[wm2] main <- two@-` / `[wm3] skip: head missing`
+      - `[wsa] jj 同步所有分支：`
+      - `[wsa] -> [ws1] rb one@ -d main` / `[wsa] -> [ws2] rb two@ -d main` / `[wsa] -> [ws3] skip: head missing`
+  - Git：
+    - `git wmsa` →
+      - `[wmsa] git: wma + wsa: 合并和同步所有分支`
+      - `[wma] git 合并所有分支：`
+      - `[wm1] main <- git-1` / `[wm2] main <- git-2` / `[wm3] skip: missing workspace`
+      - `[wsa] git 同步所有分支：`
+      - `[wsa] -> [ws1] rebase main` / `[wsa] -> [ws2] rebase main` / `[wsa] -> [ws3] skip: missing workspace`
+
+- 其它
+  - JJ 状态速览：`jj wsl`（输出 one/two/three 的目录与头部状态）
+  - Git/JJ 的 `ws*`/`wm*`/`wsa`/`wma`/`wmsa` 均已实现“失败仅报首行原因、成功静默只留目的/结果、缺失跳过”的一致策略。
