@@ -43,6 +43,10 @@ MODEL=${GIT_COMMIT_AI_MODEL:-gpt-5-codex}
 MAX_BYTES=${GIT_COMMIT_AI_MAX_BYTES:-120000}
 EXTRA_PROMPT=${GIT_COMMIT_AI_EXTRA_PROMPT:-}
 CLI_COMMAND=${GIT_COMMIT_AI_COMMAND:-codex}
+# 兼容误设别名：若显式设为 "dx"，视为 codex
+if [[ "$CLI_COMMAND" == "dx" ]]; then
+  CLI_COMMAND="codex"
+fi
 DEFAULT_CLI_ARGS=""
 LANG_PREF=${GIT_COMMIT_AI_LANG:-zh}
 SUBJECT_STYLE=${GIT_COMMIT_AI_WRAP_SUBJECT:-cn-brackets}
@@ -167,7 +171,8 @@ if [[ "$API_BACKEND" == "codex" ]]; then
   fi
 fi
 
-STATUS_OUTPUT=$(git status --short --branch 2>/dev/null || true)
+# 仅展示分支信息与“已暂存”的索引变更，过滤未暂存/未跟踪
+STATUS_OUTPUT=$(git status --porcelain=v1 --branch 2>/dev/null | grep -E '^(##|[^ ?])' || true)
 # 只检查暂存区的改动
 DIFF_STAT=$(git diff --cached --stat 2>/dev/null || true)
 DIFF_OUTPUT=$(git diff --cached --patch 2>/dev/null || true)
@@ -188,13 +193,13 @@ if (( MAX_BYTES > 0 )); then
   fi
 fi
 
-BASE_PROMPT_EN=$'You are an expert developer creating high-quality commit messages for Git repositories.\nGuidelines:\n- Provide a concise subject line (<= 72 characters).\n- Optionally add bullet list after a blank line explaining key changes.\n- No code fences or surrounding quotes.\n- Prioritise the most impactful changes if the diff is long.\n- Use sentence case for the subject.\n'
+BASE_PROMPT_EN=$'You are an expert developer creating high-quality commit messages for Git repositories.\nGuidelines:\n- Provide a concise subject line (<= 72 characters).\n- Make the subject specific and concrete; prefer user-visible behavior or feature area over file/module names. Avoid listing files or internal helper identifiers (unless they are user-facing commands). Avoid vague words like update, improve, fix.\n- Pack as many key points as feasible into the subject using compact separators (/, -, comma), while staying within 72 characters; if not possible, include the top 2–3 most important points.\n- Output only the commit message, with the subject on the first line; no preamble, meta text, disclaimers, or headings; do not write lines like "Here is...", "Drafting...", or "in Chinese".\n- Add at most 3 short bullets after a blank line; each bullet should be a single clause starting with a verb, avoid long chains (and/then/;), <= 80 characters.\n- No Markdown formatting (no bold/italics/headings) and no code fences or surrounding quotes.\n- Prioritise the most impactful changes if the diff is long.\n- Use sentence case for the subject.\n- Example (good): 【Unify source label and keep separators】; Example (bad): 【git-commit-ai/jj-commit-ai】.\n'
 BASE_PROMPT="$BASE_PROMPT_EN"
 
 if [[ -n "$LANG_PREF" ]]; then
   case "$LANG_PREF" in
     zh|zh-CN|zh-cn|cn|中文|简体中文) 
-      BASE_PROMPT=$'你是一名资深开发者，需要为 Git 仓库撰写高质量的提交信息。\n规范：\n- 提交标题不超过 72 个字符，使用简洁的陈述语气。\n- 可以在空行后列出关键要点，采用破折号或项目符号开头。\n- 不要在输出外层添加引号或代码块。\n- 若改动较多，请突出最重要的影响。\n- 所有内容必须使用简体中文撰写；如模型生成了非中文，请立即用简体中文重新表述。\n'
+      BASE_PROMPT=$'你是一名资深开发者，需要为 Git 仓库撰写高质量的提交信息。\n规范：\n- 提交标题不超过 72 个字符，使用简洁的陈述语气。\n- 标题需具体明确：优先描述“用户可见的行为/影响或功能区域”；除非是用户直接使用的命令名，否则不要把文件/模块名（尤其是 foo/bar 形式）当作标题主体；避免“更新/优化/修复”等过于抽象的词。\n- 标题尽可能涵盖本次修改的多个重点；可用“/、-、、”等紧凑分隔符串联，整体不超过 72 字符；若无法全部容纳，请保留 2–3 个最重要要点。\n- 只输出提交信息本身：首行直接给出标题；不要输出任何引导语/说明/免责声明/小标题；不要出现“以下是…/Here is/草拟/正在用中文”等字样。\n- 标题下方空一行后列出要点；最多 3 条，每条使用动宾短语且只包含一项结果，不要长句或多个“并且/以及”，长度不超过 80 字符。\n- 不要使用 Markdown 强调/标题/代码块（如 **、#、```），也不要在外层加引号。\n- 若改动较多，请突出最重要的影响。\n- 所有内容必须使用简体中文撰写；如模型生成了非中文，请立即用简体中文重新表述。\n- 示例（好的）：【统一来源标签并保留分隔线】；示例（不佳）：【git-commit-ai/jj-commit-ai】。\n'
       ;;
     *) 
       BASE_PROMPT="${BASE_PROMPT_EN}Please write the subject line and bullet list in ${LANG_PREF}.\n"
@@ -242,7 +247,7 @@ if [[ -n "$EXTRA_RUNTIME_PROMPT" ]]; then
   BASE_PROMPT+=$'\n'
 fi
 
-PROMPT_BODY=$'\nRepository status (git status --short --branch):\n'
+PROMPT_BODY=$'\nRepository status (branch + staged index only):\n'
 PROMPT_BODY+="$STATUS_OUTPUT"
 PROMPT_BODY+=$'\n\nDiff summary (git diff --stat):\n'
 PROMPT_BODY+="$DIFF_STAT"
@@ -321,7 +326,29 @@ def main():
                     parts = content.get('parts', [])
                     if parts:
                         message = parts[0].get('text', '')
-                        print(message.strip())
+                        def sanitize(msg: str) -> str:
+                            lines = []
+                            for raw in (msg or "").splitlines():
+                                s = raw.strip()
+                                if not s:
+                                    lines.append("")
+                                    continue
+                                low = s.lower()
+                                meta_kw = ("draft", "drafting", "compose", "composing", "write", "writing", "here is", "in chinese")
+                                if ((s.startswith("**") and s.endswith("**")) or s.startswith("#")) and any(k in low for k in ("commit", "message", "提交", "信息", "chinese", "中文")):
+                                    continue
+                                if any(k in low for k in meta_kw) and ("commit" in low or "message" in low or "提交" in s or "信息" in s):
+                                    continue
+                                lines.append(s)
+                            # trim leading/trailing blanks
+                            while lines and not lines[0]:
+                                lines.pop(0)
+                            while lines and not lines[-1]:
+                                lines.pop()
+                            if len(lines) > 1 and lines[1] != "":
+                                lines.insert(1, "")
+                            return "\n".join(lines).strip()
+                        print(sanitize(message))
                     else:
                         print(f"Error: Gemini API response is missing 'parts'. Full response: {response_body}", file=sys.stderr)
                         sys.exit(1)
@@ -347,6 +374,7 @@ PY_GEMINI
     set -e
     if (( CLI_STATUS == 0 )); then
       MESSAGE_SOURCE="gemini"
+      [[ -z "$COMMIT_MESSAGE" ]] && CLI_STATUS=1
     fi
 
 elif [[ "$API_BACKEND" == "codex" ]]; then
@@ -506,7 +534,38 @@ def parse_json_lines(text: str) -> str:
     return ""
 
 def strip_meta_blocks(message: str) -> str:
-    lines = [s.strip() for s in message.splitlines() if s.strip() and not (s.strip().startswith('{') and ':' in s.strip())]
+    def is_meta_line(s: str) -> bool:
+        low = s.lower().strip()
+        if not low:
+            return False
+        if (s.startswith('**') and s.endswith('**')) or s.startswith('#'):
+            if any(k in low for k in ('commit', 'message', '提交', '信息', 'chinese', '中文')):
+                return True
+        meta_kw = ('draft', 'drafting', 'compose', 'composing', 'write', 'writing', 'here is', 'in chinese', '以下是', '草拟', '正在用中文', '用中文')
+        if any(k in low for k in meta_kw) and any(k in low for k in ('commit', 'message', '提交', '信息')):
+            return True
+        if low.startswith('title:') or low.startswith('subject:'):
+            return True
+        return False
+
+    lines = []
+    for raw in message.splitlines():
+        s = raw.strip()
+        if s == "":
+            lines.append("")
+            continue
+        if (s.startswith('{') and ':' in s):
+            continue
+        if is_meta_line(s):
+            continue
+        lines.append(s)
+    # trim leading/trailing blanks
+    while lines and lines[0] == "":
+        lines.pop(0)
+    while lines and lines[-1] == "":
+        lines.pop()
+    if len(lines) > 1 and lines[1] != "":
+        lines.insert(1, "")
     return "\n".join(lines).strip()
 
 
@@ -527,7 +586,43 @@ print(message.strip())
 PY
         )
         MESSAGE_SOURCE="codex"
+        [[ -z "$COMMIT_MESSAGE" ]] && CLI_STATUS=1
     fi
+fi
+
+# 质量检验：若输出为错误语言或含自述元话术，则触发回退
+if (( CLI_STATUS == 0 )); then
+  QUALITY_CHECK=$(LANG_PREF="$LANG_PREF" COMMIT_MESSAGE="$COMMIT_MESSAGE" python3 - <<'PY'
+import os, sys, re
+msg = os.environ.get('COMMIT_MESSAGE','')
+lang = os.environ.get('LANG_PREF','').lower()
+
+def first_non_empty_line(s: str) -> str:
+    for line in s.splitlines():
+        t = line.strip()
+        if t:
+            return t
+    return ''
+
+subject = first_non_empty_line(msg)
+low = subject.lower()
+
+if any(t in lang for t in ('zh','cn','中文')) and not re.search(r'[\u4e00-\u9fff]', msg):
+    print('BAD'); sys.exit(0)
+
+meta_tokens = (
+    "i'm ", "i am ", "i will ", "i'll ", "we will ", "we'll ", "let's ",
+    "i am carefully", "i'm carefully", "analyzing", "distill", "compose", "writing", "draft", "drafting"
+)
+if any(tok in low for tok in meta_tokens):
+    print('BAD'); sys.exit(0)
+
+print('OK')
+PY
+)
+  if [[ "$QUALITY_CHECK" == "BAD" ]]; then
+    CLI_STATUS=1
+  fi
 fi
 
 if (( CLI_STATUS != 0 )); then
@@ -678,6 +773,82 @@ case "$MESSAGE_SOURCE" in
     ;;
 esac
 
+## 统一第一行括号风格：整行标题包裹在指定括号内
+COMMIT_MESSAGE=$(SUBJECT_STYLE="$SUBJECT_STYLE" COMMIT_MESSAGE="$COMMIT_MESSAGE" python3 - <<'PY'
+import os
+msg = os.environ.get('COMMIT_MESSAGE','')
+style = os.environ.get('SUBJECT_STYLE','')
+lines = msg.splitlines()
+
+def wrap_full(subject: str, left: str, right: str) -> str:
+    s = subject.strip()
+    if s.startswith(left):
+        s = s[len(left):]
+    if s.endswith(right):
+        s = s[:-len(right)]
+    # 限制标题长度（不含括号）不超过 72 字符
+    if len(s) > 72:
+        s = s[:71] + '…'
+    return f"{left}{s.strip()}{right}"
+
+if lines:
+    i = 0
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    if i < len(lines):
+        subj = lines[i]
+        if style == 'cn-brackets':
+            lines[i] = wrap_full(subj, '【', '】')
+        elif style == 'brackets':
+            lines[i] = wrap_full(subj, '[', ']')
+
+print('\n'.join(lines))
+PY
+)
+
+# 限制要点数量并做轻量规范（最多 3 条，适度截断）
+COMMIT_MESSAGE=$(COMMIT_MESSAGE="$COMMIT_MESSAGE" python3 - <<'PY'
+import os
+msg = os.environ.get('COMMIT_MESSAGE','')
+lines = msg.splitlines()
+
+def normalize_bullets(ls):
+    # 找到标题行
+    i = 0
+    while i < len(ls) and not ls[i].strip():
+        i += 1
+    if i >= len(ls):
+        return ls
+    # 确保标题后有一行空行
+    j = i + 1
+    if j < len(ls) and ls[j].strip():
+        ls.insert(j, '')
+    # 收集项目符号行
+    k = j + 1
+    bullets = []
+    while k < len(ls):
+        s = ls[k].lstrip()
+        if s.startswith(('- ', '* ', '• ', '· ')):
+            bullets.append((k, ls[k]))
+        k += 1
+    if not bullets:
+        return ls
+    # 仅保留前 3 条，轻度截断到 80 字符
+    keep = set(idx for idx, _ in bullets[:3])
+    for idx, text in bullets:
+        if idx in keep:
+            t = text.rstrip().rstrip('。；;,.，')
+            if len(t) > 80:
+                t = t[:79] + '…'
+            ls[idx] = t
+        else:
+            ls[idx] = None
+    return [x for x in ls if x is not None]
+
+print('\n'.join(normalize_bullets(lines)))
+PY
+)
+
 [[ -n "$DEBUG" ]] && {
   echo "[git-commit-ai] 提交信息如下:" >&2
   printf '%s\n' "$COMMIT_MESSAGE" >&2
@@ -725,7 +896,6 @@ case "$REPLY" in
     run_commit
     ;;
   *)
-    echo "git-commit-ai: 已放弃提交，消息已输出供参考" >&2
-    cat "$MSG_FILE"
+    echo "git-commit-ai: 已放弃提交（上方已显示生成的消息）" >&2
     ;;
 esac
