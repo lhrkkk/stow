@@ -208,31 +208,33 @@
         wa1 = "!f(){ git worktree add .jj/git-1;}; f"
         wa2 = "!f(){ git worktree add .jj/git-2;}; f"
         wa3 = "!f(){ git worktree add .jj/git-3;}; f"
-        wo1 = "!f(){ cd $(git rev-parse --show-toplevel)/.jj/git-1; if [ $# -eq 0 ]; then exec \"$SHELL\" -l; else \"$@\"; fi; }; f"
 
-        wo2 = "!f(){ cd $(git rev-parse --show-toplevel)/.jj/git-2; if [ $# -eq 0 ]; then exec \"$SHELL\" -l; else \"$@\"; fi; }; f"
+	wo1 = "!f(){ root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo >&2 'Not inside a Git repository'; return 1; }; dir=\"$root/.jj/git-1\"; [ -d \"$dir\" ] || { echo >&2 'Workspace not found:' \"$dir\"; return 1; }; export WO_RETURN_DIR=\"$root\"; cd -- \"$dir\" || return 1; if [ \"$#\" -eq 0 ]; then exec \"${SHELL:-/bin/sh}\" -l; else \"$@\"; fi; }; f"
+	wo2 = "!f(){ root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo >&2 'Not inside a Git repository'; return 1; }; dir=\"$root/.jj/git-2\"; [ -d \"$dir\" ] || { echo >&2 'Workspace not found:' \"$dir\"; return 1; }; export WO_RETURN_DIR=\"$root\"; cd -- \"$dir\" || return 1; if [ \"$#\" -eq 0 ]; then exec \"${SHELL:-/bin/sh}\" -l; else \"$@\"; fi; }; f"
+	wo3 = "!f(){ root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo >&2 'Not inside a Git repository'; return 1; }; dir=\"$root/.jj/git-3\"; [ -d \"$dir\" ] || { echo >&2 'Workspace not found:' \"$dir\"; return 1; }; export WO_RETURN_DIR=\"$root\"; cd -- \"$dir\" || return 1; if [ \"$#\" -eq 0 ]; then exec \"${SHELL:-/bin/sh}\" -l; else \"$@\"; fi; }; f"
 
-        wo3 = "!f(){ cd $(git rev-parse --show-toplevel)/.jj/git-3; if [ $# -eq 0 ]; then exec \"$SHELL\" -l; else \"$@\"; fi; }; f"
+	rbi = "!f(){ ws=\"$1\"; root=$(git rev-parse --show-toplevel 2>/dev/null) || return 1; case \"$ws\" in wo1) sub=git-1;; wo2) sub=git-2;; wo3) sub=git-3;; *) return 1;; esac; dir=\"$root/.jj/$sub\"; [ -d \"$dir\" ] || return 2; gd=$(git -C \"$dir\" rev-parse --git-dir 2>/dev/null) || return 2; [ -d \"$gd/rebase-merge\" ] || [ -d \"$gd/rebase-apply\" ]; }; f"
+        wsl = "!f(){ for n in 1 2 3; do ws=wo$n; if git \"$ws\" sh -lc : >/dev/null 2>&1; then if git rbi \"$ws\"; then echo \"[wsl] ws$n: REBASE\"; else echo \"[wsl] ws$n: clean\"; fi; else echo \"[wsl] ws$n: skip\"; fi; done; }; f"
 
         # 同步所有节点，检测是否存在冲突并立刻停下来处理
-        ws1 ="!f(){ git wo1 git rebase --continue && git wo1 git rebase main;}; f"
-        ws2 ="!f(){ git wo2 git rebase --continue && git wo2 git rebase main;}; f"
-        ws3 ="!f(){ git wo3 git rebase --continue && git wo3 git rebase main;}; f"
-        wsa ="!f(){ git ws1 ; git ws2 ; git ws3;}; f"
+	ws1 = "!f(){ git rbi wo1; st=$?; if [ $st -eq 0 ]; then git wo1 git rebase --continue && git wo1 git rebase main; elif [ $st -eq 2 ]; then echo \"[ws1] skip: missing workspace\"; return 0; else git wo1 git rebase main; fi; }; f"
+	ws2 = "!f(){ git rbi wo2; st=$?; if [ $st -eq 0 ]; then git wo2 git rebase --continue && git wo2 git rebase main; elif [ $st -eq 2 ]; then echo \"[ws2] skip: missing workspace\"; return 0; else git wo2 git rebase main; fi; }; f"
+	ws3 = "!f(){ git rbi wo3; st=$?; if [ $st -eq 0 ]; then git wo3 git rebase --continue && git wo3 git rebase main; elif [ $st -eq 2 ]; then echo \"[ws3] skip: missing workspace\"; return 0; else git wo3 git rebase main; fi; }; f"
+	wsa = "!f(){ echo \"[wsa] ws1\"; git ws1; echo \"[wsa] ws2\"; git ws2; echo \"[wsa] ws3\"; git ws3; }; f"
 
         # 合并所有节点
-        wm1 ="!f(){ git wo1 git rebase main && git rebase git-1;}; f"
-        wm2 ="!f(){ git wo2 git rebase main && git rebase git-2;}; f"
-        wm3 ="!f(){ git wo3 git rebase main && git rebase git-3;}; f"
-        wma ="!f(){ git wm1 && git wm2 && git wm3;}; f"
+	wm1 = "!f(){ echo \"[wm1] ws1 -> rebase git-1\"; root=$(git rev-parse --show-toplevel 2>/dev/null) || return 1; dir=\"$root/.jj/git-1\"; if [ ! -d \"$dir\" ]; then echo \"[wm1] skip: missing ws1\"; return 0; fi; git ws1 && git rebase git-1; }; f"
+	wm2 = "!f(){ echo \"[wm2] ws2 -> rebase git-2\"; root=$(git rev-parse --show-toplevel 2>/dev/null) || return 1; dir=\"$root/.jj/git-2\"; if [ ! -d \"$dir\" ]; then echo \"[wm2] skip: missing ws2\"; return 0; fi; git ws2 && git rebase git-2; }; f"
+	wm3 = "!f(){ echo \"[wm3] ws3 -> rebase git-3\"; root=$(git rev-parse --show-toplevel 2>/dev/null) || return 1; dir=\"$root/.jj/git-3\"; if [ ! -d \"$dir\" ]; then echo \"[wm3] skip: missing ws3\"; return 0; fi; git ws3 && git rebase git-3; }; f"
+	wma = "!f(){ git wm1 && git wm2 && git wm3; }; f"
 
-        wms1 ="!f(){ git wm1 && git wsa;}; f"
-        wms2 ="!f(){ git wm2 && git wsa;}; f"
-        wms3 ="!f(){ git wm3 && git wsa;}; f"
+	wms1 = "!f(){ git wm1 && git wsa; }; f"
+	wms2 = "!f(){ git wm2 && git wsa; }; f"
+	wms3 = "!f(){ git wm3 && git wsa; }; f"
 
         # 通常运行这一条就行，合并所有提交。分支上做好了没问题才提交，这样就可以合并所有。
         #wmsa ="!f(){ git wms1 && git wms2 && git wms3;}; f"
-        wmsa ="!f(){ git wm1 && git wm2 && git wm3 && git wsa;}; f"
+	wmsa = "!f(){ git wm1 && git wm2 && git wm3 && git wsa; }; f"
 
 #wm1 = ["util", "exec", "--", "bash", "-lc","jj new main one@ && jj bs main"]
 #ws1 = ["util", "exec", "--", "bash", "-lc","jj wo1 jj-sync && jj wo1 jj bs one"]
@@ -249,3 +251,5 @@
         # 其他
         contributors = shortlog --summary --numbered --email
         mt = mergetool
+	wo = "!f(){ if [ -n \"${WO_RETURN_DIR:-}\" ]; then root=\"$WO_RETURN_DIR\"; else root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo >&2 'Not inside a Git repository'; return 1; }; fi; [ -d \"$root\" ] || { echo >&2 'Root not found:' \"$root\"; return 1; }; cd -- \"$root\" || return 1; if [ \"$#\" -eq 0 ]; then exec \"${SHELL:-/bin/sh}\" -l; else \"$@\"; fi; }; f"
+

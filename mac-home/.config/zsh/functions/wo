@@ -1,0 +1,24 @@
+#autoload
+# zsh function: wo — like woN
+wo() {
+  set -o localoptions
+  emulate -L zsh
+  local root=""
+  if [[ -n ${WO_RETURN_DIR:-} && -d $WO_RETURN_DIR ]]; then
+    root="$WO_RETURN_DIR"
+  elif command -v git >/dev/null 2>&1 && git rev-parse --show-toplevel >/dev/null 2>&1; then
+    root="$(git rev-parse --show-toplevel)"
+  elif command -v jj >/dev/null 2>&1; then
+    root="$(jj workspace root 2>/dev/null)"
+  fi
+  if [[ -z $root || ! -d $root ]]; then
+    print -u2 -- "wo: cannot determine repo root"
+    return 1
+  fi
+  cd -- "$root" || return 1
+  if [[ $# -eq 0 ]]; then
+    exec "${SHELL:-/bin/sh}" -l
+  else
+    "$@"
+  fi
+}

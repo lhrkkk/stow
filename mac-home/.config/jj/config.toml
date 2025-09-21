@@ -310,13 +310,13 @@ wa1 = ['workspace', 'add', '--name', 'one', '.jj/workspace-one']
 wa2 = ['workspace', 'add', '--name', 'two', '.jj/workspace-two']
 wa3 = ['workspace', 'add', '--name', 'three', '.jj/workspace-three']
 wo1 = ["util", "exec", "--", "bash", "-c",
-       "cd $(jj workspace root)/.jj/workspace-one; if [ $# -eq 0 ]; then exec \"$SHELL\" -l; else \"$@\"; fi",
+       'root=$(jj workspace root 2>/dev/null) || { echo >&2 "[wo1] not in jj repo"; exit 1; }; dir="$root/.jj/workspace-one"; [ -d "$dir" ] || { echo >&2 "[wo1] skip: missing workspace"; exit 1; }; export WO_RETURN_DIR="$root"; cd -- "$dir" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',
        ""]
 wo2 = ["util", "exec", "--", "bash", "-c",
-       "cd $(jj workspace root)/.jj/workspace-two; if [ $# -eq 0 ]; then exec \"$SHELL\" -l; else \"$@\"; fi",
+       'root=$(jj workspace root 2>/dev/null) || { echo >&2 "[wo2] not in jj repo"; exit 1; }; dir="$root/.jj/workspace-two"; [ -d "$dir" ] || { echo >&2 "[wo2] skip: missing workspace"; exit 1; }; export WO_RETURN_DIR="$root"; cd -- "$dir" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',
        ""]
 wo3 = ["util", "exec", "--", "bash", "-c",
-       "cd $(jj workspace root)/.jj/workspace-three; if [ $# -eq 0 ]; then exec \"$SHELL\" -l; else \"$@\"; fi",
+       'root=$(jj workspace root 2>/dev/null) || { echo >&2 "[wo3] not in jj repo"; exit 1; }; dir="$root/.jj/workspace-three"; [ -d "$dir" ] || { echo >&2 "[wo3] skip: missing workspace"; exit 1; }; export WO_RETURN_DIR="$root"; cd -- "$dir" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',
        ""]
 wf = ['workspace', 'forget']
 wf1 = ['workspace', 'forget', 'one']
@@ -475,6 +475,7 @@ ws2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@ -d main "]
 ws3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@ -d main "]
 
 wsa = ["util", "exec", "--", "bash", "-c","jj ws1 & jj ws2 & jj ws3& wait"]
+wo = ["util", "exec", "--", "bash", "-c",'root=${WO_RETURN_DIR:-$(jj workspace root 2>/dev/null)}; if [ -z "$root" ] || [ ! -d "$root" ]; then echo >&2 "[wo] not in jj repo"; exit 1; fi; cd -- "$root" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',""]
 
 ### 合并所有工作区分支，先 sa 同步
 wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@- -d main && jj bs main -r one@- "]
