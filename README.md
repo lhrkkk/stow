@@ -94,6 +94,12 @@
    stowx apply
   ```
 
+- 自动（基础包 + 主机包，按需覆盖；支持 -n 干跑）：
+  
+  ```sh
+   stowx auto
+  ```
+
 - 列出包：
   
   ```sh
@@ -226,6 +232,43 @@
 - `.stow-global-ignore` 若不存在会自动创建，默认忽略 `.DS_Store`、缓存目录、内嵌插件仓库等常见噪音；首次触发主机模块时，也会为 `hosts/<hostname>` 写入 `.stow-local-ignore`，便于局部定制忽略。
 
 > 与 `mac-home` 同步维护主机模块，便于迁移到新机器时快速复用专属配置。
+
+---
+
+## 7. 冲突解析（--force：override/defer/ignore）
+
+当目标路径已存在同名文件/目录时，stow 会报告冲突。stowx 提供统一的冲突解析：
+
+- 交互式选择（推荐）：
+  
+  ```sh
+   stowx apply --host --force
+  ```
+  
+  - o=override：删除目标后接管（等价“覆盖”）；实现为 rm -rf 目标 + 追加 `--override '^相对路径$'`
+  - d=defer：
+    - 若是目录：追加 `--defer '^目录$'`，推迟处理父目录，利于目录折叠
+    - 若是文件：追加 `--ignore '^文件$'`，稳定跳过该文件
+  - q=quit：中止
+
+- 非交互默认覆盖（可配合 --defer 指定跳过项）：
+  
+  ```sh
+   stowx apply --host --force -y --defer '^\.zshrc$' --defer '^\.config$'
+  ```
+  
+  - .zshrc（文件）→ ignore；.config（目录）→ defer；其它路径默认覆盖
+
+- restow 也支持同样的冲突解析：
+  
+  ```sh
+   stowx restow --force -y
+  ```
+
+说明与注意
+- 仅使用 GNU Stow 的 `--override` 无法直接覆盖“not owned by stow”的现有目标，因此 override 分支会先删除目标再链接。
+- `--defer` 适合目录顺序控制（触发目录折叠）；对“文件级 not owned”基本无效，故文件使用 `--ignore` 跳过更稳妥。
+- 所有删除操作在 `-n/--dry-run` 下仅打印 DRY-RUN 日志，不会修改文件。
 
 ## 6. Zsh 补全（Git/JJ 分组版 + report-kit）
 
@@ -393,6 +436,15 @@
   ```sh
    stowx grab -p mac-home <路径>
   ```
+
+- 放回（putback：从包复制到原路径，不移动）：
+  
+  ```sh
+   stowx putback -p mac-home <路径>
+  ```
+  
+  - 相对路径默认相对 `$HOME`；可用 `-C` 改为相对当前目录
+  - 也可配合 `--host` 或 `-p hosts/<hostname>` 指定主机包
 
 - 重链 / 取消 / 列表：
   

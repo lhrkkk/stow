@@ -125,13 +125,18 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
   -  stowx preview      （等价: stow -nvt "$HOME" -d "$HOME/_env/stow" -S mac-home）
   -  stowx apply        （等价: stow -vt  "$HOME" -d "$HOME/_env/stow" -S mac-home）
   -  stowx apply --host （追加部署 hosts/$(hostname)；可用 `--host <name>` 指定）
+  -  stowx auto         （顺序执行：apply --force -y；apply --host --force -y；可配合 -n 干跑）
+  -  stowx apply --force（交互式冲突解析：o=override/d=defer/q=quit；-y 默认 override）
+  -  stowx restow --force -y（restow 同样支持冲突解析）
   -  仅收编（默认）：    ` stowx adopt -y`
   -  覆盖式部署（谨慎）：` stowx adopt -y --restore`
   -  预评估收编影响：    ` stowx preview -- --adopt`
   -  stowx grab -p mac-home <路径>（相对路径默认相对 $HOME；若需相对当前目录解析，使用 -C/--relative-to-cwd）
   -  stowx grab <路径> --host（抓取到 hosts/$(hostname)；首次使用自动创建目录）
+  -  stowx putback -p mac-home <路径>（从包复制到原路径，不移动；可用 -C 改为相对 $PWD）
   -  首次运行自动写入 `.stow-global-ignore`，并在 `hosts/<hostname>` 生成 `.stow-local-ignore`（忽略 `.DS_Store`、缓存/tmp、嵌套插件仓库等）
 - 代理注意：命令前加空格避免写入历史；adopt/覆盖操作须确认；优先先预览再 apply。
+  - 说明：目录 defer 有助于目录折叠；文件 defer 基本无效，stowx 在“跳过文件”时会使用 `--ignore` 以稳定跳过；“覆盖”会先删除目标再链接（并追加 `--override`）。
 
 七、Warp 会话日志工作流与追加规范（含作用域）
 

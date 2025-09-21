@@ -37,6 +37,17 @@
   -  ` stowx apply -n`
 - 主机附加模块
   -  ` stowx apply --host`（默认当前 `hostname`，可用 `--host <name>` 指定）
+ - 自动执行（基础包 + 主机包）：
+   -  ` stowx auto`（等价顺序：apply --force -y；apply --host --force -y；`-n` 为干跑）
+
+> 冲突解析与策略（stowx 扩展）
+- ` stowx apply --force` 支持交互式冲突解析：
+  - o=override：删除目标后接管（rm -rf + `--override '^相对路径$'`）
+  - d=defer：目录→`--defer`（推迟父目录处理、利于折叠）；文件→`--ignore`（稳定跳过）
+  - q=quit：中止
+- 非交互：`-y` 默认覆盖；若 `--defer` 命中则按“目录 defer / 文件 ignore”处理。
+- `stowx restow --force(-y)` 同样支持上述策略。
+- 说明：GNU Stow 的 `--override` 无法直接覆盖“not owned by stow”的现有目标，因此 override 分支会先删除目标再链接；`--defer` 适用于目录顺序控制，对单个文件跳过请使用 `--ignore`。
 
 四、抓取能力（grab）
 - 功能：将 TARGET 范围内的文件/目录移动到指定包的对应相对路径下，并自动 `restow` 建立符号链接。
@@ -50,6 +61,11 @@
   - 使用当前目录相对路径：` stowx grab -C -p mac-home ./WARP.md ./dir/file.txt`
   - 干跑预览抓取：` stowx -n grab -p mac-home ~/.config/karabiner`
   - 同名目标存在时可用 `-y` 覆盖
+  
+  - 反向放回（putback）：从包复制到目标（不移动，保留包内原件）
+    - 单个文件：` stowx putback -p mac-home ~/.config/wezterm/wezterm.lua`
+    - 多个路径：` stowx putback -p mac-home ~/.zshrc ~/.gitconfig`
+    - 相对路径默认相对 TARGET=`$HOME`；`-C` 改为相对 $PWD；`-y` 覆盖现有目标
 - 主机定制：
   - ` stowx grab ~/.config/wezterm/wezterm.lua --host`（无参数默认当前 `hostname`；也可写为 `--host <name>`）
 - 限制：被抓取路径必须位于 TARGET（默认 `$HOME`）之下；否则跳过并提示。

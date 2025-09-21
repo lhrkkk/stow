@@ -15,8 +15,10 @@ Usage:
 Commands:
   preview       预览变更（等价: stow -nvt "$TARGET" -d "$STOW_DIR" -S <pkgs>）
   apply         应用链接（等价: stow -vt  "$TARGET" -d "$STOW_DIR" -S <pkgs>）
+  auto          依次执行：apply --force -y 与 apply --host --force -y（-n 时为干跑）
   adopt         收编部署：默认仅 stow -S --adopt；如需覆盖式部署请加 --restore（谨慎）
   grab          抓取文件/文件夹到指定包内并建立链接（stow 化单个路径）
+  putback       反向于 grab：从包复制文件到目标（不移动，保留包内原件）
   unstow        取消链接（stow -D）
   restow        重新链接（stow -R）
   list          列出可用包（STOW_DIR 下的目录）
@@ -33,21 +35,25 @@ Options:
   -y, --yes              非交互确认危险操作（adopt/覆盖同名目标时）
   -r, --restore          adopt 后执行 git -C <包> restore .（覆盖本地改动）
       --no-restore       兼容保留；默认已不恢复（无效果）
-  -f, --force            强制覆盖冲突文件（删除现有文件后重新创建符号链接）
+  -f, --force            冲突解析（apply/restow 生效：交互式 override/defer；配合 -y 默认 override）
       --defer <regex>    推迟处理匹配正则的文件（传递给 stow --defer）
       --override <regex> 覆盖匹配正则的文件（传递给 stow --override）
+      --ignore <regex>   忽略匹配正则的路径（传递给 stow --ignore）
 
 缺省包: mac-home
 示例：
   预览:   stowx preview
   应用:   stowx apply                # 部署 mac-home
   主机:   stowx apply --host         # 仅部署 hosts/$(hostname)
+  自动:   stowx auto                 # 先 mac-home 再 hosts/<hostname>（支持 -n 干跑）
   组合:   stowx apply mac-home --host # 错误：--host 不能与其他包组合
-  强制:   stowx apply --force -y     # 强制覆盖冲突文件
-  推迟:   stowx apply --defer '\.bashrc$' # 跳过 .bashrc 冲突
+  强制:   stowx apply --force -y     # 强制覆盖冲突文件（交互/非交互）
+  强制:   stowx restow --force -y    # restow 同样支持冲突解析
+  推迟:   stowx apply --defer '\.bashrc$' # 推迟匹配路径的处理（不用于现存冲突）
   覆盖:   stowx apply --override '\.zshrc$' # 强制覆盖 .zshrc  
   收编:   stowx adopt -y -r    # 等价 --restore
   抓取:   stowx grab -p mac-home ~/.config/wezterm/wezterm.lua
+  放回:   stowx putback -p mac-home ~/.config/wezterm/wezterm.lua
   抓取:   stowx grab ~/.config/wezterm/wezterm.lua --host
   取消:   stowx unstow --host        # 仅取消主机包链接
 EOF
@@ -67,6 +73,7 @@ YES=0
 FORCE=0
 DEFER_PATTERNS=()
 OVERRIDE_PATTERNS=()
+IGNORE_PATTERNS=()
 USE_CWD=0
 USE_HOST=0
 HOST_NAME=""
@@ -222,7 +229,7 @@ pkg_ignored() {
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      preview|apply|adopt|grab|unstow|restow|list|help)
+      preview|apply|auto|adopt|grab|putback|unstow|restow|list|help)
         CMD="$1"; shift ;;
       -d|--dir)
         [[ $# -ge 2 ]] || die "--dir 需要参数"; STOW_DIR="$2"; shift 2 ;;
@@ -266,6 +273,8 @@ parse_args() {
         [[ $# -ge 2 ]] || die "--defer 需要参数"; DEFER_PATTERNS+=("$2"); shift 2 ;;
       --override)
         [[ $# -ge 2 ]] || die "--override 需要参数"; OVERRIDE_PATTERNS+=("$2"); shift 2 ;;
+      --ignore)
+        [[ $# -ge 2 ]] || die "--ignore 需要参数"; IGNORE_PATTERNS+=("$2"); shift 2 ;;
       --)
         shift; break ;;
       -h|--help)
@@ -298,6 +307,11 @@ build_opts() {
   # Add override patterns  
   for pattern in "${OVERRIDE_PATTERNS[@]}"; do
     STOW_OPTS=( "${STOW_OPTS[@]}" "--override" "$pattern" )
+  done
+  
+  # Add ignore patterns
+  for pattern in "${IGNORE_PATTERNS[@]}"; do
+    STOW_OPTS=( "${STOW_OPTS[@]}" "--ignore" "$pattern" )
   done
   
   # Debug output if verbose
@@ -372,6 +386,11 @@ run_stow() {
         opts=( "${opts[@]}" "--override" "$pattern" )
       done
       
+      # Add ignore patterns for nested packages too
+      for pattern in "${IGNORE_PATTERNS[@]}"; do
+        opts=( "${opts[@]}" "--ignore" "$pattern" )
+      done
+      
       # Show quoted command for debug
       local cmd_display="stow"
       for arg in "${opts[@]}" "${subopts[@]}"; do
@@ -396,6 +415,33 @@ ensure_packages() {
   local had_explicit=0
   if [[ ${#PACKAGES[@]} -gt 0 ]]; then
     had_explicit=1
+  fi
+
+  # Auto-detect package from current directory when none specified
+  if [[ $had_explicit -eq 0 && ${USE_HOST:-0} -eq 0 ]]; then
+    case "$PWD" in
+      "$STOW_DIR"/hosts/*/*)
+        # e.g. $STOW_DIR/hosts/<host>/sub/...
+        local rest="${PWD#"$STOW_DIR/hosts/"}"
+        local host="${rest%%/*}"
+        if [[ -n "$host" && -d "$STOW_DIR/hosts/$host" ]]; then
+          USE_HOST=1
+          HOST_NAME="$host"
+          HOST_PACKAGE="hosts/$HOST_NAME"
+          PACKAGES=("$HOST_PACKAGE")
+          had_explicit=1
+        fi
+        ;;
+      "$STOW_DIR"/*)
+        # e.g. $STOW_DIR/<pkg>/sub/...
+        local sub="${PWD#"$STOW_DIR/"}"
+        local pkg_guess="${sub%%/*}"
+        if [[ -n "$pkg_guess" && -d "$STOW_DIR/$pkg_guess" ]]; then
+          PACKAGES=("$pkg_guess")
+          had_explicit=1
+        fi
+        ;;
+    esac
   fi
 
   if [[ $USE_HOST -eq 1 && -z "$HOST_PACKAGE" ]]; then
@@ -490,9 +536,9 @@ force_remove_conflicts() {
   done
 }
 
-# Force remove conflicts by checking stow dry-run output
+# Resolve conflicts by prompting override/defer or honoring -y defaults
 force_remove_conflicts_by_stow_check() {
-  log "检查 stow 冲突并强制删除..."
+  log "检查 stow 冲突并选择 override/defer..."
   local temp_output
   temp_output=$(mktemp)
   
@@ -523,28 +569,77 @@ force_remove_conflicts_by_stow_check() {
     log "未发现可解析的冲突文件"
     return 0
   fi
-  
-  # Remove conflict files and add defer patterns for skipped ones
+
+  # Helpers
+  local action ans _rel _esc _pat
+  choose_action() {
+    local prompt="$1"
+    read -r -p "$prompt [o=override/d=defer/q=quit] (默认 d): " ans || ans=""
+    case "$ans" in
+      o|O|override|OVERRIDE) action=override ;;
+      d|D|defer|DEFER|"")  action=defer    ;;
+      q|Q|quit|QUIT)         action=quit     ;;
+      *)                     action=defer    ;;
+    esac
+  }
+  regex_matches_any() {
+    local str="$1"; shift
+    local pat
+    for pat in "$@"; do
+      [[ "$str" =~ $pat ]] && return 0
+    done
+    return 1
+  }
+
+  # Decide override/defer for each conflict
   for file in "${conflict_files[@]}"; do
-    if [[ -e "$file" || -L "$file" ]]; then
-      if [[ $YES -eq 1 ]]; then
-        log "强制删除冲突文件: $file"
-        rm -rf "$file"
-      else
-        if confirm "删除冲突文件 $file ?"; then
-          rm -rf "$file"
+    _rel="${file#$TARGET/}"
+    _esc=$(printf '%s\n' "$_rel" | sed 's/[[\.*^$()+{}|]/\\&/g')
+    _pat="^${_esc}\$"
+    if [[ $YES -eq 1 ]]; then
+      # Non-interactive: if user gave a matching --defer, skip; otherwise remove and override
+      if [[ ${#DEFER_PATTERNS[@]} -gt 0 ]] && regex_matches_any "$_rel" "${DEFER_PATTERNS[@]}"; then
+        if [[ -d "$file" && ! -L "$file" ]]; then
+          log "已匹配 defer(目录)，推迟处理: $_rel"
         else
-          log "跳过冲突文件: $file"
-          # Add defer pattern for this specific file
-          local rel_file="${file#$TARGET/}"
-          # Escape special regex characters and add anchors for exact match
-          local escaped_file=$(printf '%s\n' "$rel_file" | sed 's/[[\.*^$()+{}|]/\\&/g')
-          local pattern="^${escaped_file}\$"
-          DEFER_PATTERNS+=("$pattern")
-          log "添加 defer 模式: $pattern"
+          log "已匹配 defer(文件)，忽略处理: $_rel"
+          IGNORE_PATTERNS+=("$_pat")
         fi
+      else
+        log "覆盖冲突（删除后重建链接）: $file"
+        if [[ $DRY_RUN -eq 1 ]]; then
+          log "DRY-RUN: + rm -rf \"$file\""
+        else
+          rm -rf "$file"
+        fi
+        OVERRIDE_PATTERNS+=("$_pat")
       fi
+      continue
     fi
+    choose_action "冲突: $_rel"
+    case "$action" in
+      override)
+        if [[ $DRY_RUN -eq 1 ]]; then
+          log "DRY-RUN: + rm -rf \"$file\""
+        else
+          rm -rf "$file"
+        fi
+        OVERRIDE_PATTERNS+=("$_pat")
+        log "已删除并标记 override: $_rel"
+        ;;
+      defer)
+        if [[ -d "$file" && ! -L "$file" ]]; then
+          DEFER_PATTERNS+=("$_pat")
+          log "添加 defer(目录) 模式: $_pat"
+        else
+          IGNORE_PATTERNS+=("$_pat")
+          log "添加 ignore(文件) 模式: $_pat"
+        fi
+        ;;
+      quit)
+        die "已取消"
+        ;;
+    esac
   done
 }
 
@@ -559,10 +654,58 @@ cmd_apply()   {
   run_stow -S
 }
 cmd_unstow()  { ensure_packages; run_stow -D; }
-cmd_restow()  { ensure_packages; run_stow -R; }
+cmd_restow()  { 
+  ensure_packages
+  if [[ $FORCE -eq 1 ]]; then
+    force_remove_conflicts_by_stow_check
+  fi
+  run_stow -R
+}
+
+cmd_auto() {
+  # Save originals
+  local _orig_use_host=$USE_HOST
+  local _orig_yes=$YES
+  local _orig_force=$FORCE
+  local _orig_host_name=$HOST_NAME
+  local -a _orig_packages=("${PACKAGES[@]}")
+  local -a _orig_defer=("${DEFER_PATTERNS[@]}")
+  local -a _orig_override=("${OVERRIDE_PATTERNS[@]}")
+  local -a _orig_ignore=("${IGNORE_PATTERNS[@]}")
+
+  # Step 1: base apply --force -y
+  USE_HOST=0; YES=1; FORCE=1; PACKAGES=()
+  DEFER_PATTERNS=("${_orig_defer[@]}")
+  OVERRIDE_PATTERNS=("${_orig_override[@]}")
+  IGNORE_PATTERNS=("${_orig_ignore[@]}")
+  local _drflag=""; [[ ${DRY_RUN:-0} -eq 1 ]] && _drflag=" -n"
+  log "[auto] apply base (--force -y$_drflag)"
+  cmd_apply
+
+  # Step 2: host apply --force -y
+  USE_HOST=1; HOST_NAME=${_orig_host_name:-$(default_host)}; PACKAGES=()
+  DEFER_PATTERNS=("${_orig_defer[@]}")
+  OVERRIDE_PATTERNS=("${_orig_override[@]}")
+  IGNORE_PATTERNS=("${_orig_ignore[@]}")
+  _drflag=""; [[ ${DRY_RUN:-0} -eq 1 ]] && _drflag=" -n"
+  log "[auto] apply --host (--force -y$_drflag)"
+  cmd_apply
+
+  # Restore
+  USE_HOST=$_orig_use_host
+  YES=$_orig_yes
+  FORCE=$_orig_force
+  HOST_NAME=$_orig_host_name
+  PACKAGES=("${_orig_packages[@]}")
+  DEFER_PATTERNS=("${_orig_defer[@]}")
+  OVERRIDE_PATTERNS=("${_orig_override[@]}")
+  IGNORE_PATTERNS=("${_orig_ignore[@]}")
+}
 
 cmd_grab() {
   ensure_packages
+  # In grab, treat --force as consent to overwrite existing destination under STOW_DIR
+  if [[ $FORCE -eq 1 ]]; then YES=1; fi
   if [[ ${#PACKAGES[@]} -gt 1 ]]; then
     die "grab 目前仅支持单个包，请用 -p 指定一个包（当前: ${PACKAGES[*]}）"
   fi
@@ -573,11 +716,28 @@ cmd_grab() {
   need_cmd mkdir; need_cmd mv
   local moved_any=0
   for src_in in "${PATHS[@]}"; do
-    local abs src rel dst dstdir
+    local abs src rel dst dstdir absp
     abs=$(norm_src "$src_in")
     if [[ ! -e "$abs" ]]; then
-      err "跳过：不存在的路径 -> $abs"
-      continue
+      # 智能推断：若传入的是相对路径且当前目录存在该文件，且位于 TARGET 下，则按当前目录解析
+      if [[ "$src_in" != /* && "$src_in" != ~* ]]; then
+        absp="$PWD/$src_in"
+        if [[ -e "$absp" ]]; then
+          # 仅当位于 TARGET 下且不在 STOW_DIR 内时才采用 CWD 推断
+          if rel=$(rel_under_target "$absp"); then
+            case "$absp" in
+              "$STOW_DIR"/*) err "跳过：位于 STOW_DIR 内，忽略 -> $absp"; continue ;;
+              *) abs="$absp" ;;
+            esac
+          else
+            err "跳过：不在 TARGET 范围内 -> $absp"; continue
+          fi
+        else
+          err "跳过：不存在的路径 -> $abs"; continue
+        fi
+      else
+        err "跳过：不存在的路径 -> $abs"; continue
+      fi
     fi
     rel=$(rel_under_target "$abs") || { err "跳过：不在 TARGET 范围内 -> $abs"; continue; }
     dst="$STOW_DIR/$pkg/$rel"
@@ -627,6 +787,130 @@ cmd_grab() {
       log "restow 失败，尝试 apply (-S)"
       run_stow -S
     fi
+  fi
+}
+
+cmd_putback() {
+  ensure_packages
+  if [[ ${#PACKAGES[@]} -gt 1 ]]; then
+    die "putback 目前仅支持单个包，请用 -p 指定一个包（当前: ${PACKAGES[*]}）"
+  fi
+  local pkg="${PACKAGES[0]}"
+  if [[ ${#PATHS[@]} -eq 0 ]]; then
+    die "putback 需要至少一个路径：可传 TARGET 下路径、包内相对路径，或指向包内的符号链接"
+  fi
+  need_cmd mkdir; need_cmd cp; need_cmd readlink
+  local copied_any=0
+  for arg in "${PATHS[@]}"; do
+    local abs rel src dst dstdir orig rp pkg_root absp
+    orig="$arg"
+    abs=$(norm_src "$orig")
+    pkg_root="$STOW_DIR/$pkg"
+    # 优先：TARGET 下路径
+    if rel=$(rel_under_target "$abs"); then
+      # 若包内不存在该相对路径，且当前目录在包内，尝试用包内相对路径替代
+      if [[ ! -e "$pkg_root/$rel" && ! -L "$pkg_root/$rel" ]]; then
+        absp="$PWD/$orig"
+        if [[ "$PWD" == "$pkg_root"* && ( -e "$absp" || -L "$absp" ) && "$absp" == "$pkg_root"/* ]]; then
+          rel="${absp#"$pkg_root/"}"
+        fi
+      fi
+    else
+      # 若传入相对路径，尝试视为包内相对路径
+      if [[ "$orig" != /* && "$orig" != ~* && -e "$pkg_root/$orig" ]]; then
+        rel="$orig"
+      else
+        # 若当前目录位于包内，且参数在该子目录下存在，则推导相对包根路径
+        absp="$PWD/$orig"
+        if [[ "$PWD" == "$pkg_root"* && ( -e "$absp" || -L "$absp" ) && "$absp" == "$pkg_root"/* ]]; then
+          rel="${absp#"$pkg_root/"}"
+        else
+          # 若是符号链接且指向包内，反解相对路径
+          if [[ -L "$abs" ]]; then
+            rp=$(readlink -f "$abs" 2>/dev/null || true)
+            if [[ -n "$rp" && "$rp" == "$pkg_root"/* ]]; then
+              rel="${rp#"$pkg_root/"}"
+            else
+              err "跳过：无法解析到包内路径 -> $orig"
+              continue
+            fi
+          else
+            err "跳过：不在 TARGET 且非包内相对路径/有效符号链接 -> $orig"
+            continue
+          fi
+        fi
+      fi
+    fi
+    src="$STOW_DIR/$pkg/$rel"
+    dst="$TARGET/$rel"
+    dstdir=$(dirname "$dst")
+    # Ensure source exists
+    if [[ ! -e "$src" && ! -L "$src" ]]; then
+      err "跳过：包内不存在 -> $src"
+      continue
+    fi
+    # Strict policy: only operate when destination is a symlink. Otherwise warn and skip.
+    if [[ ! -L "$dst" ]]; then
+      # If destination resolves into STOW_DIR (parent dir is a repo symlink), warn explicitly
+      local dst_real
+      dst_real=$(readlink -f "$dst" 2>/dev/null || printf '%s' "$dst")
+      case "$dst_real" in
+        "$STOW_DIR"/*)
+          err "安全保护：目标真实路径落在 STOW_DIR 内（父目录是仓库链接），已跳过 -> $dst_real" ;;
+        *)
+          err "安全策略：目标不是符号链接，已跳过 -> $dst" ;;
+      esac
+      continue
+    fi
+    # When destination is a symlink, it's safe to replace it (won't follow into repo)
+    if [[ $DRY_RUN -eq 1 ]]; then
+      log "DRY-RUN: + mkdir -p \"$dstdir\""
+      if [[ -e "$dst" || -L "$dst" ]]; then
+        log "DRY-RUN: + rm -rf \"$dst\""
+      fi
+      log "DRY-RUN: + cp -a \"$src\" \"$dst\""
+    else
+      log "+ mkdir -p \"$dstdir\""; mkdir -p "$dstdir"
+      # Double-check source exists before touching destination
+      if [[ ! -e "$src" && ! -L "$src" ]]; then
+        err "跳过：包内不存在 -> $src"; continue
+      fi
+      if [[ -e "$dst" || -L "$dst" ]]; then
+        if [[ $YES -eq 1 ]]; then
+          if [[ -L "$dst" ]]; then
+            log "+ unlink \"$dst\""; unlink "$dst" || rm -f "$dst"
+          elif [[ -f "$dst" ]]; then
+            : # keep file, we'll overwrite via cp
+          elif [[ -d "$dst" ]]; then
+            log "+ rm -rf \"$dst\""; rm -rf "$dst"
+          else
+            log "+ rm -f \"$dst\""; rm -f "$dst"
+          fi
+        else
+          confirm "目标已存在：$dst。是否覆盖？" || { err "已跳过 $dst"; continue; }
+          if [[ -L "$dst" ]]; then
+            log "+ unlink \"$dst\""; unlink "$dst" || rm -f "$dst"
+          elif [[ -f "$dst" ]]; then
+            :
+          elif [[ -d "$dst" ]]; then
+            log "+ rm -rf \"$dst\""; rm -rf "$dst"
+          else
+            log "+ rm -f \"$dst\""; rm -f "$dst"
+          fi
+        fi
+      fi
+      # Prefer cp with --remove-destination when available to avoid following symlinks
+      if cp --help 2>/dev/null | grep -q -- "remove-destination"; then
+        log "+ cp -a --remove-destination \"$src\" \"$dst\""; cp -a --remove-destination "$src" "$dst"
+      else
+        log "+ cp -a \"$src\" \"$dst\""; cp -a "$src" "$dst"
+      fi
+      copied_any=1
+      log "已复制：$src -> $dst"
+    fi
+  done
+  if [[ $copied_any -eq 1 && $DRY_RUN -eq 0 ]]; then
+    log "putback 完成：共处理 ${#PATHS[@]} 项"
   fi
 }
 
@@ -704,7 +988,7 @@ main() {
   fi
 
   # Map POSITIONALS depending on command
-  if [[ "${CMD:-}" == "grab" ]]; then
+  if [[ "${CMD:-}" == "grab" || "${CMD:-}" == "putback" ]]; then
     PATHS=("${POSITIONALS[@]}")
   else
     if [[ ${#PACKAGES[@]} -eq 0 && ${#POSITIONALS[@]} -gt 0 ]]; then
@@ -714,8 +998,10 @@ main() {
   case "${CMD:-}" in
     preview) cmd_preview ;;
     apply)   cmd_apply   ;;
+    auto)    cmd_auto    ;;
     adopt)   cmd_adopt   ;;
     grab)    cmd_grab    ;;
+    putback) cmd_putback ;;
     unstow)  cmd_unstow  ;;
     restow)  cmd_restow  ;;
     list)    cmd_list    ;;
