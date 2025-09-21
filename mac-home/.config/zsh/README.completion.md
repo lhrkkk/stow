@@ -66,7 +66,7 @@ exec zsh -l
 
 > 当前已默认“隐藏系统命令组”，只展示别名 8 组；如需恢复见文末“可选项”。
 
-> 下方“Git 别名详解（按组）”为唯一事实来源（SSOT）。这里不再重复列清单。
+> Git 别名描述/分组维护在 `~/.config/zsh/git-completion-enhanced.zsh` 的 `__git_build_user_commands` 中；下方“Git 别名详解（按组）”同步摘录主要信息，便于快速检索。
 
 分组实现要点：
 
@@ -128,8 +128,9 @@ exec zsh -l
   - fn/fnr: 逐行追责/指定范围追责（`git blame` / `git blame -L <range> -- <file>`）
 
 - 提交/暂存（组织改动与形成提交）
-  - a/chunkyadd: 暂存/交互暂存（`git add` / `git add --patch`）
-  - c/ca/ci: 提交（快速消息/全部改动/交互式）
+  - a/aa/chunkyadd: 暂存单个/全部/交互暂存（`git add` / `git add .` / `git add --patch`）
+  - c/cm/ca/ci: 提交（裸 message / 追加 message / 所有改动 / 交互式）
+  - cc/cam: AI 生成提交信息 / 暂存全部后带参提交
   - amend/ammend: 修订上次提交（`git commit --amend`；`ammend` 为兼容拼写）
   - ss/sl/sa/sd: stash（保存/列表/应用/删除）
   - snapshot/snapshots: 快照工作区（保存并列出贴“snapshot”标签的 stash）
@@ -141,6 +142,9 @@ exec zsh -l
   - rbt: rebase 到 `origin/main`
   - rbr: 交互式 rebase（`-i`）
   - rc/rs: 流程控制（继续/跳过）
+  - wm1/wm2/wm3: 在 1/2/3 号工作树上执行 rebase
+  - ws1/ws2/ws3: 在 1/2/3 号工作树中继续/完成 rebase
+  - wsa/wms1/wms2/wms3/wmsa: 串行触发多个工作树的 rebase 及收尾流程
 
 - 分支/工作树（本地开发单元）
   - b: 分支列表（含最近提交，`git branch -v`）
@@ -148,6 +152,8 @@ exec zsh -l
   - nb: 新建并切换（`git checkout -b`）
   - recent-branches: 最近活跃分支（`git for-each-ref --sort=-committerdate`）
   - wl/wa/wf: 工作树列表/新增/删除（`git worktree`）
+  - wa1/wa2/wa3: 一键创建 `.jj/git-{1,2,3}` 工作树
+  - wo1/wo2/wo3: 进入编号工作树并启动登录 shell
 
 - 远程/推送/PR（对外协作）
   - r: 远程仓库（`git remote -v`）
