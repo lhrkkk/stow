@@ -292,12 +292,12 @@ build_opts() {
   
   # Add defer patterns
   for pattern in "${DEFER_PATTERNS[@]}"; do
-    STOW_OPTS=( "${STOW_OPTS[@]}" --defer="$pattern" )
+    STOW_OPTS=( "${STOW_OPTS[@]}" "--defer=$pattern" )
   done
   
   # Add override patterns  
   for pattern in "${OVERRIDE_PATTERNS[@]}"; do
-    STOW_OPTS=( "${STOW_OPTS[@]}" --override="$pattern" )
+    STOW_OPTS=( "${STOW_OPTS[@]}" "--override=$pattern" )
   done
   
   # Debug output if verbose
@@ -352,13 +352,14 @@ run_stow() {
       
       # Add defer patterns for nested packages too
       for pattern in "${DEFER_PATTERNS[@]}"; do
-        opts=( "${opts[@]}" --defer="$pattern" )
+        opts=( "${opts[@]}" "--defer=$pattern" )
       done
       
       # Add override patterns for nested packages too
       for pattern in "${OVERRIDE_PATTERNS[@]}"; do
-        opts=( "${opts[@]}" --override="$pattern" )
+        opts=( "${opts[@]}" "--override=$pattern" )
       done
+      
       log "stow ${opts[*]} ${subopts[*]} ${name}"
       case "$name" in
         -*) stow "${opts[@]}" "${subopts[@]}" -- "$name" || return $? ;;
@@ -500,7 +501,7 @@ force_remove_conflicts_by_stow_check() {
     return 0
   fi
   
-  # Remove conflict files and defer skipped ones
+  # Remove conflict files and add defer patterns for skipped ones
   for file in "${conflict_files[@]}"; do
     if [[ -e "$file" || -L "$file" ]]; then
       if [[ $YES -eq 1 ]]; then
@@ -513,10 +514,11 @@ force_remove_conflicts_by_stow_check() {
           log "跳过冲突文件: $file"
           # Add defer pattern for this specific file
           local rel_file="${file#$TARGET/}"
-          # Escape special regex characters for exact match
+          # Escape special regex characters and add anchors for exact match
           local escaped_file=$(printf '%s\n' "$rel_file" | sed 's/[[\.*^$()+{}|]/\\&/g')
-          DEFER_PATTERNS+=("^${escaped_file}\$")
-          log "添加 defer 模式: ^${escaped_file}\$"
+          local pattern="^${escaped_file}\$"
+          DEFER_PATTERNS+=("$pattern")
+          log "添加 defer 模式: $pattern"
         fi
       fi
     fi
@@ -530,6 +532,7 @@ cmd_apply()   {
   if [[ $FORCE -eq 1 ]]; then
     force_remove_conflicts_by_stow_check
   fi
+  
   run_stow -S
 }
 cmd_unstow()  { ensure_packages; run_stow -D; }
