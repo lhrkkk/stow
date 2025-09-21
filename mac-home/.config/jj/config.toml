@@ -468,21 +468,25 @@ wms3 = ["util", "exec", "--", "bash", "-c","jj wm3 && jj wsa"]
 # wnsa = ["util", "exec", "--", "bash", "-c","jj wn1 && jj wn2 && jj wn3 && jj wm1 &&jj wm2 && jj wm3 && jj wsa && jj e main"]
 
 # -------------- 0.7s wnsa  0.23s wmsa 0.9 wmsa
-### v4。5, 并行性能的 @- 版本，依赖 main 标签和one@, two@, three@，  wnsa 则是 new 版本。work well
-wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@- -d main && jj bs main -r one@- "]
-wm2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@- -d main && jj bs main -r two@- "]
-wm3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@- -d main && jj bs main -r three@- "]
-
+### v4.5, 并行性能的 @- 版本，依赖 main 标签和one@, two@, three@，  wnsa 则是 new 版本。work well
+# 同步所有工作区分支
 ws1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@ -d main "]
 ws2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@ -d main "]
 ws3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@ -d main "]
 
-# 同步所有工作区分支
-wna = ["util", "exec", "--", "bash", "-c","jj wn1 & jj wn2 & jj wn3& wait"]
 wsa = ["util", "exec", "--", "bash", "-c","jj ws1 & jj ws2 & jj ws3& wait"]
-wma = ["util", "exec", "--", "bash", "-c","jj wm1 && jj wm2 && jj wm3"]
 
+### 合并所有工作区分支，先 sa 同步
+wm1 = ["util", "exec", "--", "bash", "-c","jj rb -b one@- -d main && jj bs main -r one@- "]
+wm2 = ["util", "exec", "--", "bash", "-c","jj rb -b two@- -d main && jj bs main -r two@- "]
+wm3 = ["util", "exec", "--", "bash", "-c","jj rb -b three@- -d main && jj bs main -r three@- "]
+
+wma = ["util", "exec", "--", "bash", "-c","jj wm1 && jj wm2 && jj wm3"]
 wmsa = ["util", "exec", "--", "bash", "-c","jj wma && jj wsa && jj e main"]
+
+
+# 立即合并所有分支当前的 @ ，创建 new 节点
+wna = ["util", "exec", "--", "bash", "-c","jj wn1 & jj wn2 & jj wn3& wait"]
 wnsa = ["util", "exec", "--", "bash", "-c","jj wna && jj wma && jj wsa && jj e main"]
 
 
@@ -516,7 +520,7 @@ wnsa = ["util", "exec", "--", "bash", "-c","jj wna && jj wma && jj wsa && jj e m
 
 
 
-##### 推荐用 v3 或者 v4.5
+##### 推荐用 v3 或者 v4.5。    v6行为不一样，作为备用
 # v3   -------------- 1.0s wnsa  0.4s wmsa  1.0wmsa
 # v4.5 -------------- 0.7s wnsa  0.23s wmsa  0.9wmsa
 
