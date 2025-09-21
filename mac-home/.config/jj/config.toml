@@ -173,6 +173,7 @@ cm = ['commit', '-m']
 cim = ['commit', '-i', '-m']
 cc = ['util', 'exec', '--', 'bash', '-lc', 'jj-commit-ai "$@"', ""]
 caic = ['util', 'exec', '--', 'bash', '-lc', 'jj-commit-ai --commit "$@"', ""]
+dd = ['util', 'exec', '--', 'bash', '-lc', 'jj-commit-ai --describe "$@"', ""]
 
 # show
 w = ['show']

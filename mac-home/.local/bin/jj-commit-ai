@@ -3,9 +3,9 @@ set -euo pipefail
 
 show_help() {
   cat <<'USAGE'
-Usage: jj-commit-ai [options] [-- <jj commit args>]
+Usage: jj-commit-ai [options] [-- <jj commit/describe args>]
 
-生成提交信息并可选直接 `jj commit`。
+生成提交信息并可选直接 `jj commit`，或用 `jj describe -m` 更新描述。
 
 Options:
   --model NAME         指定 Codex 模型（默认：$JJ_COMMIT_AI_MODEL 或 gpt-5）
@@ -22,6 +22,7 @@ Options:
   --bracket-title-cn   快捷方式，标题使用全角方括号【】
   --reasoning-effort, -r V 设置 Codex 推理强度（默认 minimal；可选：minimal/low/medium/high）
   --api NAME           指定使用的 API 后端 (默认: codex，可选: gemini)
+  --describe           使用 `jj describe -m` 应用生成的信息（替代 `jj commit`）
   -h, --help           查看帮助
 
 环境变量：
@@ -62,6 +63,7 @@ ASSUME_YES=0
 SHOW_PROMPT=0
 EXTRA_RUNTIME_PROMPT=""
 JJ_ARGS=()
+DESCRIBE_MODE=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -128,6 +130,10 @@ while [[ $# -gt 0 ]]; do
       SUBJECT_STYLE="cn-brackets"
       shift
       ;; 
+    --describe)
+      DESCRIBE_MODE=1
+      shift
+      ;;
     -r|--reason|--reasoning|--reasoning-effort) 
       [[ $# -ge 2 ]] || { echo "jj-commit-ai: $1 需要参数" >&2; exit 2; }
       REASONING_EFFORT="$2"
@@ -1109,32 +1115,40 @@ echo "----------------------------------------" >&2
 cat "$MSG_FILE" >&2
 echo "----------------------------------------" >&2
 
-run_commit() {
+run_apply() {
   local commit_msg
   commit_msg=$(cat "$MSG_FILE")
   if (( ${#JJ_ARGS[@]} )); then
-    jj commit --message "$commit_msg" ${JJ_ARGS[@]}
+    if (( DESCRIBE_MODE )); then
+      jj describe -m "$commit_msg" "${JJ_ARGS[@]}"
+    else
+      jj commit --message "$commit_msg" "${JJ_ARGS[@]}"
+    fi
   else
-    jj commit --message "$commit_msg"
+    if (( DESCRIBE_MODE )); then
+      jj describe -m "$commit_msg"
+    else
+      jj commit --message "$commit_msg"
+    fi
   fi
 }
 
 if (( AUTO_COMMIT )); then
-  run_commit
+  run_apply
   exit 0
 fi
 
 if (( ASSUME_YES )); then
-  run_commit
+  run_apply
   exit 0
 fi
 
 read -r -p "是否使用该提交信息? [y/N] " REPLY
 case "$REPLY" in
   [yY][eE][sS]|[yY])
-    run_commit
-    ;; 
+    run_apply
+    ;;
   *)
     echo "jj-commit-ai: 已放弃提交（上方已显示生成的消息）" >&2
-    ;; 
+    ;;
 esac
