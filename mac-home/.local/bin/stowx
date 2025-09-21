@@ -431,11 +431,55 @@ force_remove_conflicts() {
   done
 }
 
+# Force remove conflicts by checking stow dry-run output
+force_remove_conflicts_by_stow_check() {
+  log "检查 stow 冲突并强制删除..."
+  local temp_output
+  temp_output=$(mktemp)
+  
+  # Run stow dry-run to detect conflicts
+  if run_stow -n -S 2>"$temp_output"; then
+    log "没有发现冲突"
+    rm -f "$temp_output"
+    return 0
+  fi
+  
+  # Parse conflict files from stow error output
+  local conflict_files=()
+  while IFS= read -r line; do
+    if [[ "$line" =~ existing\ target\ is\ not\ owned\ by\ stow:\ (.+) ]]; then
+      local file="${BASH_REMATCH[1]}"
+      local full_path="$TARGET/$file"
+      conflict_files+=("$full_path")
+    fi
+  done < "$temp_output"
+  
+  rm -f "$temp_output"
+  
+  if [[ ${#conflict_files[@]} -eq 0 ]]; then
+    log "未发现可解析的冲突文件"
+    return 0
+  fi
+  
+  # Remove conflict files
+  for file in "${conflict_files[@]}"; do
+    if [[ -e "$file" || -L "$file" ]]; then
+      if [[ $YES -eq 1 ]]; then
+        log "强制删除冲突文件: $file"
+        rm -rf "$file"
+      else
+        confirm "删除冲突文件 $file ?" || continue
+        rm -rf "$file"
+      fi
+    fi
+  done
+}
+
 cmd_preview() { ensure_packages; run_stow -n -v -S; }
 cmd_apply()   { 
   ensure_packages
   if [[ $FORCE -eq 1 ]]; then
-    force_remove_conflicts
+    force_remove_conflicts_by_stow_check
   fi
   run_stow -S
 }
