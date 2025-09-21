@@ -451,6 +451,10 @@ force_remove_conflicts_by_stow_check() {
       local file="${BASH_REMATCH[1]}"
       local full_path="$TARGET/$file"
       conflict_files+=("$full_path")
+    elif [[ "$line" =~ existing\ target\ is\ stowed\ to\ a\ different\ package:\ ([^[:space:]]+) ]]; then
+      local file="${BASH_REMATCH[1]}"
+      local full_path="$TARGET/$file"
+      conflict_files+=("$full_path")
     fi
   done < "$temp_output"
   
