@@ -396,10 +396,24 @@ rel_under_target() {
 force_remove_conflicts() {
   local pkg target_file pkg_file
   for pkg in "${PACKAGES[@]}"; do
-    local pkg_dir="$STOW_DIR/$pkg"
+    case "$pkg" in
+      */*)
+        # 嵌套包（如 hosts/VM-0-10-centos）
+        local base=${pkg%/*}
+        local name=${pkg##*/}
+        local pkg_dir="$STOW_DIR/$base/$name"
+        ;;
+      *)
+        # 普通包
+        local pkg_dir="$STOW_DIR/$pkg"
+        ;;
+    esac
+    
     if [[ ! -d "$pkg_dir" ]]; then
+      log "跳过：包目录不存在 -> $pkg_dir"
       continue
     fi
+    
     # Find all files in the package and check for conflicts
     while IFS= read -r -d '' pkg_file; do
       local rel_path="${pkg_file#$pkg_dir/}"
