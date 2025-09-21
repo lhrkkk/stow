@@ -29,20 +29,23 @@ Options:
   -n, --dry-run          预演（为 adopt/apply/unstow/restow 添加 -n）
   -v, --verbose          增强调试输出（为 stow 添加 -v）
   -p, --package <name>   指定包，可重复；也可直接作为位置参数（grab 推荐仅一个包）
-      --host[=<name>]    为命令追加 hosts/<name> 模块；不提供参数时自动取 $(hostname)
+      --host[=<name>]    仅操作 hosts/<name> 包（不包含默认包）；不提供参数时自动取 $(hostname)
   -y, --yes              非交互确认危险操作（adopt/覆盖同名目标时）
   -r, --restore          adopt 后执行 git -C <包> restore .（覆盖本地改动）
       --no-restore       兼容保留；默认已不恢复（无效果）
+  -f, --force            强制覆盖冲突文件（删除现有文件后重新创建符号链接）
 
 缺省包: mac-home
 示例：
   预览:   stowx preview
-  应用:   stowx apply
-  主机:   stowx apply --host         # 额外部署 hosts/$(hostname)
+  应用:   stowx apply                # 部署 mac-home
+  主机:   stowx apply --host         # 仅部署 hosts/$(hostname)
+  组合:   stowx apply mac-home --host # 错误：--host 不能与其他包组合
+  强制:   stowx apply --force -y     # 强制覆盖冲突文件
   覆盖:   stowx adopt -y -r    # 等价 --restore
   抓取:   stowx grab -p mac-home ~/.config/wezterm/wezterm.lua
   抓取:   stowx grab ~/.config/wezterm/wezterm.lua --host
-  取消:   stowx unstow mac-home
+  取消:   stowx unstow --host        # 仅取消主机包链接
 EOF
 }
 
@@ -57,6 +60,7 @@ VERBOSE=0
 DRY_RUN=0
 DO_RESTORE=0
 YES=0
+FORCE=0
 USE_CWD=0
 USE_HOST=0
 HOST_NAME=""
@@ -250,6 +254,8 @@ parse_args() {
       --no-restore)
         # 兼容参数：默认已不恢复
         DO_RESTORE=0; shift ;;
+      -f|--force)
+        FORCE=1; shift ;;
       --)
         shift; break ;;
       -h|--help)
@@ -338,32 +344,16 @@ ensure_packages() {
     HOST_PACKAGE="hosts/$HOST_NAME"
   fi
 
-  if [[ $USE_HOST -eq 1 && "$CMD" == "grab" ]]; then
+  if [[ $USE_HOST -eq 1 ]]; then
+    # --host 选项：只操作 host 包，不包含默认包
     if [[ $had_explicit -eq 1 ]]; then
-      die "grab 使用 --host 时请勿再指定包，可改用 -p 明确包名"
+      die "--host 与明确指定的包冲突，请选择其一"
     fi
     PACKAGES=("$HOST_PACKAGE")
   else
+    # 非 --host 模式：使用默认包逻辑
     if [[ ${#PACKAGES[@]} -eq 0 ]]; then
       PACKAGES=("mac-home")
-    fi
-    if [[ $USE_HOST -eq 1 && -n "$HOST_PACKAGE" ]]; then
-      local found=0
-      local p
-      for p in "${PACKAGES[@]}"; do
-        if [[ "$p" == "$HOST_PACKAGE" ]]; then
-          found=1
-          break
-        fi
-      done
-      if [[ $found -eq 0 ]]; then
-        local host_path="$STOW_DIR/$HOST_PACKAGE"
-        if [[ -d "$host_path" ]]; then
-          PACKAGES+=("$HOST_PACKAGE")
-        else
-          log "host 包不存在，跳过: $HOST_PACKAGE"
-        fi
-      fi
     fi
   fi
 
@@ -402,8 +392,39 @@ rel_under_target() {
   esac
 }
 
+# Force remove conflicting files/symlinks before applying
+force_remove_conflicts() {
+  local pkg target_file pkg_file
+  for pkg in "${PACKAGES[@]}"; do
+    local pkg_dir="$STOW_DIR/$pkg"
+    if [[ ! -d "$pkg_dir" ]]; then
+      continue
+    fi
+    # Find all files in the package and check for conflicts
+    while IFS= read -r -d '' pkg_file; do
+      local rel_path="${pkg_file#$pkg_dir/}"
+      local target_file="$TARGET/$rel_path"
+      if [[ -e "$target_file" || -L "$target_file" ]]; then
+        if [[ $YES -eq 1 ]]; then
+          log "强制删除冲突文件: $target_file"
+          rm -rf "$target_file"
+        else
+          confirm "删除冲突文件 $target_file ?" || continue
+          rm -rf "$target_file"
+        fi
+      fi
+    done < <(find "$pkg_dir" -type f -print0)
+  done
+}
+
 cmd_preview() { ensure_packages; run_stow -n -v -S; }
-cmd_apply()   { ensure_packages; run_stow -S; }
+cmd_apply()   { 
+  ensure_packages
+  if [[ $FORCE -eq 1 ]]; then
+    force_remove_conflicts
+  fi
+  run_stow -S
+}
 cmd_unstow()  { ensure_packages; run_stow -D; }
 cmd_restow()  { ensure_packages; run_stow -R; }
 
