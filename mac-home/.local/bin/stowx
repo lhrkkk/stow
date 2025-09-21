@@ -299,6 +299,11 @@ build_opts() {
   for pattern in "${OVERRIDE_PATTERNS[@]}"; do
     STOW_OPTS=( "${STOW_OPTS[@]}" --override="$pattern" )
   done
+  
+  # Debug output if verbose
+  if [[ $VERBOSE -eq 1 && ${#DEFER_PATTERNS[@]} -gt 0 ]]; then
+    log "Defer 模式: ${DEFER_PATTERNS[*]}"
+  fi
 }
 
 run_stow() {
@@ -498,8 +503,10 @@ force_remove_conflicts_by_stow_check() {
           log "跳过冲突文件: $file"
           # Add defer pattern for this specific file
           local rel_file="${file#$TARGET/}"
+          # Escape special regex characters for exact match
           local escaped_file=$(printf '%s\n' "$rel_file" | sed 's/[[\.*^$()+{}|]/\\&/g')
-          DEFER_PATTERNS+=("^${escaped_file}$")
+          DEFER_PATTERNS+=("^${escaped_file}\$")
+          log "添加 defer 模式: ^${escaped_file}\$"
         fi
       fi
     fi
