@@ -29,6 +29,7 @@ Options:
   -n, --dry-run          预演（为 adopt/apply/unstow/restow 添加 -n）
   -v, --verbose          增强调试输出（为 stow 添加 -v）
   -p, --package <name>   指定包，可重复；也可直接作为位置参数（grab 推荐仅一个包）
+      --host[=<name>]    为命令追加 hosts/<name> 模块；不提供参数时自动取 $(hostname)
   -y, --yes              非交互确认危险操作（adopt/覆盖同名目标时）
   -r, --restore          adopt 后执行 git -C <包> restore .（覆盖本地改动）
       --no-restore       兼容保留；默认已不恢复（无效果）
@@ -37,8 +38,10 @@ Options:
 示例：
   预览:   stowx preview
   应用:   stowx apply
+  主机:   stowx apply --host         # 额外部署 hosts/$(hostname)
   覆盖:   stowx adopt -y -r    # 等价 --restore
   抓取:   stowx grab -p mac-home ~/.config/wezterm/wezterm.lua
+  抓取:   stowx grab ~/.config/wezterm/wezterm.lua --host
   取消:   stowx unstow mac-home
 EOF
 }
@@ -55,6 +58,9 @@ DRY_RUN=0
 DO_RESTORE=0
 YES=0
 USE_CWD=0
+USE_HOST=0
+HOST_NAME=""
+HOST_PACKAGE=""
 CMD=""
 PACKAGES=()
 POSITIONALS=()
@@ -62,6 +68,113 @@ PATHS=()
 GLOBAL_IGNORE=()
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "未找到命令: $1"; }
+
+default_host() {
+  local name
+  if command -v hostname >/dev/null 2>&1; then
+    name=$(hostname 2>/dev/null || true)
+    if [[ -n "$name" ]]; then
+      printf '%s' "$name"
+      return 0
+    fi
+  fi
+  if command -v uname >/dev/null 2>&1; then
+    name=$(uname -n 2>/dev/null || true)
+    if [[ -n "$name" ]]; then
+      printf '%s' "$name"
+      return 0
+    fi
+  fi
+  printf '%s' "unknown-host"
+}
+
+ensure_global_ignore_file() {
+  local file="$STOW_DIR/.stow-global-ignore"
+  if [[ -f "$file" ]]; then
+    return 0
+  fi
+  mkdir -p "$STOW_DIR"
+  cat >"$file" <<'EOF'
+^\.git(ignore)?$
+^\.gitmodules$
+# ^WARP\.md$
+^\.specstory$
+^\.cursor$
+^\.stow-local-ignore$
+\.DS_Store$
+^\.cursorindexingignore$
+^\.cursorrules$
+^\.cursorignore$
+^\.cursorignorerules$
+# common temp/cache
+(^|/)cache(/|$)
+(^|/)Cache(/|$)
+(^|/)tmp(/|$)
+(^|/)SavedState(/|$)
+(^|/)sockets(/|$)
+(^|/)__pycache__(/|$)
+(^|/).+\.zwc$
+(^|/)\.aider(/|$)
+(^|/)\.claude(/|$)
+(^|/)#detach(/|$)
+# third-party git content
+(^|/)tmux/plugins(/|$)
+(^|/)tpm(/|$)
+# common files
+(^|/)\.DS_Store$
+(^|/)\.git($|/)
+^README(\.md)?$
+(^|/)README\.md$
+(^|/)LICENSE$
+EOF
+  log "已创建默认 .stow-global-ignore"
+  log "请核对内容后按需调整（文件首次生成时仅包含默认规则）"
+}
+
+ensure_local_ignore_file() {
+  local pkg_dir="$1"
+  local file="$pkg_dir/.stow-local-ignore"
+  if [[ -f "$file" ]]; then
+    return 0
+  fi
+  mkdir -p "$pkg_dir"
+  cat >"$file" <<'EOF'
+^\.git(ignore)?$
+^\.gitmodules$
+# ^WARP\.md$
+^\.specstory$
+^\.cursor$
+\.DS_Store$
+^\.cursorindexingignore$
+^\.cursorrules$
+^\.cursorignore$
+^\.cursorignorerules$
+# common temp/cache
+(^|/)cache(/|$)
+(^|/)Cache(/|$)
+(^|/)tmp(/|$)
+(^|/)SavedState(/|$)
+(^|/)sockets(/|$)
+(^|/)__pycache__(/|$)
+(^|/).+\.zwc$
+(^|/)\.aider(/|$)
+(^|/)\.claude(/|$)
+(^|/)#detach(/|$)
+# third-party git content
+(^|/)tmux/plugins(/|$)
+(^|/)tpm(/|$)
+# common files
+(^|/)\.DS_Store$
+(^|/)\.git($|/)
+^README(\.md)?$
+(^|/)README\.md$
+(^|/)LICENSE$
+EOF
+  local rel="${pkg_dir#$STOW_DIR/}"
+  rel=${rel:-${pkg_dir}}
+  log "已在 $rel 创建默认 .stow-local-ignore"
+  log "请核对内容后按需调整（文件首次生成时仅包含默认规则）"
+}
 
 # Load .stow-global-ignore from STOW_DIR (regex patterns, one per line)
 load_global_ignore() {
@@ -102,6 +215,23 @@ parse_args() {
         DRY_RUN=1; shift ;;
       -v|--verbose)
         VERBOSE=1; shift ;;
+      --host)
+        USE_HOST=1
+        if [[ $# -ge 2 && ${2-} != -* ]]; then
+          HOST_NAME="$2"
+          shift 2
+        else
+          HOST_NAME=$(default_host)
+          shift
+        fi
+        ;;
+      --host=*)
+        USE_HOST=1
+        HOST_NAME="${1#--host=}"
+        if [[ -z "$HOST_NAME" ]]; then
+          HOST_NAME=$(default_host)
+        fi
+        shift ;;
       -p|--package)
         [[ $# -ge 2 ]] || die "--package 需要参数"; PACKAGES+=("$2"); shift 2 ;;
       -y|--yes)
@@ -140,29 +270,100 @@ run_stow() {
   need_cmd stow
   build_opts
   local subopts=("$@")
-  # 仅当包名以 '-' 开头时才插入选项结束符 --，以兼容某些 stow 版本在 -- 下的边界行为
-  local sep=()
+  local -a normal=()
+  local -a nested=()
+  local p
   for p in "${PACKAGES[@]}"; do
     case "$p" in
-      -*) sep=(--); break ;;
+      */*) nested+=("$p") ;;
+      *)   normal+=("$p") ;;
     esac
   done
-  if [[ ${#sep[@]} -gt 0 ]]; then
-    log "stow ${STOW_OPTS[*]} ${subopts[*]} -- ${PACKAGES[*]}"
-    stow "${STOW_OPTS[@]}" "${subopts[@]}" -- "${PACKAGES[@]}"
-  else
-    log "stow ${STOW_OPTS[*]} ${subopts[*]} ${PACKAGES[*]}"
-    stow "${STOW_OPTS[@]}" "${subopts[@]}" "${PACKAGES[@]}"
+
+  if [[ ${#normal[@]} -gt 0 ]]; then
+    local -a sep=()
+    for p in "${normal[@]}"; do
+      case "$p" in
+        -*) sep=(--); break ;;
+      esac
+    done
+    if [[ ${#sep[@]} -gt 0 ]]; then
+      log "stow ${STOW_OPTS[*]} ${subopts[*]} -- ${normal[*]}"
+      stow "${STOW_OPTS[@]}" "${subopts[@]}" -- "${normal[@]}" || return $?
+    else
+      log "stow ${STOW_OPTS[*]} ${subopts[*]} ${normal[*]}"
+      stow "${STOW_OPTS[@]}" "${subopts[@]}" "${normal[@]}" || return $?
+    fi
+  fi
+
+  if [[ ${#nested[@]} -gt 0 ]]; then
+    local base name dir
+    for p in "${nested[@]}"; do
+      base=${p%/*}
+      name=${p##*/}
+      dir="$STOW_DIR/$base"
+      if [[ ! -d "$dir/$name" ]]; then
+        err "跳过：包不存在 -> $dir/$name"
+        continue
+      fi
+      local -a opts=( -t "$TARGET" -d "$dir" )
+      if [[ $VERBOSE -eq 1 ]]; then opts=( -v "${opts[@]}" ); fi
+      if [[ $DRY_RUN -eq 1 ]]; then opts=( -n "${opts[@]}" ); fi
+      log "stow ${opts[*]} ${subopts[*]} ${name}"
+      case "$name" in
+        -*) stow "${opts[@]}" "${subopts[@]}" -- "$name" || return $? ;;
+        *)  stow "${opts[@]}" "${subopts[@]}" "$name" || return $? ;;
+      esac
+    done
   fi
 }
 
 ensure_packages() {
-  if [[ ${#PACKAGES[@]} -eq 0 ]]; then
-    PACKAGES=("mac-home")
+  local had_explicit=0
+  if [[ ${#PACKAGES[@]} -gt 0 ]]; then
+    had_explicit=1
   fi
-  # Validate against global ignore patterns
+
+  if [[ $USE_HOST -eq 1 && -z "$HOST_PACKAGE" ]]; then
+    HOST_NAME=${HOST_NAME:-$(default_host)}
+    HOST_PACKAGE="hosts/$HOST_NAME"
+  fi
+
+  if [[ $USE_HOST -eq 1 && "$CMD" == "grab" ]]; then
+    if [[ $had_explicit -eq 1 ]]; then
+      die "grab 使用 --host 时请勿再指定包，可改用 -p 明确包名"
+    fi
+    PACKAGES=("$HOST_PACKAGE")
+  else
+    if [[ ${#PACKAGES[@]} -eq 0 ]]; then
+      PACKAGES=("mac-home")
+    fi
+    if [[ $USE_HOST -eq 1 && -n "$HOST_PACKAGE" ]]; then
+      local found=0
+      local p
+      for p in "${PACKAGES[@]}"; do
+        if [[ "$p" == "$HOST_PACKAGE" ]]; then
+          found=1
+          break
+        fi
+      done
+      if [[ $found -eq 0 ]]; then
+        local host_path="$STOW_DIR/$HOST_PACKAGE"
+        if [[ -d "$host_path" ]]; then
+          PACKAGES+=("$HOST_PACKAGE")
+        else
+          log "host 包不存在，跳过: $HOST_PACKAGE"
+        fi
+      fi
+    fi
+  fi
+
+  ensure_global_ignore_file
   load_global_ignore
   for p in "${PACKAGES[@]}"; do
+    if [[ $p == hosts/* ]]; then
+      ensure_local_ignore_file "$STOW_DIR/$p"
+    fi
     if pkg_ignored "$p"; then
       die "包名被 .stow-global-ignore 规则匹配：$p"
     fi
@@ -298,20 +499,50 @@ cmd_adopt() {
 
 cmd_list() {
   [[ -d "$STOW_DIR" ]] || die "STOW_DIR 不存在: $STOW_DIR"
+  ensure_global_ignore_file
   load_global_ignore
+  local -a top_dirs=()
   while IFS= read -r name; do
-    # 仅列出未被忽略的包目录名
-    if pkg_ignored "$name"; then continue; fi
-    echo "$name"
+    top_dirs+=("$name")
   done < <(find "$STOW_DIR" -mindepth 1 -maxdepth 1 -type d -prune -exec basename {} \; | sort)
+
+  local name
+  for name in "${top_dirs[@]}"; do
+    if pkg_ignored "$name"; then
+      continue
+    fi
+    case "$name" in
+      hosts|mods)
+        echo "$name/"
+        local dir="$STOW_DIR/$name"
+        if [[ -d "$dir" ]]; then
+          while IFS= read -r sub; do
+            local rel="$name/$sub"
+            if pkg_ignored "$rel"; then
+              continue
+            fi
+            echo "  $sub"
+          done < <(find "$dir" -mindepth 1 -maxdepth 1 -type d -prune -exec basename {} \; | sort)
+        fi
+        ;;
+      *)
+        echo "$name"
+        ;;
+    esac
+  done
 }
 
 main() {
   parse_args "$@"
+
+  if [[ $USE_HOST -eq 1 ]]; then
+    HOST_NAME=${HOST_NAME:-$(default_host)}
+    HOST_PACKAGE="hosts/$HOST_NAME"
+  fi
+
   # Map POSITIONALS depending on command
   if [[ "${CMD:-}" == "grab" ]]; then
     PATHS=("${POSITIONALS[@]}")
-    if [[ ${#PACKAGES[@]} -eq 0 ]]; then PACKAGES=("mac-home"); fi
   else
     if [[ ${#PACKAGES[@]} -eq 0 && ${#POSITIONALS[@]} -gt 0 ]]; then
       PACKAGES=("${POSITIONALS[@]}")
@@ -331,4 +562,3 @@ main() {
 }
 
 main "$@"
-

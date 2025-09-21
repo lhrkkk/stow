@@ -58,6 +58,7 @@ exec zsh -l
 
 - 懒加载流程捕获 `compdef`，`compinit` 之后执行内置 `_stowx` 注册；`print -r -- $STOWX_COMPLETION_READY` 可验证脚本已装入。
 - 支持子命令与包名提示：`preview/apply/adopt/unstow/restow` 等会读取 `STOW_DIR`（可被 `-d/--dir` 覆盖）列出台下的包。
+- `--host` 会读取 `$STOW_DIR/hosts` 下的目录作为候选，便于直接选择主机专属模块。
 - `grab` 子命令保持 `_files` 行为补齐抓取路径；若输入 `--` 之后则回落到默认补全以便继续传递给 GNU Stow。
 - `stowx` 未安装时脚本自动跳过，不影响其它补全；安装后重新开启登录 shell 即可生效。
 

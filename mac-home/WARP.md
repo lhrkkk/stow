@@ -119,14 +119,18 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 六、Stow 规则引用
 
 - 规则文件路径：/Users/lhr/_env/stow/STOW.md
-- 摘要：使用 GNU Stow 管理 dotfiles，STOW_DIR=$HOME/_env/stow，TARGET=$HOME，默认包 mac-home；提供辅助脚本 ~/.local/bin/stowx，支持 preview/apply/adopt/grab/unstow/restow/list。
+- 摘要：使用 GNU Stow 管理 dotfiles，STOW_DIR=$HOME/_env/stow，TARGET=$HOME，默认包 mac-home；提供辅助脚本 ~/.local/bin/stowx，支持 preview/apply/adopt/grab/unstow/restow/list，并可通过 `--host` 追加 `$STOW_DIR/hosts/<hostname>`。
+  首次运行会生成 `.stow-global-ignore`，默认忽略 `.DS_Store`、缓存目录、嵌套插件仓库等。
 - 快速命令：
   -  stowx preview      （等价: stow -nvt "$HOME" -d "$HOME/_env/stow" -S mac-home）
   -  stowx apply        （等价: stow -vt  "$HOME" -d "$HOME/_env/stow" -S mac-home）
+  -  stowx apply --host （追加部署 hosts/$(hostname)；可用 `--host <name>` 指定）
   -  仅收编（默认）：    ` stowx adopt -y`
   -  覆盖式部署（谨慎）：` stowx adopt -y --restore`
   -  预评估收编影响：    ` stowx preview -- --adopt`
   -  stowx grab -p mac-home <路径>（相对路径默认相对 $HOME；若需相对当前目录解析，使用 -C/--relative-to-cwd）
+  -  stowx grab <路径> --host（抓取到 hosts/$(hostname)；首次使用自动创建目录）
+  -  首次运行自动写入 `.stow-global-ignore`，并在 `hosts/<hostname>` 生成 `.stow-local-ignore`（忽略 `.DS_Store`、缓存/tmp、嵌套插件仓库等）
 - 代理注意：命令前加空格避免写入历史；adopt/覆盖操作须确认；优先先预览再 apply。
 
 七、Warp 会话日志工作流与追加规范（含作用域）

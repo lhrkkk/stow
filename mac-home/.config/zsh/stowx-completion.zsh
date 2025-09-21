@@ -54,6 +54,20 @@ __ami_stowx_register_completion() {
     _wanted stowx-packages expl 'stowx package' compadd -a pkgs
   }
 
+  _stowx_complete_host() {
+    local dir hosts_dir
+    dir=$(_stowx_resolve_dir)
+    hosts_dir="$dir/hosts"
+    [[ -d $hosts_dir ]] || return 1
+    local path
+    local -a host_pkgs=()
+    for path in "$hosts_dir"/*(/N); do
+      host_pkgs+=("${path:t}")
+    done
+    (( ${#host_pkgs[@]} )) || return 1
+    _wanted stowx-hosts expl 'stowx host module' compadd -a host_pkgs
+  }
+
   _stowx_detect_command() {
     local word
     for word in ${words[@]:1}; do
@@ -89,6 +103,7 @@ __ami_stowx_register_completion() {
       '(-n --dry-run)'{-n,--dry-run}'[enable dry-run for stow operations]'
       '(-v --verbose)'{-v,--verbose}'[enable verbose output]'
       '(-p --package)'{-p,--package}'[select package (repeatable)]:package name:->package'
+      '--host[append host-specific package (default: hostname)]::host name:->host'
       '(-y --yes)'{-y,--yes}'[assume yes for confirmations]'
       '(-r --restore)'{-r,--restore}'[after adopt, restore tracked files]'
       '(--no-restore)--no-restore[skip restore step after adopt]'
@@ -117,6 +132,10 @@ __ami_stowx_register_completion() {
         ;;
       package)
         _stowx_complete_packages
+        return 0
+        ;;
+      host)
+        _stowx_complete_host
         return 0
         ;;
       args)

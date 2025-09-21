@@ -100,6 +100,8 @@
    stowx list
   ```
 
+  输出中会把 `hosts/`、`mods/` 下的一级子目录缩进列出，方便直接查看主机或模块包。
+
 - 重链（刷新所有链接）：
   
   ```sh
@@ -124,7 +126,14 @@
    stowx apply -n
   ```
 
+- 主机特定模块：
+  
+  ```sh
+   stowx apply --host
+  ```
+
 > 说明：`stowx` 为你在 `mac-home` 包内维护的辅助脚本，底层仍是 GNU Stow。习惯是“先预览，再执行”。
+> 首次运行会在 `$STOW_DIR/.stow-global-ignore` 写入常见忽略规则（`.DS_Store`、临时目录、嵌套插件仓库等），避免把这些文件链接回家目录。
 
 ---
 
@@ -195,9 +204,28 @@
    stowx -n grab -p mac-home ~/.config/karabiner
   ```
 
+- 抓取主机定制：
+  
+  ```sh
+   stowx grab ~/.config/wezterm/wezterm.lua --host
+  ```
+
 > 限制：被抓取路径必须位于 `$HOME` 之下；否则会跳过并提示。
 
 ---
+
+## 6. 主机特定模块（`hosts/<hostname>`）
+
+当某台机器需要额外配置时，可在 `$STOW_DIR/hosts/<hostname>` 下维护主机专属模块：
+
+- `stowx preview --host`、`stowx apply --host` 会在默认的 `mac-home` 基础上追加 `hosts/<hostname>`（`--host <name>` 可显式指定）。
+- `stowx grab --host` 会把路径抓取到 `hosts/<hostname>`，首次使用时若目录不存在会自动创建。
+- 只部署主机模块时，可直接指定包名：`stowx apply hosts/<hostname>` 或 `stowx apply -p hosts/<hostname>`。
+- `stowx --host` 默认读取 `$(hostname)`；若需抓取同时传参，可写为 `stowx grab --host $(hostname) <path>` 或将 `--host` 放在参数末尾。
+- `hosts/<hostname>` 目录不存在时，`--host` 会忽略该模块并输出提示，不影响其它包部署。
+- `.stow-global-ignore` 若不存在会自动创建，默认忽略 `.DS_Store`、缓存目录、内嵌插件仓库等常见噪音；首次触发主机模块时，也会为 `hosts/<hostname>` 写入 `.stow-local-ignore`，便于局部定制忽略。
+
+> 与 `mac-home` 同步维护主机模块，便于迁移到新机器时快速复用专属配置。
 
 ## 6. Zsh 补全（Git/JJ 分组版 + report-kit）
 
