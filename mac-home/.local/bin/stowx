@@ -34,6 +34,8 @@ Options:
   -r, --restore          adopt 后执行 git -C <包> restore .（覆盖本地改动）
       --no-restore       兼容保留；默认已不恢复（无效果）
   -f, --force            强制覆盖冲突文件（删除现有文件后重新创建符号链接）
+      --defer <regex>    推迟处理匹配正则的文件（传递给 stow --defer）
+      --override <regex> 覆盖匹配正则的文件（传递给 stow --override）
 
 缺省包: mac-home
 示例：
@@ -42,7 +44,9 @@ Options:
   主机:   stowx apply --host         # 仅部署 hosts/$(hostname)
   组合:   stowx apply mac-home --host # 错误：--host 不能与其他包组合
   强制:   stowx apply --force -y     # 强制覆盖冲突文件
-  覆盖:   stowx adopt -y -r    # 等价 --restore
+  推迟:   stowx apply --defer '\.bashrc$' # 跳过 .bashrc 冲突
+  覆盖:   stowx apply --override '\.zshrc$' # 强制覆盖 .zshrc  
+  收编:   stowx adopt -y -r    # 等价 --restore
   抓取:   stowx grab -p mac-home ~/.config/wezterm/wezterm.lua
   抓取:   stowx grab ~/.config/wezterm/wezterm.lua --host
   取消:   stowx unstow --host        # 仅取消主机包链接
@@ -61,6 +65,8 @@ DRY_RUN=0
 DO_RESTORE=0
 YES=0
 FORCE=0
+DEFER_PATTERNS=()
+OVERRIDE_PATTERNS=()
 USE_CWD=0
 USE_HOST=0
 HOST_NAME=""
@@ -256,6 +262,10 @@ parse_args() {
         DO_RESTORE=0; shift ;;
       -f|--force)
         FORCE=1; shift ;;
+      --defer)
+        [[ $# -ge 2 ]] || die "--defer 需要参数"; DEFER_PATTERNS+=("$2"); shift 2 ;;
+      --override)
+        [[ $# -ge 2 ]] || die "--override 需要参数"; OVERRIDE_PATTERNS+=("$2"); shift 2 ;;
       --)
         shift; break ;;
       -h|--help)
@@ -279,6 +289,16 @@ build_opts() {
   STOW_OPTS=( -t "$TARGET" -d "$STOW_DIR" )
   if [[ $VERBOSE -eq 1 ]]; then STOW_OPTS=( -v "${STOW_OPTS[@]}" ); fi
   if [[ $DRY_RUN -eq 1 ]]; then STOW_OPTS=( -n "${STOW_OPTS[@]}" ); fi
+  
+  # Add defer patterns
+  for pattern in "${DEFER_PATTERNS[@]}"; do
+    STOW_OPTS=( "${STOW_OPTS[@]}" --defer="$pattern" )
+  done
+  
+  # Add override patterns  
+  for pattern in "${OVERRIDE_PATTERNS[@]}"; do
+    STOW_OPTS=( "${STOW_OPTS[@]}" --override="$pattern" )
+  done
 }
 
 run_stow() {
@@ -465,18 +485,106 @@ force_remove_conflicts_by_stow_check() {
     return 0
   fi
   
-  # Remove conflict files
+  # Remove conflict files and track skipped ones
+  local skipped_files=()
   for file in "${conflict_files[@]}"; do
     if [[ -e "$file" || -L "$file" ]]; then
       if [[ $YES -eq 1 ]]; then
         log "强制删除冲突文件: $file"
         rm -rf "$file"
       else
-        confirm "删除冲突文件 $file ?" || continue
-        rm -rf "$file"
+        if confirm "删除冲突文件 $file ?"; then
+          rm -rf "$file"
+        else
+          log "跳过冲突文件: $file"
+          skipped_files+=("$file")
+        fi
       fi
     fi
   done
+  
+  # Store skipped files for manual stow
+  if [[ ${#skipped_files[@]} -gt 0 ]]; then
+    printf '%s\n' "${skipped_files[@]}" > "$STOW_DIR/.stowx-skip-conflicts"
+    log "将使用手动模式跳过 ${#skipped_files[@]} 个冲突文件"
+  else
+    rm -f "$STOW_DIR/.stowx-skip-conflicts"
+  fi
+}
+
+# Manual stow that skips conflicted files
+manual_stow_with_skips() {
+  log "使用手动模式进行 stow，跳过冲突文件..."
+  
+  # Load skipped files
+  local -a skipped_files
+  if [[ -f "$STOW_DIR/.stowx-skip-conflicts" ]]; then
+    while IFS= read -r file; do
+      skipped_files+=("$file")
+    done < "$STOW_DIR/.stowx-skip-conflicts"
+  fi
+  
+  local created_links=0
+  local skipped_links=0
+  
+  for pkg in "${PACKAGES[@]}"; do
+    local pkg_dir
+    case "$pkg" in
+      */*)
+        local base=${pkg%/*}
+        local name=${pkg##*/}
+        pkg_dir="$STOW_DIR/$base/$name"
+        ;;
+      *)
+        pkg_dir="$STOW_DIR/$pkg"
+        ;;
+    esac
+    
+    if [[ ! -d "$pkg_dir" ]]; then
+      log "跳过：包目录不存在 -> $pkg_dir"
+      continue
+    fi
+    
+    # Manually create symlinks for non-conflicted files
+    while IFS= read -r -d '' pkg_file; do
+      local rel_path="${pkg_file#$pkg_dir/}"
+      local target_file="$TARGET/$rel_path"
+      
+      # Check if this file should be skipped
+      local should_skip=0
+      for skipped in "${skipped_files[@]}"; do
+        if [[ "$target_file" == "$skipped" ]]; then
+          should_skip=1
+          break
+        fi
+      done
+      
+      if [[ $should_skip -eq 1 ]]; then
+        log "跳过冲突文件: $rel_path"
+        ((skipped_links++))
+        continue
+      fi
+      
+      # Create directory if needed
+      local target_dir=$(dirname "$target_file")
+      if [[ ! -d "$target_dir" ]]; then
+        mkdir -p "$target_dir"
+      fi
+      
+      # Create symlink
+      if [[ -e "$target_file" || -L "$target_file" ]]; then
+        log "警告：目标已存在，跳过: $rel_path"
+        ((skipped_links++))
+      else
+        log "创建链接: $rel_path -> $pkg_file"
+        ln -s "$pkg_file" "$target_file"
+        ((created_links++))
+      fi
+    done < <(find "$pkg_dir" -type f -print0)
+  done
+  
+  log "手动 stow 完成：创建 $created_links 个链接，跳过 $skipped_links 个文件"
+  rm -f "$STOW_DIR/.stowx-skip-conflicts"
 }
 
 cmd_preview() { ensure_packages; run_stow -n -v -S; }
@@ -485,7 +593,13 @@ cmd_apply()   {
   if [[ $FORCE -eq 1 ]]; then
     force_remove_conflicts_by_stow_check
   fi
-  run_stow -S
+  
+  # Check if we need manual stow due to skipped conflicts
+  if [[ -f "$STOW_DIR/.stowx-skip-conflicts" ]]; then
+    manual_stow_with_skips
+  else
+    run_stow -S
+  fi
 }
 cmd_unstow()  { ensure_packages; run_stow -D; }
 cmd_restow()  { ensure_packages; run_stow -R; }
