@@ -39,6 +39,7 @@ Options:
       --defer <regex>    推迟处理匹配正则的文件（传递给 stow --defer）
       --override <regex> 覆盖匹配正则的文件（传递给 stow --override）
       --ignore <regex>   忽略匹配正则的路径（传递给 stow --ignore）
+      --allow-non-symlink  putback 允许覆盖/创建“非符号链接”的目标（默认仅处理符号链接）
 
 缺省包: mac-home
 示例：
@@ -74,6 +75,7 @@ FORCE=0
 DEFER_PATTERNS=()
 OVERRIDE_PATTERNS=()
 IGNORE_PATTERNS=()
+ALLOW_NON_SYMLINK=0
 USE_CWD=0
 USE_HOST=0
 HOST_NAME=""
@@ -275,6 +277,8 @@ parse_args() {
         [[ $# -ge 2 ]] || die "--override 需要参数"; OVERRIDE_PATTERNS+=("$2"); shift 2 ;;
       --ignore)
         [[ $# -ge 2 ]] || die "--ignore 需要参数"; IGNORE_PATTERNS+=("$2"); shift 2 ;;
+      --allow-non-symlink)
+        ALLOW_NON_SYMLINK=1; shift ;;
       --)
         shift; break ;;
       -h|--help)
@@ -578,10 +582,11 @@ force_remove_conflicts_by_stow_check() {
   local action ans _rel _esc _pat
   choose_action() {
     local prompt="$1"
-    read -r -p "$prompt [o=override/d=defer/q=quit] (默认 d): " ans || ans=""
+    read -r -p "$prompt [o=override/d=defer/a=adopt/q=quit] (默认 d): " ans || ans=""
     case "$ans" in
       o|O|override|OVERRIDE) action=override ;;
       d|D|defer|DEFER|"")  action=defer    ;;
+      a|A|adopt|ADOPT)       action=adopt    ;;
       q|Q|quit|QUIT)         action=quit     ;;
       *)                     action=defer    ;;
     esac
@@ -638,6 +643,53 @@ force_remove_conflicts_by_stow_check() {
         else
           IGNORE_PATTERNS+=("$_pat")
           log "添加 ignore(文件) 模式: $_pat"
+        fi
+        ;;
+      adopt)
+        # Move existing target from $TARGET into the current package
+        # Determine destination package directory (first package in PACKAGES)
+        local pkg dst_in_pkg dst_dir
+        pkg="${PACKAGES[0]}"
+        case "$pkg" in
+          */*) dst_dir="$STOW_DIR/${pkg%/*}/${pkg##*/}" ;;
+          *)   dst_dir="$STOW_DIR/$pkg" ;;
+        esac
+        dst_in_pkg="$dst_dir/$_rel"
+        if [[ -L "$file" ]]; then
+          # Adopting a symlink is ambiguous; prefer override instead
+          log "目标为符号链接，采用 override 接管: $_rel"
+          if [[ $DRY_RUN -eq 1 ]]; then
+            log "DRY-RUN: + rm -rf \"$file\""
+          else
+            rm -rf "$file"
+          fi
+          OVERRIDE_PATTERNS+=("$_pat")
+          log "已删除并标记 override: $_rel"
+        else
+          if [[ $DRY_RUN -eq 1 ]]; then
+            log "DRY-RUN: + mkdir -p \"$(dirname "$dst_in_pkg")\""
+            if [[ -e "$dst_in_pkg" || -L "$dst_in_pkg" ]]; then
+              log "DRY-RUN: + rm -rf \"$dst_in_pkg\""
+            fi
+            log "DRY-RUN: + mv \"$file\" \"$dst_in_pkg\""
+          else
+            mkdir -p "$(dirname "$dst_in_pkg")"
+            if [[ -e "$dst_in_pkg" || -L "$dst_in_pkg" ]]; then
+              if [[ $YES -eq 1 ]]; then
+                rm -rf "$dst_in_pkg"
+              else
+                if ! confirm "包内已存在：$dst_in_pkg。是否覆盖？"; then
+                  # 用户拒绝覆盖包内文件：回退为忽略该路径，避免后续 stow 再次冲突并中止
+                  IGNORE_PATTERNS+=("$_pat")
+                  log "已跳过收编并添加 ignore: $_rel"
+                  continue
+                fi
+                rm -rf "$dst_in_pkg"
+              fi
+            fi
+            mv "$file" "$dst_in_pkg"
+            log "已收编：$file -> $dst_in_pkg"
+          fi
         fi
         ;;
       quit)
@@ -853,18 +905,22 @@ cmd_putback() {
       err "跳过：包内不存在 -> $src"
       continue
     fi
-    # Strict policy: only operate when destination is a symlink. Otherwise warn and skip.
-    if [[ ! -L "$dst" ]]; then
-      # If destination resolves into STOW_DIR (parent dir is a repo symlink), warn explicitly
-      local dst_real
-      dst_real=$(readlink -f "$dst" 2>/dev/null || printf '%s' "$dst")
-      case "$dst_real" in
-        "$STOW_DIR"/*)
-          err "安全保护：目标真实路径落在 STOW_DIR 内（父目录是仓库链接），已跳过 -> $dst_real" ;;
-        *)
-          err "安全策略：目标不是符号链接，已跳过 -> $dst" ;;
-      esac
-      continue
+    # Policy: if destination exists and is not a symlink, skip unless --allow-non-symlink
+    if [[ -e "$dst" || -L "$dst" ]]; then
+      if [[ ! -L "$dst" ]]; then
+        if [[ $ALLOW_NON_SYMLINK -eq 0 ]]; then
+          # If destination resolves into STOW_DIR (parent dir is a repo symlink), warn explicitly
+          local dst_real
+          dst_real=$(readlink -f "$dst" 2>/dev/null || printf '%s' "$dst")
+          case "$dst_real" in
+            "$STOW_DIR"/*)
+              err "安全保护：目标真实路径落在 STOW_DIR 内（父目录是仓库链接），已跳过 -> $dst_real" ;;
+            *)
+              err "安全策略：目标存在且不是符号链接，已跳过（可用 --allow-non-symlink 覆盖） -> $dst" ;;
+          esac
+          continue
+        fi
+      fi
     fi
     # When destination is a symlink, it's safe to replace it (won't follow into repo)
     if [[ $DRY_RUN -eq 1 ]]; then

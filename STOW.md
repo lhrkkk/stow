@@ -66,6 +66,7 @@
     - 单个文件：` stowx putback -p mac-home ~/.config/wezterm/wezterm.lua`
     - 多个路径：` stowx putback -p mac-home ~/.zshrc ~/.gitconfig`
     - 相对路径默认相对 TARGET=`$HOME`；`-C` 改为相对 $PWD；`-y` 覆盖现有目标
+    - 仅当目标不存在或为“符号链接”时执行；如需覆盖已存在的普通文件，加 `--allow-non-symlink`
 - 主机定制：
   - ` stowx grab ~/.config/wezterm/wezterm.lua --host`（无参数默认当前 `hostname`；也可写为 `--host <name>`）
 - 限制：被抓取路径必须位于 TARGET（默认 `$HOME`）之下；否则跳过并提示。

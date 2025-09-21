@@ -235,7 +235,7 @@
 
 ---
 
-## 7. 冲突解析（--force：override/defer/ignore）
+## 7. 冲突解析（--force：override/defer/ignore/adopt）
 
 当目标路径已存在同名文件/目录时，stow 会报告冲突。stowx 提供统一的冲突解析：
 
@@ -250,6 +250,9 @@
     - 若是目录：追加 `--defer '^目录$'`，推迟处理父目录，利于目录折叠
     - 若是文件：追加 `--ignore '^文件$'`，稳定跳过该文件
   - q=quit：中止
+  - a=adopt：逐文件“收编”（把 `$HOME` 下现有文件/目录移动到包内对应路径，然后继续 stow 建立链接）
+    - 目标为符号链接时 adopt 语义不明确，自动退化为 override 接管
+    - 包内已存在同名且你拒绝覆盖时，会为该路径追加 `--ignore`，避免后续 stow 再次因该路径中止
 
 - 非交互默认覆盖（可配合 --defer 指定跳过项）：
   
@@ -316,7 +319,8 @@
 
 - 工具：`git-commit-ai`、`jj-commit-ai` 默认调用 **Codex** 后端，模型为 `gpt-5`。
 - 切换后端：`--api gemini` 可改用 Gemini；也可通过 `GIT_COMMIT_AI_BACKEND` / `JJ_COMMIT_AI_BACKEND` 环境变量。
- - 推理强度：`--reasoning-effort`, `-r`（或环境变量 `GIT_COMMIT_AI_REASONING_EFFORT`、`JJ_COMMIT_AI_REASONING_EFFORT`）会透传为 `model_reasoning_effort`，可选 `minimal / low / medium / high`（默认 `minimal`）。
+- 推理强度：`--reasoning-effort`, `-r`（或环境变量 `GIT_COMMIT_AI_REASONING_EFFORT`、`JJ_COMMIT_AI_REASONING_EFFORT`）会透传为 `model_reasoning_effort`，可选 `minimal / low / medium / high`（默认 `minimal`）。
+- JJ 支持：使用 `--describe` 以 `jj describe -m` 应用生成信息（替代 `jj commit`）。
 - 语言兜底：若偏好中文但 Codex 仅返回英文，脚本会打印原始结果并回退到本地摘要；设置 `GIT_COMMIT_AI_ALLOW_ENGLISH=1`（或 JJ 对应变量）可放行英文输出。
 - 常见示例：
   
@@ -325,6 +329,7 @@
    git-commit-ai --api gemini --preview  # 切换到 Gemini
    git-commit-ai --api codex -r medium   # 指定推理强度
    JJ_COMMIT_AI_ALLOW_ENGLISH=1 jj-commit-ai --api codex --preview
+   jj-commit-ai --describe --preview     # 仅更新当前变更的描述（jj describe -m）
   ```
 
 ---
@@ -445,6 +450,7 @@
   
   - 相对路径默认相对 `$HOME`；可用 `-C` 改为相对当前目录
   - 也可配合 `--host` 或 `-p hosts/<hostname>` 指定主机包
+  - 仅当目标不存在或是“符号链接”时执行；若希望覆盖已存在的普通文件，可加 `--allow-non-symlink`
 
 - 重链 / 取消 / 列表：
   
