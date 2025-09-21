@@ -20,12 +20,12 @@ Options:
   --wrap-subject STYLE 自定义标题包装（例如 brackets、cn-brackets；默认：cn-brackets）
   --bracket-title      标题使用半角方括号 []
   --bracket-title-cn   标题使用全角方括号 【】
-  --api NAME           指定使用的 API 后端 (默认: codex, 可选: gemini)
+  --api NAME           指定使用的 API 后端 (默认: gemini，可选: codex)
   -h, --help           查看帮助
 
 环境变量：
   GEMINI_API_KEY            使用 gemini 后端时的 API Key
-  GIT_COMMIT_AI_BACKEND      默认的 API 后端 (codex 或 gemini)
+  GIT_COMMIT_AI_BACKEND      默认的 API 后端（默认 gemini，可选 codex）
   GIT_COMMIT_AI_MODEL        默认模型名称
   GIT_COMMIT_AI_MAX_BYTES    diff 上限
   GIT_COMMIT_AI_EXTRA_PROMPT 额外固定提示词
@@ -47,7 +47,7 @@ DEFAULT_CLI_ARGS=""
 LANG_PREF=${GIT_COMMIT_AI_LANG:-zh}
 SUBJECT_STYLE=${GIT_COMMIT_AI_WRAP_SUBJECT:-cn-brackets}
 DEBUG=${GIT_COMMIT_AI_DEBUG:-}
-API_BACKEND=${GIT_COMMIT_AI_BACKEND:-codex}
+API_BACKEND=${GIT_COMMIT_AI_BACKEND:-gemini}
 
 AUTO_COMMIT=0
 PREVIEW_ONLY=0
@@ -143,26 +143,28 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
-# 查找 Codex CLI
-if ! command -v "$CLI_COMMAND" >/dev/null 2>&1; then
-  if [[ -d "$HOME/.local/share/mise/shims" ]]; then
-    PATH="$HOME/.local/share/mise/shims:$PATH"
+# 查找 Codex CLI（仅在使用 codex 后端时）
+if [[ "$API_BACKEND" == "codex" ]]; then
+  if ! command -v "$CLI_COMMAND" >/dev/null 2>&1; then
+    if [[ -d "$HOME/.local/share/mise/shims" ]]; then
+      PATH="$HOME/.local/share/mise/shims:$PATH"
+    fi
   fi
-fi
 
-if ! command -v "$CLI_COMMAND" >/dev/null 2>&1; then
-  if [[ -x "/opt/homebrew/bin/$CLI_COMMAND" ]]; then
-    PATH="/opt/homebrew/bin:$PATH"
-  elif [[ -x "/home/linuxbrew/.linuxbrew/bin/$CLI_COMMAND" ]]; then
-    PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-  elif [[ -x "$HOME/.local/bin/$CLI_COMMAND" ]]; then
-    PATH="$HOME/.local/bin:$PATH"
+  if ! command -v "$CLI_COMMAND" >/dev/null 2>&1; then
+    if [[ -x "/opt/homebrew/bin/$CLI_COMMAND" ]]; then
+      PATH="/opt/homebrew/bin:$PATH"
+    elif [[ -x "/home/linuxbrew/.linuxbrew/bin/$CLI_COMMAND" ]]; then
+      PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+    elif [[ -x "$HOME/.local/bin/$CLI_COMMAND" ]]; then
+      PATH="$HOME/.local/bin:$PATH"
+    fi
   fi
-fi
 
-if ! command -v "$CLI_COMMAND" >/dev/null 2>&1; then
-  echo "git-commit-ai: 找不到 $CLI_COMMAND，可设置 GIT_COMMIT_AI_COMMAND 自定义" >&2
-  exit 127
+  if ! command -v "$CLI_COMMAND" >/dev/null 2>&1; then
+    echo "git-commit-ai: 找不到 $CLI_COMMAND，可设置 GIT_COMMIT_AI_COMMAND 自定义" >&2
+    exit 127
+  fi
 fi
 
 STATUS_OUTPUT=$(git status --short --branch 2>/dev/null || true)
@@ -259,6 +261,7 @@ fi
 COMMIT_MESSAGE=""
 USING_FALLBACK=0
 CLI_STATUS=0
+MESSAGE_SOURCE=""
 
 if [[ "$API_BACKEND" == "gemini" ]]; then
     if [[ -z "${GEMINI_API_KEY:-}" ]]; then
@@ -342,6 +345,9 @@ PY_GEMINI
     )
     CLI_STATUS=$?
     set -e
+    if (( CLI_STATUS == 0 )); then
+      MESSAGE_SOURCE="gemini"
+    fi
 
 elif [[ "$API_BACKEND" == "codex" ]]; then
     KEEP_HISTORY=${GIT_COMMIT_AI_KEEP_HISTORY:-}
@@ -520,6 +526,7 @@ if not message: message = next(iter(fallbacks), "")
 print(message.strip())
 PY
         )
+        MESSAGE_SOURCE="codex"
     fi
 fi
 
@@ -634,6 +641,7 @@ PY
   if [[ -n "$FALLBACK_MESSAGE" ]]; then
     USING_FALLBACK=1
     COMMIT_MESSAGE="$FALLBACK_MESSAGE"
+    MESSAGE_SOURCE="fallback"
     echo "git-commit-ai: API 调用失败 (exit $CLI_STATUS)，已回退到本地摘要" >&2
   else
     echo "git-commit-ai: API 调用失败 (exit $CLI_STATUS)，且本地摘要生成失败" >&2
@@ -649,6 +657,27 @@ if [[ -z "$COMMIT_MESSAGE" ]]; then
   exit 1
 fi
 
+if [[ -z "$MESSAGE_SOURCE" ]]; then
+  if (( USING_FALLBACK )); then
+    MESSAGE_SOURCE="fallback"
+  else
+    MESSAGE_SOURCE="$API_BACKEND"
+  fi
+fi
+
+SOURCE_LABEL="生成的提交信息："
+case "$MESSAGE_SOURCE" in
+  gemini)
+    SOURCE_LABEL="Gemini API 生成的提交信息："
+    ;;
+  codex)
+    SOURCE_LABEL="Codex API 生成的提交信息："
+    ;;
+  fallback)
+    SOURCE_LABEL="本地摘要生成的提交信息："
+    ;;
+esac
+
 [[ -n "$DEBUG" ]] && {
   echo "[git-commit-ai] 提交信息如下:" >&2
   printf '%s\n' "$COMMIT_MESSAGE" >&2
@@ -658,14 +687,14 @@ MSG_FILE=$(mktemp "${TMPDIR:-/tmp}/git-commit-msg-XXXXXX")
 printf '%s\n' "$COMMIT_MESSAGE" >"$MSG_FILE"
 
 if (( PREVIEW_ONLY )); then
-  echo "生成的提交信息:" >&2
+  echo "$SOURCE_LABEL" >&2
   echo "----------------------------------------" >&2
   cat "$MSG_FILE"
   echo "----------------------------------------" >&2
   exit 0
 fi
 
-echo "生成的提交信息:" >&2
+echo "$SOURCE_LABEL" >&2
 echo "----------------------------------------" >&2
 cat "$MSG_FILE" >&2
 echo "----------------------------------------" >&2
