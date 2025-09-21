@@ -327,11 +327,23 @@ run_stow() {
         -*) sep=(--); break ;;
       esac
     done
+    # Show quoted command for debug
+    local cmd_display="stow"
+    for arg in "${STOW_OPTS[@]}" "${subopts[@]}"; do
+      if [[ "$arg" =~ [[:space:]\$\^] ]]; then
+        cmd_display="$cmd_display \"$arg\""
+      else
+        cmd_display="$cmd_display $arg"
+      fi
+    done
+    
     if [[ ${#sep[@]} -gt 0 ]]; then
-      log "stow ${STOW_OPTS[*]} ${subopts[*]} -- ${normal[*]}"
+      cmd_display="$cmd_display -- ${normal[*]}"
+      log "$cmd_display"
       stow "${STOW_OPTS[@]}" "${subopts[@]}" -- "${normal[@]}" || return $?
     else
-      log "stow ${STOW_OPTS[*]} ${subopts[*]} ${normal[*]}"
+      cmd_display="$cmd_display ${normal[*]}"
+      log "$cmd_display"
       stow "${STOW_OPTS[@]}" "${subopts[@]}" "${normal[@]}" || return $?
     fi
   fi
@@ -360,7 +372,18 @@ run_stow() {
         opts=( "${opts[@]}" "--override" "$pattern" )
       done
       
-      log "stow ${opts[*]} ${subopts[*]} ${name}"
+      # Show quoted command for debug
+      local cmd_display="stow"
+      for arg in "${opts[@]}" "${subopts[@]}"; do
+        if [[ "$arg" =~ [[:space:]\$\^] ]]; then
+          cmd_display="$cmd_display \"$arg\""
+        else
+          cmd_display="$cmd_display $arg"
+        fi
+      done
+      cmd_display="$cmd_display $name"
+      log "$cmd_display"
+      
       case "$name" in
         -*) stow "${opts[@]}" "${subopts[@]}" -- "$name" || return $? ;;
         *)  stow "${opts[@]}" "${subopts[@]}" "$name" || return $? ;;
