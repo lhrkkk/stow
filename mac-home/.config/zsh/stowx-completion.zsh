@@ -161,8 +161,16 @@ __ami_stowx_register_completion() {
     esac
   }
 
-  compdef _stowx stowx
-  __AMI_STOWX_COMPLETION_DONE=1
+  # Register mapping robustly depending on compsys state
+  local mapped=0
+  if typeset -p _comps >/dev/null 2>&1; then
+    _comps[stowx]=_stowx
+    mapped=1
+  elif typeset -f compdef >/dev/null; then
+    compdef _stowx stowx
+    mapped=1
+  fi
+  (( mapped )) && __AMI_STOWX_COMPLETION_DONE=1
 }
 
 __ami_after_compinit() {
