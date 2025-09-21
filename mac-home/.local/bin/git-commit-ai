@@ -20,7 +20,7 @@ Options:
   --wrap-subject STYLE 自定义标题包装（例如 brackets、cn-brackets；默认：cn-brackets）
   --bracket-title      标题使用半角方括号 []
   --bracket-title-cn   标题使用全角方括号 【】
-  --reasoning-effort, -r V 设置 Codex 推理强度（默认读取配置，可选：minimal/low/medium/high）
+  --reasoning-effort, -r V 设置 Codex 推理强度（默认 minimal；可选：minimal/low/medium/high）
   --api NAME           指定使用的 API 后端 (默认: codex，可选: gemini)
   -h, --help           查看帮助
 
@@ -51,7 +51,7 @@ fi
 DEFAULT_CLI_ARGS=""
 LANG_PREF=${GIT_COMMIT_AI_LANG:-zh}
 SUBJECT_STYLE=${GIT_COMMIT_AI_WRAP_SUBJECT:-cn-brackets}
-REASONING_EFFORT=${GIT_COMMIT_AI_REASONING_EFFORT:-}
+REASONING_EFFORT=${GIT_COMMIT_AI_REASONING_EFFORT:-minimal}
 DEBUG=${GIT_COMMIT_AI_DEBUG:-}
 API_BACKEND=${GIT_COMMIT_AI_BACKEND:-codex}
 
