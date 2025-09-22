@@ -320,11 +320,7 @@ __git_apply_styles() {
   # Do not sort matches; preserve emission order across groups
   zstyle ':completion:*:*:git:*' sort false
   # Plain text descriptions so fzf-tab recognizes groups
-  local _ami_git_desc_format
-  if ! zstyle -s ':completion:*:descriptions' format _ami_git_desc_format 2>/dev/null; then
-    zstyle ':completion:*:descriptions' format '[%d]'
-  fi
-  unset _ami_git_desc_format
+  zstyle ':completion:*:descriptions' format '[%d]'
   # Ensure per-item descriptions are shown with a clear separator
   zstyle ':completion:*:*:git:*:values' list-separator ' -- '
   # 不注入 fzf 预览，保留用户自定义
@@ -529,33 +525,23 @@ if [[ $- == *i* ]]; then
   autoload -Uz add-zsh-hook 2>/dev/null || true
   # 轻量兜底：每次 precmd 重新保证 git 的 compdef 指向我们
   __git_compdef_always() {
-    # 若 compinit 尚未完成（compdef 不存在），先跳过，避免报错
-    if ! typeset -f compdef >/dev/null; then
-      return 0
-    fi
     compdef __git_complete_with_aliases=git
     # compdef g=git 2>/dev/null || true
   }
   add-zsh-hook -Uz precmd __git_compdef_always 2>/dev/null || true
 fi
 
-# Load git's zsh wrapper safely and override its alias provider
+# Load git's zsh wrapper (after compinit) and override its alias provider
 __git_load_and_override() {
-  # If _git is still autoloaded, only force-load it inside completion context
-  # to avoid calling completion internals outside compsys.
+  # Load the wrapper script from fpath if not yet loaded
   if [[ $functions[_git] == *"autoload -X"* ]]; then
-    if (( $+compstate )); then
-      # Silence a first call to trigger autoload and function definitions
-      local __ami_out __ami_err __ret=0
-      exec {__ami_out}>&1 {__ami_err}>&2
-      { _git } >/dev/null 2>/dev/null || __ret=$?
-      exec >&$__ami_out 2>&$__ami_err
-      exec {__ami_out}>&- {__ami_err}>&-
-      # ignore __ret here; we only needed to load the definitions
-    else
-      # Not in completion context: skip forcing load to avoid _tags errors
-      return 0
-    fi
+    local d _f
+    for d in $fpath; do
+      _f="$d/_git"
+      [[ -r $_f ]] || continue
+      builtin source "$_f"
+      break
+    done
   fi
   # Neutralize system alias providers (we inject aliases via _git_commands wrapper)
   __git_zsh_cmd_alias() { return 1 }

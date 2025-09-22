@@ -4,13 +4,18 @@
 
 # First, ensure jj completion is available
 if (( $+commands[jj] )); then
-  # Marker for verification (checked after lazy load triggers)
-  typeset -g JJ_COMPLETION_ENHANCED=1
-  # We don't force-load _jj here to avoid calling completion internals
-  # outside completion context. We'll prepare overrides inside the wrapper.
+  # Generate jj completion if not already done
+  if ! typeset -f _jj >/dev/null; then
+    eval "$(jj util completion zsh 2>/dev/null || true)"
+  fi
 
-  # Our enhanced provider that can be installed as _jj_commands
-  __ami_jj_commands_with_aliases() {
+  # Save the original _jj_commands function
+  if typeset -f _jj_commands >/dev/null; then
+    functions[_jj_commands_original]=$functions[_jj_commands]
+  fi
+
+  # Override _jj_commands to include aliases with grouping
+  _jj_commands() {
     # Define alias groups (compact to 8 groups)
     local -a essential_aliases
     local -a statuslog_aliases
@@ -22,9 +27,6 @@ if (( $+commands[jj] )); then
     local -a workspacefile_aliases
 
     # Build and add aliases with categorization first (so commands can be last)
-    # Also export a global alias-name set for de-dup with clap output
-    typeset -gA __jj_alias_map
-    __jj_alias_map=()
     local alias_line name value desc
 
     # Parse jj aliases from config
@@ -37,9 +39,6 @@ if (( $+commands[jj] )); then
         value="${value//[\[\]]/}"
         value="${value//\'/}"
         value="${value//\,/}"
-
-        # Track alias name for later de-dup of clap results
-        __jj_alias_map[$name]=1
 
         # Create description based on alias name
         case $name in
@@ -286,119 +285,12 @@ if (( $+commands[jj] )); then
       _jj_commands_original "$@"
     fi
   }
-
-  # Install wrapper mapping: ensure we hook jj completion safely
-  __jj_prepare_overrides() {
-    emulate -L zsh
-    setopt local_options no_xtrace
-    # Capture original if present, then replace with our enhanced one
-    if typeset -f _jj_commands >/dev/null; then
-      functions[_jj_commands_original]=$functions[_jj_commands]
-    else
-      unset "functions[_jj_commands_original]" 2>/dev/null || true
-    fi
-    functions[_jj_commands]=$functions[__ami_jj_commands_with_aliases]
-  }
-
-  __jj_complete_with_aliases() {
-    emulate -L zsh
-    setopt local_options no_xtrace
-    # Use Clap dynamic completion protocol directly (works with or without
-    # the zsh function autoloaded), so both top-level and subcommands work.
-    local is_top=0
-    (( CURRENT == 2 )) && is_top=1
-    if (( CURRENT == 3 )) && [[ -z ${words[CURRENT]:-} ]]; then
-      # If cursor is right after a command word and not after "--",
-      # keep suggesting commands/aliases.
-      local _idx _after_dd=0
-      for (( _idx = 1; _idx < CURRENT; ++_idx )); do
-        [[ ${words[_idx]} == -- ]] && _after_dd=1 && break
-      done
-      (( !_after_dd )) && is_top=1
-    fi
-
-    if (( is_top )); then
-      __ami_jj_commands_with_aliases "$@"
-      local _CLAP_IFS=$'\n'
-      local _CLAP_COMPLETE_INDEX=$(( CURRENT - 1 ))
-      local -a __raw __pairs
-      __raw=( "${(@f)$( _CLAP_IFS="$_CLAP_IFS" _CLAP_COMPLETE_INDEX="$_CLAP_COMPLETE_INDEX" COMPLETE="zsh" jj -- "${words[@]}" 2>/dev/null )}" )
-      local line name desc sep=$'\t'
-      for line in ${__raw[@]}; do
-        if [[ $line == *$sep* ]]; then
-          name=${line%%$sep*}
-          desc=${line#*$sep}
-          [[ -n ${__jj_alias_map[$name]:-} ]] && continue
-          __pairs+=("${name}:${desc}")
-        else
-          [[ -n ${__jj_alias_map[$line]:-} ]] && continue
-          __pairs+=("${line}")
-        fi
-      done
-      (( ${#__pairs[@]} )) && _describe -t commands 'commands' __pairs "$@"
-      return 0
-    else
-      local _CLAP_IFS=$'\n'
-      local _CLAP_COMPLETE_INDEX=$(( CURRENT - 1 ))
-      local -a __raw __vals
-      __raw=( "${(@f)$( _CLAP_IFS="$_CLAP_IFS" _CLAP_COMPLETE_INDEX="$_CLAP_COMPLETE_INDEX" COMPLETE="zsh" jj -- "${words[@]}" 2>/dev/null )}" )
-      local line sep=$'\t'
-      for line in ${__raw[@]}; do
-        __vals+=("${line%%$sep*}")
-      done
-      (( ${#__vals[@]} )) && compadd -Q -o nosort -- ${__vals[@]}
-      return 0
-    fi
-  }
-
-  # Map jj -> our wrapper now, prefer direct _comps assignment if available
-  if typeset -p _comps >/dev/null 2>&1; then
-    _comps[jj]=__jj_complete_with_aliases
-  else
-    compdef __jj_complete_with_aliases=jj 2>/dev/null || compdef __jj_complete_with_aliases jj 2>/dev/null || true
-  fi
-
-  if [[ $- == *i* ]]; then
-    autoload -Uz add-zsh-hook 2>/dev/null || true
-    __jj_compdef_always() {
-      if ! typeset -f compdef >/dev/null; then
-        return 0
-      fi
-      if typeset -p _comps >/dev/null 2>&1; then
-        _comps[jj]=__jj_complete_with_aliases
-      else
-        compdef __jj_complete_with_aliases=jj 2>/dev/null || compdef __jj_complete_with_aliases jj 2>/dev/null || true
-      fi
-    }
-    add-zsh-hook -Uz precmd __jj_compdef_always 2>/dev/null || true
-  fi
-
-  # Keep mapping after compinit; chain any previous hook if present
-  if typeset -f __ami_after_compinit >/dev/null; then
-    functions -c __ami_after_compinit __ami_after_compinit_jj_prev 2>/dev/null || true
-  fi
-  __ami_after_compinit() {
-    if typeset -f __ami_after_compinit_jj_prev >/dev/null; then
-      __ami_after_compinit_jj_prev "$@"
-    fi
-    if typeset -f __jj_compdef_always >/dev/null; then
-      __jj_compdef_always
-    elif typeset -p _comps >/dev/null 2>&1; then
-      _comps[jj]=__jj_complete_with_aliases
-    else
-      compdef __jj_complete_with_aliases=jj 2>/dev/null || compdef __jj_complete_with_aliases jj 2>/dev/null || true
-    fi
-  }
 fi
 
 # Enable better formatting
 zstyle ':completion:*:*:jj:*' verbose yes
 # Use plain text (no escapes) so fzf-tab can read group headers
-typeset _ami_jj_desc_format
-if ! zstyle -s ':completion:*:descriptions' format _ami_jj_desc_format 2>/dev/null; then
-  zstyle ':completion:*:descriptions' format '[%d]'
-fi
-unset _ami_jj_desc_format
+zstyle ':completion:*:descriptions' format '[%d]'
 
 # Define tag and group order for jj (commands last)
 # Avoid restricting results to a single tag; rely on group-order only
