@@ -184,6 +184,8 @@ exec zsh -l
 
 ## JJ：8 组别名规划（commands 在最后）
 
+- 验证：`print -r -- $JJ_COMPLETION_ENHANCED`（首次 Tab 触发后应为 1，表示增强脚本已挂接）
+
 1) 核心（`essential-aliases`）
    - s, l
 

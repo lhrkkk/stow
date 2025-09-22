@@ -320,7 +320,11 @@ __git_apply_styles() {
   # Do not sort matches; preserve emission order across groups
   zstyle ':completion:*:*:git:*' sort false
   # Plain text descriptions so fzf-tab recognizes groups
-  zstyle ':completion:*:descriptions' format '[%d]'
+  local _ami_git_desc_format
+  if ! zstyle -s ':completion:*:descriptions' format _ami_git_desc_format 2>/dev/null; then
+    zstyle ':completion:*:descriptions' format '[%d]'
+  fi
+  unset _ami_git_desc_format
   # Ensure per-item descriptions are shown with a clear separator
   zstyle ':completion:*:*:git:*:values' list-separator ' -- '
   # 不注入 fzf 预览，保留用户自定义

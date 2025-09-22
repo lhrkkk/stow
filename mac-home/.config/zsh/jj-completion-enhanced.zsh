@@ -4,6 +4,8 @@
 
 # First, ensure jj completion is available
 if (( $+commands[jj] )); then
+  # Marker for verification (checked after lazy load triggers)
+  typeset -g JJ_COMPLETION_ENHANCED=1
   # We don't force-load _jj here to avoid calling completion internals
   # outside completion context. We'll prepare overrides inside the wrapper.
 
@@ -356,6 +358,21 @@ if (( $+commands[jj] )); then
     compdef __jj_complete_with_aliases=jj 2>/dev/null || compdef __jj_complete_with_aliases jj 2>/dev/null || true
   fi
 
+  if [[ $- == *i* ]]; then
+    autoload -Uz add-zsh-hook 2>/dev/null || true
+    __jj_compdef_always() {
+      if ! typeset -f compdef >/dev/null; then
+        return 0
+      fi
+      if typeset -p _comps >/dev/null 2>&1; then
+        _comps[jj]=__jj_complete_with_aliases
+      else
+        compdef __jj_complete_with_aliases=jj 2>/dev/null || compdef __jj_complete_with_aliases jj 2>/dev/null || true
+      fi
+    }
+    add-zsh-hook -Uz precmd __jj_compdef_always 2>/dev/null || true
+  fi
+
   # Keep mapping after compinit; chain any previous hook if present
   if typeset -f __ami_after_compinit >/dev/null; then
     functions -c __ami_after_compinit __ami_after_compinit_jj_prev 2>/dev/null || true
@@ -364,7 +381,9 @@ if (( $+commands[jj] )); then
     if typeset -f __ami_after_compinit_jj_prev >/dev/null; then
       __ami_after_compinit_jj_prev "$@"
     fi
-    if typeset -p _comps >/dev/null 2>&1; then
+    if typeset -f __jj_compdef_always >/dev/null; then
+      __jj_compdef_always
+    elif typeset -p _comps >/dev/null 2>&1; then
       _comps[jj]=__jj_complete_with_aliases
     else
       compdef __jj_complete_with_aliases=jj 2>/dev/null || compdef __jj_complete_with_aliases jj 2>/dev/null || true
@@ -375,7 +394,11 @@ fi
 # Enable better formatting
 zstyle ':completion:*:*:jj:*' verbose yes
 # Use plain text (no escapes) so fzf-tab can read group headers
-zstyle ':completion:*:descriptions' format '[%d]'
+typeset _ami_jj_desc_format
+if ! zstyle -s ':completion:*:descriptions' format _ami_jj_desc_format 2>/dev/null; then
+  zstyle ':completion:*:descriptions' format '[%d]'
+fi
+unset _ami_jj_desc_format
 
 # Define tag and group order for jj (commands last)
 # Avoid restricting results to a single tag; rely on group-order only

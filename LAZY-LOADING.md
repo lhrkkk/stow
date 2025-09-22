@@ -59,6 +59,7 @@
 ```zsh
 exec zsh -l
 print -r -- $GIT_COMPLETION_ENHANCED   # 启动后应为空；触发 Tab/首个提示符后变为 1
+print -r -- $JJ_COMPLETION_ENHANCED    # 首次 Tab 后应为 1，用于验证 JJ 补全已挂接
 type -a mise                             # 能找到 mise
 cd <含 .mise.toml 或 .tool-versions 的目录> && mise current
 bindkey '^I'                             # 确认 Tab 绑定到 fzf-tab 流程
