@@ -134,7 +134,7 @@ lg = ['log', '-r', 'all()']
 
 # default
 # [NOTE] limit jj log to use no pager, occupy ~2/3 the screen, and show also elided changes
-default = ['util', 'exec', '--', 'bash', '-c', 'echo "" && jj sf --no-pager && jj lg --no-pager --limit 20']
+default = ['util', 'exec', '--', 'bash', '-c', 'echo "" && jj sf --no-pager && jj lg --no-pager --limit 8']
 
 # init
 init = ['git', 'init', '--colocate']

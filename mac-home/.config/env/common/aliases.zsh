@@ -37,7 +37,7 @@ alias f='fuck'
 alias fk='fuck'
 alias av='source venv/bin/activate'
 # alias c='clear'
-alias c='specstory run'
+# alias c='specstory run'
 alias cl='claude-code-log --tui'
 alias clf='claude-code-log --clear-html && claude-code-log --open-browser'
 alias cs='bunx ccusage'
@@ -80,7 +80,7 @@ alias py="python"
 alias co="codex --sandbox danger-full-access"
 # Codex helpers
 alias ca="codex --model gpt-5-codex --full-auto"
-alias cf="codex --model gpt-5-codex --dangerously-bypass-approvals-and-sandbox"
+alias c="codex --model gpt-5-codex --dangerously-bypass-approvals-and-sandbox"
 
 # ---- Migrated from Bash ----
 # Mosh shortcuts
