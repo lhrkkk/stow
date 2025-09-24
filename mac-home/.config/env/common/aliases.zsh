@@ -32,6 +32,14 @@ alias jc='jj-commit-ai --commit --chinese --bracket-title-cn'
 alias gc='git-commit-ai --commit --chinese --bracket-title-cn'
 
 alias d='delta'
+# alias gi='gibo dump Python > .gitignore'
+
+  gi() {
+    if [ $# -eq 0 ]; then
+      set -- Python
+    fi
+    gibo dump "$@" > .gitignore
+  }
 
 alias f='fuck'
 alias fk='fuck'

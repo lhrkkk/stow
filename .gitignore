@@ -8,6 +8,7 @@
 .cursorindexingignore
 
 \#detach/
+boilerplates
 
 # macOS / OS artifacts
 .DS_Store

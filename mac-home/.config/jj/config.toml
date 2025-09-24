@@ -588,3 +588,4 @@ layout-percent = 50             # Balanced split
 
 [snapshot]
 auto-update-stale = true
+# auto-track = "none()"
