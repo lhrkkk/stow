@@ -522,7 +522,8 @@
 
 - 同步与合并（输出风格统一）
   - 成功：仅显示成功结果（不带冒号）
-    - 例（JJ 同步某分支）：`[ws1] a1b2c3 Update deps`
+    - 例（JJ 同步某分支）：`[ws1] default <- one@: a1b2c3 Update deps`
+    - 例（JJ 合并标记）：`[wm1] default <- one: a1b2c3 Update deps`
     - 例（Git 合并标记）：`[wm1] main <- git-1`
   - 失败：仅提示失败原因，使用冒号
     - 例：`[wm2] fail: Rebase aborted: conflicts ...`
@@ -532,19 +533,28 @@
 - 组合命令（含工具前缀提示）
   - JJ：
     - `jj wmsa` →
-      - `[wmsa] jj: wma + wsa: 合并和同步所有分支`
+      - `[wmsa] jj: 标记+合并+同步所有分支`
+      - `[wseta] jj 标记 one/two/three：`
+      - `[wset1] one <- one@-: …` / `[wset2] two <- two@-: …` / `[wset3] three <- three@-: …`
       - `[wma] jj 合并所有分支：`
-      - `[wm1] main <- one@-` / `[wm2] main <- two@-` / `[wm3] skip: head missing`
+      - `[wm1] default <- one: …` / `[wm2] default <- two: …` / `[wm3] skip: bookmark missing`
       - `[wsa] jj 同步所有分支：`
-      - `[wsa] -> [ws1] rb one@ -d main` / `[wsa] -> [ws2] rb two@ -d main` / `[wsa] -> [ws3] skip: head missing`
+      - `[ws1] default <- one@: …` / `[ws2] default <- two@: …` / `[ws3] skip: head missing`
+    - `jj wmsap`（“@ 版”，不刷新 one/two/three 书签）→
+      - `[wmsap] jj: wmap + wsap`
+      - `[wmap] jj 合并所有 @- 分支：`
+      - `[wm1p] default <- one@-` / `[wm2p] default <- two@-` / `[wm3p] skip: head missing`
+      - `[wsap] jj 同步所有分支(@ 版)：`
+      - `[ws1p] default <- one@` / `[ws2p] default <- two@` / `[ws3p] skip: head missing`
   - Git：
     - `git wmsa` →
       - `[wmsa] git: wma + wsa: 合并和同步所有分支`
       - `[wma] git 合并所有分支：`
       - `[wm1] main <- git-1` / `[wm2] main <- git-2` / `[wm3] skip: missing workspace`
       - `[wsa] git 同步所有分支：`
-      - `[wsa] -> [ws1] rebase main` / `[wsa] -> [ws2] rebase main` / `[wsa] -> [ws3] skip: missing workspace`
+      - `[ws1] rebase main` / `[ws2] rebase main` / `[ws3] skip: missing workspace`
 
 - 其它
-  - JJ 状态速览：`jj wsl`（输出 one/two/three 的目录与头部状态）
-  - Git/JJ 的 `ws*`/`wm*`/`wsa`/`wma`/`wmsa` 均已实现“失败仅报首行原因、成功静默只留目的/结果、缺失跳过”的一致策略。
+  - JJ 状态速览：`jj wsl`（输出 one/two/three 的目录与 head 状态）
+  - `wmsa` 会自动执行 `wseta`，确保 `one|two|three` 书签与 `@-` 对齐；`wmsap` 则保持原样，仅推进 `@`/`@-`。
+  - Git/JJ 的 `ws*`/`wm*` 系列均统一使用“成功仅输出结果、失败输出首行原因、缺失 skip”的风格。

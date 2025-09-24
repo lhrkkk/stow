@@ -466,29 +466,94 @@ wms3 = ["util", "exec", "--", "bash", "-c","jj wm3 && jj wsa"]
 # wmsa = ["util", "exec", "--", "bash", "-c","jj wm1 &&jj wm2 && jj wm3 && jj wsa && jj e main"]
 # wnsa = ["util", "exec", "--", "bash", "-c","jj wn1 && jj wn2 && jj wn3 && jj wm1 &&jj wm2 && jj wm3 && jj wsa && jj e main"]
 
-# -------------- 0.7s wnsa  0.23s wmsa 0.9 wmsa
-### v4.5, 并行性能的 @- 版本，依赖 main 标签和one@, two@, three@，  wnsa 则是 new 版本。work well
-# 同步所有工作区分支
-ws1 = ["util", "exec", "--", "bash", "-c",'jj log -r one@ -n 1 >/dev/null 2>&1 || { echo "[ws1] skip head missing"; exit 0; }; out=$(jj rb -b one@ -d main 2>&1); st=$?; if [ $st -eq 0 ]; then info=$(jj log -r one@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws1] $info"; else first=$(printf "%s" "$out" | head -n1); echo "[ws1] fail: $first"; exit 1; fi']
-ws2 = ["util", "exec", "--", "bash", "-c",'jj log -r two@ -n 1 >/dev/null 2>&1 || { echo "[ws2] skip head missing"; exit 0; }; out=$(jj rb -b two@ -d main 2>&1); st=$?; if [ $st -eq 0 ]; then info=$(jj log -r two@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws2] $info"; else first=$(printf "%s" "$out" | head -n1); echo "[ws2] fail: $first"; exit 1; fi']
-ws3 = ["util", "exec", "--", "bash", "-c",'jj log -r three@ -n 1 >/dev/null 2>&1 || { echo "[ws3] skip head missing"; exit 0; }; out=$(jj rb -b three@ -d main 2>&1); st=$?; if [ $st -eq 0 ]; then info=$(jj log -r three@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws3] $info"; else first=$(printf "%s" "$out" | head -n1); echo "[ws3] fail: $first"; exit 1; fi']
+# --------------------------
 
-wsa = ["util", "exec", "--", "bash", "-c",'echo "[wsa] jj 同步所有分支："; if jj log -r one@ -n 1 >/dev/null 2>&1; then echo "[wsa] -> [ws1] rb one@ -d main"; out=$(jj rb -b one@ -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wsa] -> [ws1] fail: $first"; exit 1; fi; else echo "[wsa] -> [ws1] skip: head missing"; fi; if jj log -r two@ -n 1 >/dev/null 2>&1; then echo "[wsa] -> [ws2] rb two@ -d main"; out=$(jj rb -b two@ -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wsa] -> [ws2] fail: $first"; exit 1; fi; else echo "[wsa] -> [ws2] skip: head missing"; fi; if jj log -r three@ -n 1 >/dev/null 2>&1; then echo "[wsa] -> [ws3] rb three@ -d main"; out=$(jj rb -b three@ -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wsa] -> [ws3] fail: $first"; exit 1; fi; else echo "[wsa] -> [ws3] skip: head missing"; fi']
+  # --------------
+  # v3 串行：进入 workspace + 更新 one/two/three 书签，再推进 default
+   # ws1 = ["util", "exec", "--", "bash", "-c", "jj rb -b one@ -d default && jj wo1 jj bs one -r @-"]
+  # ws2 = ["util", "exec", "--", "bash", "-c", "jj rb -b two@ -d default && jj wo2 jj bs two -r @-"]
+  # ws3 = ["util", "exec", "--", "bash", "-c", "jj rb -b three@ -d default && jj wo3 jj bs three -r @-"]
+
+  # wset1 = ["bookmark", "set", "one", "-r", "one@-"]
+  # wset2 = ["bookmark", "set", "two", "-r", "two@-"]
+  # wset3 = ["bookmark", "set", "three", "-r", "three@-"]
+
+  # wma  = ["util", "exec", "--", "bash", "-c", "jj wm1 && jj wm2 && jj wm3"]
+  # wsa  = ["util", "exec", "--", "bash", "-c", "jj ws1 && jj ws2 && jj ws3"]
+  # wseta = ["util", "exec", "--", "bash", "-c", "jj wset1 && jj wset2 && jj wset3"]
+  # wmsa = ["util", "exec", "--", "bash", "-c", "jj wseta && jj wma && jj wsa && jj e default"]
+
+  # wm1 = ["util", "exec", "--", "bash", "-c", "jj rb -b one -d default && jj bs default -r one"]
+  # wm2 = ["util", "exec", "--", "bash", "-c", "jj rb -b two -d default && jj bs default -r two"]
+  # wm3 = ["util", "exec", "--", "bash", "-c", "jj rb -b three -d default && jj bs default -r three"]
+
+  # wna  = ["util", "exec", "--", "bash", "-c", "jj wn1 && jj wn2 && jj wn3"]
+  # wnsa = ["util", "exec", "--", "bash", "-c", "jj wna && jj wseta && jj wma && jj wsa && jj e default"]
+
+
+ # --------------
+  # 以及 v4.5 “@ 版”极简形式：只推进 one@ / two@ / three@，不刷新书签
+
+  # ws1p = ["util", "exec", "--", "bash", "-c", "jj rb -b one@ -d default"]
+  # ws2p = ["util", "exec", "--", "bash", "-c", "jj rb -b two@ -d default"]
+  # ws3p = ["util", "exec", "--", "bash", "-c", "jj rb -b three@ -d default"]
+
+  # wm1p = ["util", "exec", "--", "bash", "-c", "jj rb -b one@- -d default && jj bs default -r one@-"]
+  # wm2p = ["util", "exec", "--", "bash", "-c", "jj rb -b two@- -d default && jj bs default -r two@-"]
+  # wm3p = ["util", "exec", "--", "bash", "-c", "jj rb -b three@- -d default && jj bs default -r three@-"]
+
+  # wmap  = ["util", "exec", "--", "bash", "-c", "jj wm1p && jj wm2p && jj wm3p"]
+  # wsap  = ["util", "exec", "--", "bash", "-c", "jj ws1p && jj ws2p && jj ws3p"]
+  # wmsap = ["util", "exec", "--", "bash", "-c", "jj wmap && jj wsap && jj e default"]
+
+  # wnap  = ["util", "exec", "--", "bash", "-c", "jj wn1 && jj wn2 && jj wn3"]
+  # wnsap = ["util", "exec", "--", "bash", "-c", "jj wnap && jj wmap && jj wsap && jj e default"]
+
+
+# # --------------1.0s wnsa 0.4s wmsa 1.0wmsa
+# ### v3 改进性能的 v2 版本，合并只 set 不重复 sync，仍然具有 main，one，two，three 标签。work good。
+# 同步所有工作区分支
+ws1 = ["util", "exec", "--", "bash", "-c",'jj log -r one@ -n 1 >/dev/null 2>&1 || { echo "[ws1] skip: head missing"; exit 0; }; out=$(jj rb -b one@ -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[ws1] fail: $first"; exit 1; fi; out2=$(jj wo1 jj bs one -r @- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[ws1] fail: $first"; exit 1; fi; info=$(jj log -r one@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws1] default <- one@: $info"']
+ws2 = ["util", "exec", "--", "bash", "-c",'jj log -r two@ -n 1 >/dev/null 2>&1 || { echo "[ws2] skip: head missing"; exit 0; }; out=$(jj rb -b two@ -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[ws2] fail: $first"; exit 1; fi; out2=$(jj wo2 jj bs two -r @- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[ws2] fail: $first"; exit 1; fi; info=$(jj log -r two@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws2] default <- two@: $info"']
+ws3 = ["util", "exec", "--", "bash", "-c",'jj log -r three@ -n 1 >/dev/null 2>&1 || { echo "[ws3] skip: head missing"; exit 0; }; out=$(jj rb -b three@ -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[ws3] fail: $first"; exit 1; fi; out2=$(jj wo3 jj bs three -r @- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[ws3] fail: $first"; exit 1; fi; info=$(jj log -r three@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws3] default <- three@: $info"']
+
+wset1 = ["util", "exec", "--", "bash", "-c",'jj log -r one@- -n 1 >/dev/null 2>&1 || { echo "[wset1] skip: head missing"; exit 0; }; out=$(jj bookmark set one -r one@- 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wset1] fail: $first"; exit 1; fi; info=$(jj log -r one@- -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[wset1] one <- one@-: $info"']
+wset2 = ["util", "exec", "--", "bash", "-c",'jj log -r two@- -n 1 >/dev/null 2>&1 || { echo "[wset2] skip: head missing"; exit 0; }; out=$(jj bookmark set two -r two@- 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wset2] fail: $first"; exit 1; fi; info=$(jj log -r two@- -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[wset2] two <- two@-: $info"']
+wset3 = ["util", "exec", "--", "bash", "-c",'jj log -r three@- -n 1 >/dev/null 2>&1 || { echo "[wset3] skip: head missing"; exit 0; }; out=$(jj bookmark set three -r three@- 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wset3] fail: $first"; exit 1; fi; info=$(jj log -r three@- -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[wset3] three <- three@-: $info"']
+wseta = ["util", "exec", "--", "bash", "-c",'echo "[wseta] jj 标记 one/two/three："; jj wset1 && jj wset2 && jj wset3']
+wsa = ["util", "exec", "--", "bash", "-c",'echo "[wsa] jj 同步所有分支："; jj ws1 && jj ws2 && jj ws3']
 wo = ["util", "exec", "--", "bash", "-c",'root=${WO_RETURN_DIR:-$(jj workspace root 2>/dev/null)}; if [ -z "$root" ] || [ ! -d "$root" ]; then echo >&2 "[wo] not in jj repo"; exit 1; fi; cd -- "$root" || exit 1; if [ "$#" -eq 0 ]; then exec "${SHELL:-/bin/sh}" -l; else "$@"; fi',""]
 wsl = ["util", "exec", "--", "bash", "-c",'root=$(jj workspace root 2>/dev/null) || { echo "[wsl] not in jj repo"; exit 1; }; for n in one two three; do dir="$root/.jj/workspace-$n"; if [ ! -d "$dir" ]; then echo "[wsl] $n: dir=missing head=unknown"; continue; fi; if jj log -r "${n}@" -n 1 >/dev/null 2>&1; then echo "[wsl] $n: dir=ok head=ok"; else echo "[wsl] $n: dir=ok head=missing"; fi; done',""]
 
 ### 合并所有工作区分支，先 sa 同步
-wm1 = ["util", "exec", "--", "bash", "-c",'jj log -r one@ -n 1 >/dev/null 2>&1 || { echo "[wm1] skip: head missing"; exit 0; }; out=$(jj rb -b one@- -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm1] fail: $first"; exit 1; fi; out2=$(jj bs main -r one@- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm1] fail: $first"; exit 1; fi; echo "[wm1] main <- one@-"']
-wm2 = ["util", "exec", "--", "bash", "-c",'jj log -r two@ -n 1 >/dev/null 2>&1 || { echo "[wm2] skip: head missing"; exit 0; }; out=$(jj rb -b two@- -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm2] fail: $first"; exit 1; fi; out2=$(jj bs main -r two@- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm2] fail: $first"; exit 1; fi; echo "[wm2] main <- two@-"']
-wm3 = ["util", "exec", "--", "bash", "-c",'jj log -r three@ -n 1 >/dev/null 2>&1 || { echo "[wm3] skip: head missing"; exit 0; }; out=$(jj rb -b three@- -d main 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm3] fail: $first"; exit 1; fi; out2=$(jj bs main -r three@- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm3] fail: $first"; exit 1; fi; echo "[wm3] main <- three@-"']
+wm1 = ["util", "exec", "--", "bash", "-c",'jj log -r one -n 1 >/dev/null 2>&1 || { echo "[wm1] skip: bookmark missing"; exit 0; }; out=$(jj rb -b one -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm1] fail: $first"; exit 1; fi; out2=$(jj bs default -r one 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm1] fail: $first"; exit 1; fi; info=$(jj log -r one -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[wm1] default <- one: $info"']
+wm2 = ["util", "exec", "--", "bash", "-c",'jj log -r two -n 1 >/dev/null 2>&1 || { echo "[wm2] skip: bookmark missing"; exit 0; }; out=$(jj rb -b two -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm2] fail: $first"; exit 1; fi; out2=$(jj bs default -r two 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm2] fail: $first"; exit 1; fi; info=$(jj log -r two -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[wm2] default <- two: $info"']
+wm3 = ["util", "exec", "--", "bash", "-c",'jj log -r three -n 1 >/dev/null 2>&1 || { echo "[wm3] skip: bookmark missing"; exit 0; }; out=$(jj rb -b three -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm3] fail: $first"; exit 1; fi; out2=$(jj bs default -r three 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm3] fail: $first"; exit 1; fi; info=$(jj log -r three -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[wm3] default <- three: $info"']
 
 wma = ["util", "exec", "--", "bash", "-c",'echo "[wma] jj 合并所有分支："; jj wm1 && jj wm2 && jj wm3']
-wmsa = ["util", "exec", "--", "bash", "-c",'echo "[wmsa] jj: wma + wsa: 合并和同步所有分支"; jj wma && jj wsa && jj e main >/dev/null 2>&1']
+wmsa = ["util", "exec", "--", "bash", "-c",'echo "[wmsa] jj: 标记+合并+同步所有分支"; jj wseta && jj wma && jj wsa && jj e default >/dev/null 2>&1']
 
 
 # 立即合并所有分支当前的 @ ，创建 new 节点。适合清空分支，建立新工作区。
-wna = ["util", "exec", "--", "bash", "-c","jj wn1 & jj wn2 & jj wn3& wait"]
-wnsa = ["util", "exec", "--", "bash", "-c","jj wna && jj wma && jj wsa && jj e main"]
+wna = ["util", "exec", "--", "bash", "-c",'echo "[wna] jj new 所有工作区："; jj wn1 && jj wn2 && jj wn3']
+wnsa = ["util", "exec", "--", "bash", "-c",'echo "[wnsa] jj: new+标记+合并+同步"; jj wna && jj wseta && jj wma && jj wsa && jj e default']
+
+
+
+### v4.5 并行版本（保留原版）
+# -------------- 0.7s wnsa  0.23s wmsa 0.9 wmsa
+### v4.5, 并行性能的 @- 版本，依赖 main 标签和one@, two@, three@，  wnsa 则是 new 版本。work well
+ws1p = ["util", "exec", "--", "bash", "-c",'jj log -r one@ -n 1 >/dev/null 2>&1 || { echo "[ws1p] skip: head missing"; exit 0; }; out=$(jj rb -b one@ -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[ws1p] fail: $first"; exit 1; fi; info=$(jj log -r one@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws1p] default <- one@: $info"']
+ws2p = ["util", "exec", "--", "bash", "-c",'jj log -r two@ -n 1 >/dev/null 2>&1 || { echo "[ws2p] skip: head missing"; exit 0; }; out=$(jj rb -b two@ -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[ws2p] fail: $first"; exit 1; fi; info=$(jj log -r two@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws2p] default <- two@: $info"']
+ws3p = ["util", "exec", "--", "bash", "-c",'jj log -r three@ -n 1 >/dev/null 2>&1 || { echo "[ws3p] skip: head missing"; exit 0; }; out=$(jj rb -b three@ -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[ws3p] fail: $first"; exit 1; fi; info=$(jj log -r three@ -n 1 -T "{commit_id.short()} {description.first_line()}" --no-pager 2>/dev/null); echo "[ws3p] default <- three@: $info"']
+wmap = ["util", "exec", "--", "bash", "-c",'echo "[wmap] jj 合并所有 @- 分支："; jj wm1p && jj wm2p && jj wm3p']
+wsap = ["util", "exec", "--", "bash", "-c",'echo "[wsap] jj 同步所有分支(@ 版)："; jj ws1p && jj ws2p && jj ws3p']
+wm1p = ["util", "exec", "--", "bash", "-c",'jj log -r one@ -n 1 >/dev/null 2>&1 || { echo "[wm1p] skip: head missing"; exit 0; }; out=$(jj rb -b one@- -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm1p] fail: $first"; exit 1; fi; out2=$(jj bs default -r one@- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm1p] fail: $first"; exit 1; fi; echo "[wm1p] default <- one@-"']
+wm2p = ["util", "exec", "--", "bash", "-c",'jj log -r two@ -n 1 >/dev/null 2>&1 || { echo "[wm2p] skip: head missing"; exit 0; }; out=$(jj rb -b two@- -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm2p] fail: $first"; exit 1; fi; out2=$(jj bs default -r two@- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm2p] fail: $first"; exit 1; fi; echo "[wm2p] default <- two@-"']
+wm3p = ["util", "exec", "--", "bash", "-c",'jj log -r three@ -n 1 >/dev/null 2>&1 || { echo "[wm3p] skip: head missing"; exit 0; }; out=$(jj rb -b three@- -d default 2>&1); st=$?; if [ $st -ne 0 ]; then first=$(printf "%s" "$out" | head -n1); echo "[wm3p] fail: $first"; exit 1; fi; out2=$(jj bs default -r three@- 2>&1); st2=$?; if [ $st2 -ne 0 ]; then first=$(printf "%s" "$out2" | head -n1); echo "[wm3p] fail: $first"; exit 1; fi; echo "[wm3p] default <- three@-"']
+wmsap = ["util", "exec", "--", "bash", "-c",'echo "[wmsap] jj: wmap + wsap"; jj wmap && jj wsap && jj e default >/dev/null 2>&1']
+wnap = ["util", "exec", "--", "bash", "-c",'echo "[wnap] jj new 所有工作区(@ 版)："; jj wn1 && jj wn2 && jj wn3']
+wnsap = ["util", "exec", "--", "bash", "-c",'echo "[wnsap] jj: new+合并+同步(@ 版)"; jj wnap && jj wmap && jj wsap && jj e default']
 
 
 
