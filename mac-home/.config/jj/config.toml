@@ -424,8 +424,9 @@ wms3 = ["util", "exec", "--", "bash", "-c","jj wm3 && jj wsa"]
 # wsa = ["util", "exec", "--", "bash", "-c","jj ws1 && jj ws2 && jj ws3"]
 # wseta = ["util", "exec", "--", "bash", "-c","jj wset1 && jj wset2 && jj wset3"]
 
-# wmsa = ["util", "exec", "--", "bash", "-c","jj wset1 && jj wm1 && jj wset2 &&jj wm2 && jj wset3 && jj wm3 && jj wsa && pwd"]
-# wnsa = ["util", "exec", "--", "bash", "-c","jj wn1 && jj wn2 && jj wn3 &&jj wseta && jj wm1 &&jj wm2 && jj wm3 && jj wsa && jj e main"]
+# wma = ["util", "exec", "--", "bash", "-c","jj wm1 && jj wm2 && jj wm3"]
+# wmsa = ["util", "exec", "--", "bash", "-c","jj wseta && jj wma && jj wsa && pwd"]
+# wnsa = ["util", "exec", "--", "bash", "-c","jj wn1 && jj wn2 && jj wn3 && jj wseta && jj wma && jj wsa && jj e main"]
 
 
 # # --------------0.9s wnsa  0.3s wmsa
@@ -443,12 +444,9 @@ wms3 = ["util", "exec", "--", "bash", "-c","jj wm3 && jj wsa"]
 # wset3 = ["bookmark","set","three", "-r", "three@-"]
 
 # # 同步所有工作区分支
-# wna = ["util", "exec", "--", "bash", "-c","jj wn1 & jj wn2 & jj wn3 & wait"]
-# wsa = ["util", "exec", "--", "bash", "-c","jj ws1 & jj ws2 & jj ws3 & wait"]
-# wseta = ["util", "exec", "--", "bash", "-c","jj wset1 & jj wset2 & jj wset3 & wait"]
-
-# wmsa = ["util", "exec", "--", "bash", "-c","jj wset1 && jj wm1 && jj wset2 &&jj wm2 && jj wset3 && jj wm3 && jj wsa && pwd"]
-# wnsa = ["util", "exec", "--", "bash", "-c","jj wna &&jj wseta && jj wm1 &&jj wm2 && jj wm3 && jj wsa && jj e main"]
+# wna = ["util", "exec", "--", "bash", "-c","jj wn1 && jj wn2 && jj wn3"]
+# wsa = ["util", "exec", "--", "bash", "-c","jj ws1 && jj ws2 && jj ws3"]
+# wseta = ["util", "exec", "--", "bash", "-c","jj wset1 && jj wset2 && jj wset3"]
 
 
 
