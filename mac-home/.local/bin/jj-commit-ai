@@ -22,8 +22,13 @@ Options:
   --bracket-title-cn   快捷方式，标题使用全角方括号【】
   --reasoning-effort, -r V 设置 Codex 推理强度（默认 minimal；可选：minimal/low/medium/high）
   --api NAME           指定使用的 API 后端 (默认: codex，可选: gemini)
-  --describe           使用 `jj describe -m` 应用生成的信息（替代 `jj commit`）
+  --describe           使用 `jj describe -m` 应用生成的信息（默认作用于工作副本 @）
+  --rev REV            描述模式下指定目标修订，隐式启用 --describe；等价传给
+                       `jj describe -r REV`
   -h, --help           查看帮助
+
+子命令：
+  fill-empty           批量为描述为空、父提交描述非空的提交生成描述
 
 环境变量：
   GEMINI_API_KEY            使用 gemini 后端时的 API Key
@@ -41,6 +46,283 @@ Options:
   JJ_COMMIT_AI_CODEX_FALLBACK 指定无权限写入时的备选目录（默认使用 $TMPDIR/jj-commit-ai）
 USAGE
 }
+
+fill_empty_help() {
+  cat <<'USAGE'
+Usage: jj-commit-ai fill-empty [options] [-- <jj-commit-ai options> [-- <jj describe args>]]
+
+查找描述为空、且所有父提交描述均非空的提交，并为其生成描述。
+
+Options:
+  --revset EXPR        搜索范围（默认：::@，当前工作副本的所有祖先）
+  --limit N            最多处理前 N 个匹配提交
+  -n, --dry-run        仅列出匹配提交，不执行描述
+  -y, --yes            跳过确认（执行模式下生效）
+  -h, --help           查看子命令帮助
+
+子命令后的 `--` 可继续传递 `jj-commit-ai` 的常规参数（如 `--lang en`），
+若再额外提供第二个 `--`，其后的参数会传递给底层的 `jj describe`。
+USAGE
+}
+
+fill_empty_subcommand() {
+  local revset='::@'
+  local limit=0
+  local dry_run=0
+  local assume_yes=0
+  local forwarded_opts=()
+  local forwarded_jj_args=()
+  local in_jj_args=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --revset)
+        [[ $# -ge 2 ]] || { echo 'jj-commit-ai fill-empty: --revset 需要参数' >&2; return 2; }
+        revset="$2"
+        shift 2
+        ;;
+      --limit)
+        [[ $# -ge 2 ]] || { echo 'jj-commit-ai fill-empty: --limit 需要参数' >&2; return 2; }
+        if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+          echo 'jj-commit-ai fill-empty: --limit 必须为非负整数' >&2
+          return 2
+        fi
+        limit="$2"
+        shift 2
+        ;;
+      -n|--dry-run|--preview)
+        dry_run=1
+        shift
+        ;;
+      -y|--yes|--commit)
+        assume_yes=1
+        shift
+        ;;
+      --help|-h)
+        fill_empty_help
+        return 0
+        ;;
+      --)
+        shift
+        if (( in_jj_args )); then
+          while [[ $# -gt 0 ]]; do
+            forwarded_jj_args+=("$1")
+            shift
+          done
+          break
+        else
+          in_jj_args=1
+          while [[ $# -gt 0 ]]; do
+            if [[ "$1" == "--" ]]; then
+              shift
+              while [[ $# -gt 0 ]]; do
+                forwarded_jj_args+=("$1")
+                shift
+              done
+              break 2
+            fi
+            forwarded_opts+=("$1")
+            shift
+          done
+          break
+        fi
+        ;;
+      *)
+        if (( in_jj_args )); then
+          forwarded_jj_args+=("$1")
+        else
+          forwarded_opts+=("$1")
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  local template_candidates
+  template_candidates='if(description == "" && parents.len() > 0, change_id ++ "\n", "")'
+
+  local raw_candidates=""
+  local tmp_err
+  tmp_err=$(mktemp "${TMPDIR:-/tmp}/jj-fill-empty-err-XXXXXX")
+  if ! raw_candidates=$(JJ_NO_PAGER=1 jj log --no-pager --no-graph -r "$revset" --template "$template_candidates" 2>"$tmp_err"); then
+    if ! raw_candidates=$(JJ_NO_PAGER=1 jj log --no-graph -r "$revset" --template "$template_candidates" 2>>"$tmp_err"); then
+      echo 'jj-commit-ai fill-empty: 无法执行 jj log，请确认当前目录位于 jj 仓库内且 revset 合法' >&2
+      if [[ -s "$tmp_err" ]]; then
+        echo '--- jj log 错误输出 ---' >&2
+        cat "$tmp_err" >&2
+        echo '----------------------' >&2
+      fi
+      rm -f "$tmp_err"
+      return 1
+    fi
+  fi
+  rm -f "$tmp_err"
+
+  local -a all_candidates=()
+  declare -A candidate_label=()
+  declare -A candidate_seen=()
+  declare -A raw_seen=()
+
+  declare -A empty_cache=()
+  is_commit_empty() {
+    local cid="$1"
+    if [[ -n "${empty_cache[$cid]+x}" ]]; then
+      [[ "${empty_cache[$cid]}" == 'empty' ]]
+      return $?
+    fi
+    local flag
+    flag=$(JJ_NO_PAGER=1 jj log --no-graph -r "change_id($cid)" --template 'if(empty, "empty", "non")' 2>/dev/null || echo "empty")
+    empty_cache[$cid]="$flag"
+    [[ "$flag" == 'empty' ]]
+  }
+
+  local cand
+  while IFS= read -r cand; do
+    cand=${cand%$'\r'}
+    cand=${cand//[[:space:]]/}
+    [[ -z "$cand" ]] && continue
+    if [[ -n "${raw_seen[$cand]+x}" ]]; then
+      continue
+    fi
+    raw_seen[$cand]=1
+    if is_commit_empty "$cand"; then
+      continue
+    fi
+    candidate_seen[$cand]=1
+    all_candidates+=("$cand")
+    local label_value
+    label_value=$(JJ_NO_PAGER=1 jj log --no-graph -r "change_id($cand)" --template 'change_id.short(12) ++ " [" ++ commit_id.short(12) ++ "]"' 2>/dev/null || true)
+    if [[ -z "$label_value" ]]; then
+      label_value="$cand"
+    fi
+    candidate_label[$cand]="$label_value"
+  done <<< "$raw_candidates"
+
+  if (( ${#all_candidates[@]} == 0 )); then
+    echo 'jj-commit-ai fill-empty: 未找到符合条件的提交' >&2
+    return 0
+  fi
+
+  declare -A parent_cache=()
+  parent_cache_get() {
+    local cid="$1"
+    if [[ -n "${parent_cache[$cid]+x}" ]]; then
+      printf '%s' "${parent_cache[$cid]}"
+      return 0
+    fi
+    local parents_output
+    parents_output=$(JJ_NO_PAGER=1 jj log --no-graph -r "parents(change_id($cid))" --template 'change_id ++ "\n"' 2>/dev/null || true)
+    parent_cache[$cid]="$parents_output"
+    printf '%s' "$parents_output"
+  }
+
+  declare -A scheduled=()
+  local -a ordered=()
+
+  while :; do
+    local chosen=""
+    for cand in "${all_candidates[@]}"; do
+      [[ -n "${scheduled[$cand]+x}" ]] && continue
+      local parents_raw
+      parents_raw=$(parent_cache_get "$cand")
+      if [[ -z "$parents_raw" ]]; then
+        continue
+      fi
+      local ok=1
+      local parent
+      while IFS= read -r parent; do
+        parent=${parent%$'\r'}
+        parent=${parent//[[:space:]]/}
+        [[ -z "$parent" ]] && continue
+        if is_commit_empty "$parent"; then
+          continue
+        fi
+        if [[ -n "${scheduled[$parent]+x}" ]]; then
+          continue
+        fi
+        if [[ -n "${candidate_seen[$parent]+x}" ]]; then
+          ok=0
+          break
+        fi
+      done <<< "$parents_raw"
+      if (( ok )); then
+        chosen="$cand"
+        break
+      fi
+    done
+
+    [[ -z "$chosen" ]] && break
+
+    scheduled[$chosen]=1
+    ordered+=("$chosen")
+    if (( limit > 0 && ${#ordered[@]} >= limit )); then
+      break
+    fi
+  done
+
+  if (( ${#ordered[@]} == 0 )); then
+    echo 'jj-commit-ai fill-empty: 未找到符合条件的提交' >&2
+    return 0
+  fi
+
+  echo "jj-commit-ai fill-empty: 找到 ${#ordered[@]} 个提交需要生成描述："
+  local cid
+  for cid in "${ordered[@]}"; do
+    printf '  - %s\n' "${candidate_label[$cid]:-$cid}"
+  done
+
+  if (( dry_run )); then
+    return 0
+  fi
+
+  if (( ! assume_yes )); then
+    local reply
+    read -r -p "是否为以上提交生成描述？[y/N] " reply
+    case "$reply" in
+      [yY]|[yY][eE][sS])
+        ;;
+      *)
+        echo 'jj-commit-ai fill-empty: 已取消' >&2
+        return 1
+        ;;
+    esac
+  fi
+
+  local child_opts=("${forwarded_opts[@]}")
+  local need_auto_yes=1
+  local opt
+  for opt in "${child_opts[@]}"; do
+    case "$opt" in
+      --yes|--commit|-y|--preview|--dry-run|--message-only)
+        need_auto_yes=0
+        ;;
+    esac
+  done
+  if (( need_auto_yes )); then
+    child_opts=(--yes "${child_opts[@]}")
+  fi
+
+  local total=${#ordered[@]}
+  local idx=0
+  for cid in "${ordered[@]}"; do
+    idx=$((idx + 1))
+    local display="${candidate_label[$cid]:-$cid}"
+    printf '[fill-empty] 处理 %s (%d/%d)\n' "$display" "$idx" "$total" >&2
+    local cmd=("$0" --rev "change_id($cid)" "${child_opts[@]}")
+    if (( ${#forwarded_jj_args[@]} )); then
+      cmd+=(-- "${forwarded_jj_args[@]}")
+    fi
+    "${cmd[@]}"
+  done
+
+  return 0
+}
+
+if [[ $# -gt 0 && "$1" == "fill-empty" ]]; then
+  shift
+  fill_empty_subcommand "$@"
+  exit $?
+fi
 
 MODEL=${JJ_COMMIT_AI_MODEL:-gpt-5}
 MAX_BYTES=${JJ_COMMIT_AI_MAX_BYTES:-120000}
@@ -64,6 +346,7 @@ SHOW_PROMPT=0
 EXTRA_RUNTIME_PROMPT=""
 JJ_ARGS=()
 DESCRIBE_MODE=0
+TARGET_REVISION_CLI=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -134,6 +417,17 @@ while [[ $# -gt 0 ]]; do
       DESCRIBE_MODE=1
       shift
       ;;
+    --rev|--describe-revision)
+      [[ $# -ge 2 ]] || { echo "jj-commit-ai: $1 需要参数" >&2; exit 2; }
+      TARGET_REVISION_CLI="$2"
+      DESCRIBE_MODE=1
+      shift 2
+      ;;
+    --rev=*)
+      TARGET_REVISION_CLI="${1#*=}"
+      DESCRIBE_MODE=1
+      shift
+      ;;
     -r|--reason|--reasoning|--reasoning-effort) 
       [[ $# -ge 2 ]] || { echo "jj-commit-ai: $1 需要参数" >&2; exit 2; }
       REASONING_EFFORT="$2"
@@ -154,6 +448,81 @@ while [[ $# -gt 0 ]]; do
       ;; 
   esac
 done
+
+TARGET_REVISIONS=()
+TARGET_REVISION=""
+if [[ -n "$TARGET_REVISION_CLI" ]]; then
+  TARGET_REVISIONS+=("$TARGET_REVISION_CLI")
+fi
+if (( DESCRIBE_MODE )); then
+  i=0
+  while (( i < ${#JJ_ARGS[@]} )); do
+    arg="${JJ_ARGS[i]}"
+    case "$arg" in
+      -r|--revision)
+        if (( i + 1 < ${#JJ_ARGS[@]} )); then
+          TARGET_REVISIONS+=("${JJ_ARGS[i+1]}")
+          ((i+=2))
+        else
+          ((i++))
+        fi
+        continue
+        ;;
+      --revision=*)
+        rev="${arg#*=}"
+        [[ -n "$rev" ]] && TARGET_REVISIONS+=("$rev")
+        ((i++))
+        continue
+        ;;
+      --repository=*|--config=*|--config-file=*|--at-operation=*|--at-op=*|--author=*|--message=*|--color=*|--template=*)
+        ((i++))
+        continue
+        ;;
+      -R|--repository|--config|--config-file|--at-operation|--at-op|--author|-T|--template|--message|--color)
+        if (( i + 1 < ${#JJ_ARGS[@]} )); then
+          ((i+=2))
+        else
+          ((i++))
+        fi
+        continue
+        ;;
+    esac
+    if [[ "$arg" == --* ]]; then
+      ((i++))
+      continue
+    fi
+    if [[ "$arg" == -* ]]; then
+      ((i++))
+      continue
+    fi
+    TARGET_REVISIONS+=("$arg")
+    ((i++))
+  done
+
+  if (( ${#TARGET_REVISIONS[@]} )); then
+    declare -A __ami_target_seen=()
+    filtered=()
+    for rev in "${TARGET_REVISIONS[@]}"; do
+      [[ -z "$rev" ]] && continue
+      if [[ -z "${__ami_target_seen[$rev]:-}" ]]; then
+        __ami_target_seen[$rev]=1
+        filtered+=("$rev")
+      fi
+    done
+    TARGET_REVISIONS=("${filtered[@]}")
+    unset filtered __ami_target_seen
+    TARGET_REVISION="${TARGET_REVISIONS[0]}"
+    if (( ${#TARGET_REVISIONS[@]} > 1 )); then
+      others=("${TARGET_REVISIONS[@]:1}")
+      printf 'jj-commit-ai: 检测到多个修订，仅使用第一个 (%s)，忽略: %s\n' "$TARGET_REVISION" "${others[*]}" >&2
+      unset others
+    fi
+    if ! jj log -r "$TARGET_REVISION" --limit=1 >/dev/null 2>&1; then
+      printf 'jj-commit-ai: 无法解析修订 %s\n' "$TARGET_REVISION" >&2
+      exit 1
+    fi
+  fi
+fi
 
 # 尝试找到 codex CLI（仅在使用 codex 后端时需要）
 if [[ "$API_BACKEND" == "codex" ]]; then
@@ -179,9 +548,26 @@ if [[ "$API_BACKEND" == "codex" ]]; then
   fi
 fi
 
-STATUS_OUTPUT=$(jj status --color=never 2>/dev/null || true)
-DIFF_STAT=$(jj diff --stat --color=never 2>/dev/null || true)
-DIFF_OUTPUT=$(jj diff --git --color=never 2>/dev/null || true)
+STATUS_LABEL="Repository status (jj status)"
+STATUS_CMD=(jj status --color=never)
+DIFF_STAT_LABEL="Diff summary (jj diff --stat)"
+DIFF_STAT_CMD=(jj diff --stat --color=never)
+DIFF_PATCH_LABEL="Diff (git format)"
+DIFF_PATCH_CMD=(jj diff --git --color=never)
+
+if (( DESCRIBE_MODE )) && [[ -n "$TARGET_REVISION" ]]; then
+  TARGET_REV_LABEL="$TARGET_REVISION"
+  printf -v STATUS_LABEL "Revision summary (jj show --summary -r '%s')" "$TARGET_REV_LABEL"
+  STATUS_CMD=(jj show --summary --color=never "$TARGET_REVISION")
+  printf -v DIFF_STAT_LABEL "Diff summary (jj diff --stat -r '%s')" "$TARGET_REV_LABEL"
+  DIFF_STAT_CMD=(jj diff --stat --color=never -r "$TARGET_REVISION")
+  printf -v DIFF_PATCH_LABEL "Diff (jj diff --git -r '%s')" "$TARGET_REV_LABEL"
+  DIFF_PATCH_CMD=(jj diff --git --color=never -r "$TARGET_REVISION")
+fi
+
+STATUS_OUTPUT=$("${STATUS_CMD[@]}" 2>/dev/null || true)
+DIFF_STAT=$("${DIFF_STAT_CMD[@]}" 2>/dev/null || true)
+DIFF_OUTPUT=$("${DIFF_PATCH_CMD[@]}" 2>/dev/null || true)
 
 trimmed_diff=$(printf '%s' "$DIFF_OUTPUT" | tr -d '\r\n\t ')
 trimmed_stat=$(printf '%s' "$DIFF_STAT" | tr -d '\r\n\t ')
@@ -255,11 +641,17 @@ if [[ -n "$EXTRA_RUNTIME_PROMPT" ]]; then
   BASE_PROMPT+=$'\n'
 fi
 
-PROMPT_BODY=$'\nRepository status (jj status):\n'
+PROMPT_BODY=$'\n'
+PROMPT_BODY+="$STATUS_LABEL"
+PROMPT_BODY+=$':\n'
 PROMPT_BODY+="$STATUS_OUTPUT"
-PROMPT_BODY+=$'\n\nDiff summary (jj diff --stat):\n'
+PROMPT_BODY+=$'\n\n'
+PROMPT_BODY+="$DIFF_STAT_LABEL"
+PROMPT_BODY+=$':\n'
 PROMPT_BODY+="$DIFF_STAT"
-PROMPT_BODY+=$'\n\nDiff (git format):\n'
+PROMPT_BODY+=$'\n\n'
+PROMPT_BODY+="$DIFF_PATCH_LABEL"
+PROMPT_BODY+=$':\n'
 PROMPT_BODY+="$DIFF_OUTPUT"
 PROMPT_BODY+="$TRUNCATED_FLAG"
 
@@ -1118,18 +1510,30 @@ echo "----------------------------------------" >&2
 run_apply() {
   local commit_msg
   commit_msg=$(cat "$MSG_FILE")
-  if (( ${#JJ_ARGS[@]} )); then
-    if (( DESCRIBE_MODE )); then
-      jj describe -m "$commit_msg" "${JJ_ARGS[@]}"
-    else
-      jj commit --message "$commit_msg" "${JJ_ARGS[@]}"
+  local run_args=("${JJ_ARGS[@]}")
+  if (( DESCRIBE_MODE )) && [[ -n "$TARGET_REVISION" ]]; then
+    local has_rev=0
+    for (( idx=0; idx<${#run_args[@]}; idx++ )); do
+      case "${run_args[idx]}" in
+        -r|--revision)
+          has_rev=1
+          break
+          ;;
+        --revision=*)
+          has_rev=1
+          break
+          ;;
+      esac
+    done
+    if (( ! has_rev )); then
+      run_args=(-r "$TARGET_REVISION" "${run_args[@]}")
     fi
+  fi
+
+  if (( DESCRIBE_MODE )); then
+    jj describe -m "$commit_msg" "${run_args[@]}"
   else
-    if (( DESCRIBE_MODE )); then
-      jj describe -m "$commit_msg"
-    else
-      jj commit --message "$commit_msg"
-    fi
+    jj commit --message "$commit_msg" "${run_args[@]}"
   fi
 }
 
