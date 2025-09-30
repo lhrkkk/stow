@@ -41,3 +41,5 @@ export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
 export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 
 # export ZOXIDE_USE_CD=1
+
+export JJ_COMMIT_AI_GEMINI_MODEL=gemini-flash-latest
