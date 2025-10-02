@@ -22,6 +22,8 @@ Options:
   --bracket-title-cn   快捷方式，标题使用全角方括号【】
   --reasoning-effort, -r V 设置 Codex 推理强度（默认 minimal；可选：minimal/low/medium/high）
   --api NAME           指定使用的 API 后端 (默认: codex，可选: gemini)
+  --fallback           API 失败时回退到本地摘要（默认关闭）
+  --no-fallback        明确禁用本地摘要回退（默认行为）
   --describe           使用 `jj describe -m` 应用生成的信息（默认作用于工作副本 @）
   --rev REV            描述模式下指定目标修订，隐式启用 --describe；等价传给
                        `jj describe -r REV`
@@ -344,6 +346,7 @@ PREVIEW_ONLY=0
 ASSUME_YES=0
 SHOW_PROMPT=0
 EXTRA_RUNTIME_PROMPT=""
+ENABLE_FALLBACK=0
 JJ_ARGS=()
 DESCRIBE_MODE=0
 TARGET_REVISION_CLI=""
@@ -412,7 +415,15 @@ while [[ $# -gt 0 ]]; do
     --bracket-title-cn) 
       SUBJECT_STYLE="cn-brackets"
       shift
-      ;; 
+      ;;
+    --fallback) 
+      ENABLE_FALLBACK=1
+      shift
+      ;;
+    --no-fallback) 
+      ENABLE_FALLBACK=0
+      shift
+      ;;
     --describe)
       DESCRIBE_MODE=1
       shift
@@ -1366,7 +1377,7 @@ if bullets:
 print('\n'.join(output_lines).strip())
 PY
   )
-  if [[ -n "$FALLBACK_MESSAGE" ]]; then
+  if (( ENABLE_FALLBACK )) && [[ -n "$FALLBACK_MESSAGE" ]]; then
     USING_FALLBACK=1
     COMMIT_MESSAGE="$FALLBACK_MESSAGE"
     if [[ "$API_BACKEND" == "gemini" ]]; then
