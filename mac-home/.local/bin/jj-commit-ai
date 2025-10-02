@@ -21,7 +21,7 @@ Options:
   --bracket-title      快捷方式，标题使用半角方括号[]
   --bracket-title-cn   快捷方式，标题使用全角方括号【】
   --reasoning-effort, -r V 设置 Codex 推理强度（默认 minimal；可选：minimal/low/medium/high）
-  --api NAME           指定使用的 API 后端 (默认: codex，可选: gemini)
+  --api NAME           指定使用的 API 后端 (默认: codex，可选: gemini, claude)
   --fallback           API 失败时回退到本地摘要（默认关闭）
   --no-fallback        明确禁用本地摘要回退（默认行为）
   --describe           使用 `jj describe -m` 应用生成的信息（默认作用于工作副本 @）
@@ -34,7 +34,8 @@ Options:
 
 环境变量：
   GEMINI_API_KEY            使用 gemini 后端时的 API Key
-  JJ_COMMIT_AI_BACKEND      默认的 API 后端（默认 codex，可选 gemini）
+  JJ_COMMIT_AI_BACKEND      默认的 API 后端（默认 codex，可选 gemini, claude）
+  JJ_COMMIT_AI_CLAUDE_MODEL 使用 claude 后端时的模型（默认 sonnet）
   JJ_COMMIT_AI_MODEL        默认模型名称
   JJ_COMMIT_AI_MAX_BYTES    diff 上限
   JJ_COMMIT_AI_EXTRA_PROMPT 额外固定提示词
@@ -679,7 +680,24 @@ USING_FALLBACK=0
 CLI_STATUS=0
 MESSAGE_SOURCE=""
 
-if [[ "$API_BACKEND" == "gemini" ]]; then
+if [[ "$API_BACKEND" == "claude" ]]; then
+    # 检查 claude CLI 是否可用
+    if ! command -v claude >/dev/null 2>&1; then
+        echo "jj-commit-ai: 使用 claude 后端时，必须安装 claude CLI" >&2
+        exit 127
+    fi
+
+    set +e
+    CLAUDE_MODEL=${JJ_COMMIT_AI_CLAUDE_MODEL:-sonnet}
+    COMMIT_MESSAGE=$(printf '%s' "$FINAL_PROMPT" | claude --print --model "$CLAUDE_MODEL" 2>/dev/null)
+    CLI_STATUS=$?
+    set -e
+    if (( CLI_STATUS == 0 )); then
+      MESSAGE_SOURCE="claude"
+      [[ -z "$COMMIT_MESSAGE" ]] && CLI_STATUS=1
+    fi
+
+elif [[ "$API_BACKEND" == "gemini" ]]; then
     if [[ -z "${GEMINI_API_KEY:-}" ]]; then
         echo "jj-commit-ai: 使用 gemini 后端时，必须设置 GEMINI_API_KEY 环境变量" >&2
         exit 1
@@ -1380,14 +1398,18 @@ PY
   if (( ENABLE_FALLBACK )) && [[ -n "$FALLBACK_MESSAGE" ]]; then
     USING_FALLBACK=1
     COMMIT_MESSAGE="$FALLBACK_MESSAGE"
-    if [[ "$API_BACKEND" == "gemini" ]]; then
+    if [[ "$API_BACKEND" == "claude" ]]; then
+        echo "jj-commit-ai: Claude CLI 调用失败 (exit $CLI_STATUS)，已回退到本地摘要" >&2
+    elif [[ "$API_BACKEND" == "gemini" ]]; then
         echo "jj-commit-ai: Gemini API 调用失败 (exit $CLI_STATUS)，已回退到本地摘要" >&2
     else
         echo "jj-commit-ai: $CLI_COMMAND exec 失败 (exit $CLI_STATUS)，已回退到本地摘要" >&2
     fi
     MESSAGE_SOURCE="fallback"
   else
-    if [[ "$API_BACKEND" == "gemini" ]]; then
+    if [[ "$API_BACKEND" == "claude" ]]; then
+        echo "jj-commit-ai: Claude CLI 调用失败 (exit $CLI_STATUS)" >&2
+    elif [[ "$API_BACKEND" == "gemini" ]]; then
         echo "jj-commit-ai: Gemini API 调用失败 (exit $CLI_STATUS)" >&2
     else
         echo "jj-commit-ai: $CLI_COMMAND exec 失败 (exit $CLI_STATUS)" >&2
@@ -1415,6 +1437,9 @@ fi
 
 SOURCE_LABEL="生成的提交信息："
 case "$MESSAGE_SOURCE" in
+  claude)
+    SOURCE_LABEL="Claude CLI 生成的提交信息："
+    ;;
   gemini)
     SOURCE_LABEL="Gemini API 生成的提交信息："
     ;;
