@@ -21,15 +21,16 @@ Options:
   --bracket-title      标题使用半角方括号 []
   --bracket-title-cn   标题使用全角方括号 【】
   --reasoning-effort, -r V 设置 Codex 推理强度（默认 minimal；可选：minimal/low/medium/high）
-  --api NAME           指定使用的 API 后端 (默认: codex，可选: gemini, claude)
+  --api NAME           指定使用的 API 后端 (默认: codex，可选: gemini, claude, gemini-cli)
   --fallback           API 失败时回退到本地摘要（默认关闭）
   --no-fallback        明确禁用本地摘要回退（默认行为）
   -h, --help           查看帮助
 
 环境变量：
   GEMINI_API_KEY            使用 gemini 后端时的 API Key
-  GIT_COMMIT_AI_BACKEND      默认的 API 后端（默认 codex，可选 gemini, claude）
+  GIT_COMMIT_AI_BACKEND      默认的 API 后端（默认 codex，可选 gemini, claude, gemini-cli）
   GIT_COMMIT_AI_CLAUDE_MODEL 使用 claude 后端时的模型（默认 sonnet）
+  GIT_COMMIT_AI_GEMINI_CLI_MODEL 使用 gemini-cli 后端时的模型（可选）
   GIT_COMMIT_AI_MODEL        默认模型名称
   GIT_COMMIT_AI_MAX_BYTES    diff 上限
   GIT_COMMIT_AI_EXTRA_PROMPT 额外固定提示词
@@ -287,7 +288,28 @@ USING_FALLBACK=0
 CLI_STATUS=0
 MESSAGE_SOURCE=""
 
-if [[ "$API_BACKEND" == "claude" ]]; then
+if [[ "$API_BACKEND" == "gemini-cli" ]]; then
+    # 检查 gemini CLI 是否可用
+    if ! command -v gemini >/dev/null 2>&1; then
+        echo "git-commit-ai: 使用 gemini-cli 后端时，必须安装 gemini CLI" >&2
+        exit 127
+    fi
+
+    set +e
+    GEMINI_CLI_MODEL=${GIT_COMMIT_AI_GEMINI_CLI_MODEL:-}
+    if [[ -n "$GEMINI_CLI_MODEL" ]]; then
+        COMMIT_MESSAGE=$(printf '%s' "$FINAL_PROMPT" | gemini --output-format text --model "$GEMINI_CLI_MODEL" 2>/dev/null)
+    else
+        COMMIT_MESSAGE=$(printf '%s' "$FINAL_PROMPT" | gemini --output-format text 2>/dev/null)
+    fi
+    CLI_STATUS=$?
+    set -e
+    if (( CLI_STATUS == 0 )); then
+      MESSAGE_SOURCE="gemini-cli"
+      [[ -z "$COMMIT_MESSAGE" ]] && CLI_STATUS=1
+    fi
+
+elif [[ "$API_BACKEND" == "claude" ]]; then
     # 检查 claude CLI 是否可用
     if ! command -v claude >/dev/null 2>&1; then
         echo "git-commit-ai: 使用 claude 后端时，必须安装 claude CLI" >&2
@@ -811,6 +833,9 @@ fi
 
 SOURCE_LABEL="生成的提交信息："
 case "$MESSAGE_SOURCE" in
+  gemini-cli)
+    SOURCE_LABEL="Gemini CLI 生成的提交信息："
+    ;;
   claude)
     SOURCE_LABEL="Claude CLI 生成的提交信息："
     ;;
