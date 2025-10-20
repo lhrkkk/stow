@@ -87,8 +87,8 @@ alias py="python"
 # alias cl="claude --dangerously-skip-permissions"
 alias co="codex --sandbox danger-full-access"
 # Codex helpers
-alias ca="codex --model gpt-5-codex --full-auto"
-alias c="codex --model gpt-5-codex --dangerously-bypass-approvals-and-sandbox"
+alias ca="codex --model gpt-5.2-codex --full-auto"
+alias c="codex --model gpt-5.2-codex --dangerously-bypass-approvals-and-sandbox"
 
 # ---- Migrated from Bash ----
 # Mosh shortcuts

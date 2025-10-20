@@ -4,12 +4,12 @@ mode: Rule
 log-level: info
 external-controller: :9090
 proxies:
-  - {name: JMS-849673@c26s1.portablesubmarines.com:19138, server: c26s1.portablesubmarines.com, port: 19138, type: ss, cipher: aes-256-gcm, password: FxV2s46gk6gBg4fv}
-  - {name: JMS-849673@c26s2.portablesubmarines.com:19138, server: c26s2.portablesubmarines.com, port: 19138, type: ss, cipher: aes-256-gcm, password: FxV2s46gk6gBg4fv}
-  - {name: JMS-849673@c26s3.portablesubmarines.com:19138, server: c26s3.portablesubmarines.com, port: 19138, type: vmess, uuid: bdc2dc2d-7323-46e9-8a9c-8e7d521f8b43, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true}
-  - {name: JMS-849673@c26s4.portablesubmarines.com:19138, server: c26s4.portablesubmarines.com, port: 19138, type: vmess, uuid: bdc2dc2d-7323-46e9-8a9c-8e7d521f8b43, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true}
-  - {name: JMS-849673@c26s5.portablesubmarines.com:19138, server: c26s5.portablesubmarines.com, port: 19138, type: vmess, uuid: bdc2dc2d-7323-46e9-8a9c-8e7d521f8b43, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true}
-  - {name: JMS-849673@c26s801.portablesubmarines.com:19138, server: c26s801.portablesubmarines.com, port: 19138, type: vmess, uuid: bdc2dc2d-7323-46e9-8a9c-8e7d521f8b43, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true}
+  - {name: JMS-849673@c26s1.portablesubmarines.com:19138, server: c26s1.portablesubmarines.com, port: 19138, type: ss, cipher: aes-256-gcm, password: cfx7F9yYRrEhPCAn}
+  - {name: JMS-849673@c26s2.portablesubmarines.com:19138, server: c26s2.portablesubmarines.com, port: 19138, type: ss, cipher: aes-256-gcm, password: cfx7F9yYRrEhPCAn}
+  - {name: JMS-849673@c26s3.portablesubmarines.com:19138, server: c26s3.portablesubmarines.com, port: 19138, type: vmess, uuid: 1c195442-fc2b-46d8-b891-2f77f7574033, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true}
+  - {name: JMS-849673@c26s4.portablesubmarines.com:19138, server: c26s4.portablesubmarines.com, port: 19138, type: vmess, uuid: 1c195442-fc2b-46d8-b891-2f77f7574033, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true}
+  - {name: JMS-849673@c26s5.portablesubmarines.com:19138, server: c26s5.portablesubmarines.com, port: 19138, type: vmess, uuid: 1c195442-fc2b-46d8-b891-2f77f7574033, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true}
+  - {name: JMS-849673@c26s801.portablesubmarines.com:19138, server: c26s801.portablesubmarines.com, port: 19138, type: vmess, uuid: 1c195442-fc2b-46d8-b891-2f77f7574033, alterId: 0, cipher: auto, tls: false, skip-cert-verify: true}
 proxy-groups:
   - name: Proxies
     type: select

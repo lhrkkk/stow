@@ -122,9 +122,9 @@ config.webgpu_power_preference = "HighPerformance"
 -- key bindings（基础通用部分；resurrect 相关快捷键在模块中附加）
 config.keys = {
   -- Close current pane via Ctrl+W (Linux/Windows-style alternative)
-  { key = "w", mods = "CTRL", action = wezterm.action.CloseCurrentPane { confirm = true } },
+  -- { key = "w", mods = "CTRL", action = wezterm.action.CloseCurrentPane { confirm = true } },
   -- Split pane right 50% via Ctrl+Space
-  { key = "Space", mods = "CTRL", action = wezterm.action.SplitPane { direction = "Right", size = { Percent = 50 } } },
+  -- { key = "Space", mods = "CTRL", action = wezterm.action.SplitPane { direction = "Right", size = { Percent = 50 } } },
   -- Split pane horizontally 50% via Ctrl+S
   { key = "s", mods = "CTRL", action = wezterm.action.SplitPane { direction = "Down", size = { Percent = 50 } } },
   -- Split pane vertically 50% via Ctrl+V

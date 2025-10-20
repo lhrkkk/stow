@@ -122,7 +122,7 @@ function M.setup(config)
     else
       pane:send_text("\necho '❌ 插件未加载'\n")
     end
-  end)))
+  end))
 
   -- 交互恢复（带时间戳展示）：Cmd+Opt+R
   add_key(config, "r", "CMD|OPT", wezterm.action_callback(function(win, pane)
@@ -146,7 +146,7 @@ function M.setup(config)
     else
       pane:send_text("\necho '❌ 插件未加载'\n")
     end
-  end)))
+  end))
 
   -- 保存窗口/标签
   if resurrect then
@@ -164,7 +164,7 @@ function M.setup(config)
     else
       pane:send_text("\necho '❌ 插件未加载'\n")
     end
-  end)))
+  end))
 
   -- 删除已保存状态（选择器）：Cmd+Opt+D
   add_key(config, "d", "CMD|OPT", wezterm.action_callback(function(win, pane)
@@ -176,7 +176,7 @@ function M.setup(config)
     else
       pane:send_text("\necho '❌ 插件未加载'\n")
     end
-  end)))
+  end))
 
   -- 工作区管理：重命名（Cmd+Opt+Ctrl+R）、切换/创建（Cmd+Opt+Ctrl+G）
   add_key(config, "r", "CMD|OPT|CTRL", wezterm.action.PromptInputLine({
@@ -216,7 +216,7 @@ function M.setup(config)
     else
       pane:send_text("\necho '❌ 插件未加载'\n")
     end
-  end)))
+  end))
 
   -- 保存工作区快照（自定义名）：Cmd+Opt+Ctrl+S
   add_key(config, "S", "CMD|OPT|CTRL", wezterm.action.PromptInputLine({
@@ -271,7 +271,7 @@ function M.setup(config)
     else
       win:perform_action(wezterm.action.CloseCurrentTab({ confirm = false }), pane)
     end
-  end)))
+  end))
 
   -- 先保存再关闭窗口：Cmd+Shift+W（逐个关闭该窗口的所有标签）
   add_key(config, "W", "CMD|SHIFT", wezterm.action_callback(function(_, pane)
@@ -286,7 +286,7 @@ function M.setup(config)
     else
       pane:send_text("\necho '❌ 插件未加载'\n")
     end
-  end)))
+  end))
 
   -- 重新打开最近保存的标签：Cmd+Shift+L
   add_key(config, "L", "CMD|SHIFT", wezterm.action_callback(function(_, pane)
@@ -325,7 +325,7 @@ function M.setup(config)
       tab:set_zoomed(true)
     end
     pane:send_text("\necho '✅ 已恢复最近保存的标签: " .. (state.title or name):gsub("'", "") .. "'\n")
-  end)))
+  end))
 
   return resurrect
 end
