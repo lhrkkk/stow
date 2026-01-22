@@ -36,3 +36,5 @@ fpath=(/usr/share/zsh/5.9/functions $fpath)
 
 # fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
 #
+
+export DEV_RELOAD=1

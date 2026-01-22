@@ -127,7 +127,7 @@ fzf-redraw-prompt() {
 zle -N fzf-redraw-prompt
 
 zle -N fzf-find-widget
-bindkey '^p' fzf-find-widget
+bindkey '^[' fzf-find-widget
 
 fzf-cd-widget() {
 	ami-fzf-theme-once

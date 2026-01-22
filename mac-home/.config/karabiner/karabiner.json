@@ -1196,6 +1196,41 @@
                                     }
                                 ],
                                 "from": {
+                                    "key_code": "y",
+                                    "modifiers": {
+                                        "mandatory": [
+                                            "left_command"
+                                        ],
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "y",
+                                        "modifiers": [
+                                            "control"
+                                        ]
+                                    }
+                                ],
+                                "type": "basic"
+                            },
+                            {
+                                "conditions": [
+                                    {
+                                        "bundle_identifiers": [
+                                            "^com.googlecode.iterm2",
+                                            "org.alacritty",
+                                            "com.github.wez.wezterm",
+                                            "dev.warp.Warp-Stable",
+                                            "com.mitchellh.ghostty",
+                                            "com.todesktop.230313mzl4w4u92"
+                                        ],
+                                        "type": "frontmost_application_if"
+                                    }
+                                ],
+                                "from": {
                                     "key_code": "w",
                                     "modifiers": {
                                         "mandatory": [
