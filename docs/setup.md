@@ -320,6 +320,7 @@
 - 工具：`git-commit-ai`、`jj-commit-ai` 默认调用 **Codex** 后端，模型为 `gpt-5`。
 - 切换后端：`--api gemini` 可改用 Gemini；也可通过 `GIT_COMMIT_AI_BACKEND` / `JJ_COMMIT_AI_BACKEND` 环境变量。
 - 推理强度：`--reasoning-effort`, `-r`（或环境变量 `GIT_COMMIT_AI_REASONING_EFFORT`、`JJ_COMMIT_AI_REASONING_EFFORT`）会透传为 `model_reasoning_effort`，可选 `minimal / low / medium / high`（默认 `minimal`）。
+- 大 diff 处理：若 Codex 调用失败且检测到可能超限，`jj-commit-ai` 会自动缩小 `--max-bytes` 并重试（默认最多 3 次，最小 8000 字节；可用 `JJ_COMMIT_AI_TRUNCATE_RETRY_MAX`、`JJ_COMMIT_AI_TRUNCATE_RETRY_MIN_BYTES` 调整）。
 - JJ 支持：使用 `--describe` 以 `jj describe -m` 应用生成信息（替代 `jj commit`）；
   若要针对非工作副本的修订，可直接加 `--rev <rev>`（隐式启用 `--describe`）。
   若需要批量处理描述为空但有改动的提交，可用 `jj-commit-ai fill-empty`。

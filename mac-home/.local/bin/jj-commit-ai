@@ -48,6 +48,8 @@ Options:
   JJ_COMMIT_AI_KEEP_HISTORY 非空时保留 Codex CLI 历史目录（默认使用隔离目录）
   JJ_COMMIT_AI_CODEX_HOME   自定义隔离目录根路径（默认：$HOME/.codex/jj-commit-ai）
   JJ_COMMIT_AI_CODEX_FALLBACK 指定无权限写入时的备选目录（默认使用 $TMPDIR/jj-commit-ai）
+  JJ_COMMIT_AI_TRUNCATE_RETRY_MAX Codex 因超限失败时最多自动重试次数（默认 3）
+  JJ_COMMIT_AI_TRUNCATE_RETRY_MIN_BYTES 自动重试时的最小 diff 截断字节（默认 8000）
 USAGE
 }
 
@@ -316,7 +318,14 @@ fill_empty_subcommand() {
     if (( ${#forwarded_jj_args[@]} )); then
       cmd+=(-- "${forwarded_jj_args[@]}")
     fi
+    set +e
     "${cmd[@]}"
+    local child_status=$?
+    set -e
+    if (( child_status != 0 )); then
+      printf '[fill-empty] 失败 %s (%d/%d), exit=%d\n' "$display" "$idx" "$total" "$child_status" >&2
+      return "$child_status"
+    fi
   done
 
   return 0
@@ -589,16 +598,8 @@ if [[ -z "$trimmed_diff" && -z "$trimmed_stat" ]]; then
   exit 1
 fi
 
-TRUNCATED_FLAG=""
-if (( MAX_BYTES > 0 )); then
-  DIFF_BYTES=$(printf '%s' "$DIFF_OUTPUT" | wc -c | tr -d ' ')
-  if (( DIFF_BYTES > MAX_BYTES )); then
-    DIFF_OUTPUT=$(printf '%s' "$DIFF_OUTPUT" | head -c "$MAX_BYTES")
-    TRUNCATED_FLAG=$'\n\n[Diff truncated to '
-    TRUNCATED_FLAG+="$MAX_BYTES"
-    TRUNCATED_FLAG+=$' bytes for AI prompt.]'
-  fi
-fi
+DIFF_OUTPUT_RAW="$DIFF_OUTPUT"
+DIFF_BYTES=$(printf '%s' "$DIFF_OUTPUT_RAW" | wc -c | tr -d ' ')
 
 BASE_PROMPT_EN=$'You are an expert developer creating high-quality commit messages for the Jujutsu (jj) VCS.\nGuidelines:\n- Provide a concise subject line (<= 72 characters).\n- Make the subject specific and concrete; prefer user-visible behavior or feature area over file/module names. Avoid listing files or internal helper identifiers (unless they are user-facing commands). Avoid vague words like update, improve, fix.\n- Pack as many key points as feasible into the subject using compact separators (/, -, comma), while staying within 72 characters; if not possible, include the top 2–3 most important points.\n- Output only the commit message, with the subject on the first line; no preamble, meta text, disclaimers, or headings; do not write lines like "Here is...", "Drafting...", or "in Chinese".\n- Add at most 3 short bullets after a blank line; each bullet should be a single clause starting with a verb, avoid long chains (and/then/;), <= 80 characters.\n- No Markdown formatting (no bold/italics/headings) and no code fences or surrounding quotes.\n- Prioritise the most impactful changes if the diff is long.\n- Use sentence case for the subject.\n- Example (good): 【Unify source label and keep separators】; Example (bad): 【jj-commit-ai】.\n'
 BASE_PROMPT="$BASE_PROMPT_EN"
@@ -654,23 +655,45 @@ if [[ -n "$EXTRA_RUNTIME_PROMPT" ]]; then
   BASE_PROMPT+=$'\n'
 fi
 
-PROMPT_BODY=$'\n'
-PROMPT_BODY+="$STATUS_LABEL"
-PROMPT_BODY+=$':\n'
-PROMPT_BODY+="$STATUS_OUTPUT"
-PROMPT_BODY+=$'\n\n'
-PROMPT_BODY+="$DIFF_STAT_LABEL"
-PROMPT_BODY+=$':\n'
-PROMPT_BODY+="$DIFF_STAT"
-PROMPT_BODY+=$'\n\n'
-PROMPT_BODY+="$DIFF_PATCH_LABEL"
-PROMPT_BODY+=$':\n'
-PROMPT_BODY+="$DIFF_OUTPUT"
-PROMPT_BODY+="$TRUNCATED_FLAG"
+build_final_prompt() {
+  local limit_bytes="$1"
+  local diff_payload="$DIFF_OUTPUT_RAW"
+  local truncated_flag=""
+  if (( limit_bytes > 0 && DIFF_BYTES > limit_bytes )); then
+    # 在 pipefail 下，head 提前结束会让上游 printf 收到 SIGPIPE(141)；这里允许该情况。
+    diff_payload=$(printf '%s' "$DIFF_OUTPUT_RAW" | head -c "$limit_bytes" || true)
+    truncated_flag=$'\n\n[Diff truncated to '
+    truncated_flag+="$limit_bytes"
+    truncated_flag+=$' bytes for AI prompt.]'
+  fi
 
-FINAL_PROMPT="$BASE_PROMPT$PROMPT_BODY"
+  PROMPT_BODY=$'\n'
+  PROMPT_BODY+="$STATUS_LABEL"
+  PROMPT_BODY+=$':\n'
+  PROMPT_BODY+="$STATUS_OUTPUT"
+  PROMPT_BODY+=$'\n\n'
+  PROMPT_BODY+="$DIFF_STAT_LABEL"
+  PROMPT_BODY+=$':\n'
+  PROMPT_BODY+="$DIFF_STAT"
+  PROMPT_BODY+=$'\n\n'
+  PROMPT_BODY+="$DIFF_PATCH_LABEL"
+  PROMPT_BODY+=$':\n'
+  PROMPT_BODY+="$diff_payload"
+  PROMPT_BODY+="$truncated_flag"
 
-if (( SHOW_PROMPT )); then
+  FINAL_PROMPT="$BASE_PROMPT$PROMPT_BODY"
+}
+
+stdout_has_context_limit_error() {
+  local stdout_file="$1"
+  [[ -s "$stdout_file" ]] || return 1
+  grep -Eiq 'context window|context length|context_length|token limit|too long|request too large|payload too large|input too large|max(imum)? input|413' "$stdout_file"
+}
+
+CURRENT_MAX_BYTES="$MAX_BYTES"
+build_final_prompt "$CURRENT_MAX_BYTES"
+
+if (( SHOW_PROMPT )) && [[ "$API_BACKEND" != "codex" ]]; then
   echo "===== AI PROMPT BEGIN ===="
   printf '%s\n' "$FINAL_PROMPT"
   echo "===== AI PROMPT END ===="
@@ -832,6 +855,18 @@ elif [[ "$API_BACKEND" == "codex" ]]; then
     SOURCE_CODEX_HOME=${CODEX_HOME:-$HOME/.codex}
     CUSTOM_CODEX_HOME=${JJ_COMMIT_AI_CODEX_HOME:-$SOURCE_CODEX_HOME/jj-commit-ai}
     USE_ISOLATED_CODEX_HOME=0
+    TRUNCATE_RETRY_MAX=${JJ_COMMIT_AI_TRUNCATE_RETRY_MAX:-3}
+    TRUNCATE_RETRY_MIN_BYTES=${JJ_COMMIT_AI_TRUNCATE_RETRY_MIN_BYTES:-8000}
+
+    if ! [[ "$TRUNCATE_RETRY_MAX" =~ ^[0-9]+$ ]]; then
+      TRUNCATE_RETRY_MAX=3
+    fi
+    if ! [[ "$TRUNCATE_RETRY_MIN_BYTES" =~ ^[0-9]+$ ]]; then
+      TRUNCATE_RETRY_MIN_BYTES=8000
+    fi
+    if (( TRUNCATE_RETRY_MIN_BYTES < 1 )); then
+      TRUNCATE_RETRY_MIN_BYTES=1
+    fi
 
     if [[ -z "$KEEP_HISTORY" && -z "${CODEX_HOME+x}" ]]; then
       USE_ISOLATED_CODEX_HOME=1
@@ -898,18 +933,73 @@ elif [[ "$API_BACKEND" == "codex" ]]; then
       fi
     }
 
-    set +e
-    if (( USE_ISOLATED_CODEX_HOME )); then
-      CODEX_HOME="$CODEX_ENV_HOME" "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
-    else
-      "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
-    fi
-    CLI_STATUS=$?
-    set -e
+    RETRY_COUNT=0
+    while :; do
+      build_final_prompt "$CURRENT_MAX_BYTES"
+      if (( SHOW_PROMPT )); then
+        if (( RETRY_COUNT > 0 )); then
+          printf '===== AI PROMPT BEGIN (retry %d, max-bytes=%s) ====\n' "$RETRY_COUNT" "$CURRENT_MAX_BYTES"
+        else
+          echo "===== AI PROMPT BEGIN ===="
+        fi
+        printf '%s\n' "$FINAL_PROMPT"
+        echo "===== AI PROMPT END ===="
+      fi
 
-    if (( USE_ISOLATED_CODEX_HOME )); then
-      rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
-    fi
+      set +e
+      if (( USE_ISOLATED_CODEX_HOME )); then
+        CODEX_HOME="$CODEX_ENV_HOME" "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
+      else
+        "${CLI_ARGS[@]}" "$FINAL_PROMPT" >"$TMP_STDOUT" 2>&1
+      fi
+      CLI_STATUS=$?
+      set -e
+
+      if (( USE_ISOLATED_CODEX_HOME )); then
+        rm -f "$CODEX_ENV_HOME/history.jsonl" 2>/dev/null || true
+      fi
+
+      EMPTY_LAST_MESSAGE=0
+      if (( CLI_STATUS == 0 )) && [[ ! -s "$TMP_OUTPUT" ]]; then
+        EMPTY_LAST_MESSAGE=1
+        CLI_STATUS=1
+        [[ -n "$DEBUG" ]] && echo "[jj-commit-ai] codex 未输出 last-message，按失败处理以触发重试" >&2
+      fi
+
+      if (( CLI_STATUS == 0 )); then
+        break
+      fi
+      if (( RETRY_COUNT >= TRUNCATE_RETRY_MAX )); then
+        break
+      fi
+      if (( CURRENT_MAX_BYTES <= 1 )); then
+        break
+      fi
+
+      SHOULD_RETRY=0
+      if (( DIFF_BYTES > CURRENT_MAX_BYTES )); then
+        SHOULD_RETRY=1
+      elif (( EMPTY_LAST_MESSAGE )) && (( CURRENT_MAX_BYTES > TRUNCATE_RETRY_MIN_BYTES )); then
+        SHOULD_RETRY=1
+      elif stdout_has_context_limit_error "$TMP_STDOUT"; then
+        SHOULD_RETRY=1
+      fi
+      if (( ! SHOULD_RETRY )); then
+        break
+      fi
+
+      NEXT_MAX_BYTES=$(( CURRENT_MAX_BYTES / 2 ))
+      if (( CURRENT_MAX_BYTES > TRUNCATE_RETRY_MIN_BYTES && NEXT_MAX_BYTES < TRUNCATE_RETRY_MIN_BYTES )); then
+        NEXT_MAX_BYTES=$TRUNCATE_RETRY_MIN_BYTES
+      fi
+      if (( NEXT_MAX_BYTES < 1 || NEXT_MAX_BYTES >= CURRENT_MAX_BYTES )); then
+        break
+      fi
+
+      RETRY_COUNT=$(( RETRY_COUNT + 1 ))
+      printf 'jj-commit-ai: 可能因 diff 过大失败，自动重试 (%d/%d, --max-bytes=%s)\n' "$RETRY_COUNT" "$TRUNCATE_RETRY_MAX" "$NEXT_MAX_BYTES" >&2
+      CURRENT_MAX_BYTES="$NEXT_MAX_BYTES"
+    done
 
     if (( CLI_STATUS == 0 )); then
         [[ -n "$DEBUG" ]] && {
@@ -1439,7 +1529,14 @@ PY
         echo "jj-commit-ai: Gemini API 调用失败 (exit $CLI_STATUS)" >&2
     else
         echo "jj-commit-ai: $CLI_COMMAND exec 失败 (exit $CLI_STATUS)" >&2
-        cat "$TMP_STDOUT" >&2 || true
+        if [[ -n "${RETRY_COUNT+x}" ]]; then
+          printf 'jj-commit-ai: codex 重试统计 attempts=%d, final-max-bytes=%s, diff-bytes=%s\n' "$((RETRY_COUNT + 1))" "${CURRENT_MAX_BYTES:-unknown}" "${DIFF_BYTES:-unknown}" >&2
+        fi
+        if [[ -s "${TMP_STDOUT:-}" ]]; then
+          cat "$TMP_STDOUT" >&2 || true
+        else
+          echo "jj-commit-ai: 未收到可用错误输出（stdout/stderr 为空）" >&2
+        fi
     fi
     exit "$CLI_STATUS"
   fi
