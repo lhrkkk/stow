@@ -83,16 +83,22 @@
    "$HOME/_env/stow/bootstrap.sh" update --allow-dirty
   ```
 
-- 若你只想把当前仓库部署到当前机器，使用更轻量的 `deploy.sh`：
+- 若你想在本地运行后把仓库同步到远端并在远端部署，使用 `deploy.sh`：
   
   ```sh
    "$HOME/_env/stow/deploy.sh"
   ```
 
-- 若部署时也要同步 Homebrew：
+- 若远端部署时也要同步 Homebrew：
   
   ```sh
    "$HOME/_env/stow/deploy.sh" --with-brew
+  ```
+
+- 若要覆盖远端目标：
+  
+  ```sh
+   "$HOME/_env/stow/deploy.sh" --remote lhr@example.com --port 22 --remote-dir ~/stow
   ```
 
 说明：
@@ -100,7 +106,9 @@
 - 默认会自动检测 `hosts/$(hostname)`；存在则一并 `apply/restow`，不存在则跳过。
 - `update` 在仓库工作区不干净时会中止，除非显式传 `--allow-dirty`。
 - `--skip-brew`、`--skip-stow`、`--skip-pull` 可用于局部执行。
-- `deploy.sh` 默认等价于 `bootstrap.sh update --skip-brew`；`deploy.sh apply` 则等价于 `bootstrap.sh bootstrap --skip-brew`。
+- `deploy.sh` 默认会先通过 `rsync` 把本地仓库镜像到远端，再在远端执行 `bootstrap.sh update --skip-pull --skip-brew`。
+- `deploy.sh apply` 则会在远端执行 `bootstrap.sh bootstrap --skip-brew`。
+- 当前默认远端是 `lhr@43.137.38.19:6000`，目录是 `/SDA/lhr/_env/stow`；也可通过参数或环境变量覆盖。
 
 ---
 
