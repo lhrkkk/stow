@@ -3,6 +3,7 @@
 This repository now keeps detailed guides under the `docs/` directory. Start here:
 
 - [Setup Guide](docs/setup.md)
+- [Bootstrap Script](bootstrap.sh)
 - [Warp Workflow Notes](docs/warp.md)
 - [Alias Reference](docs/alias-reference.md)
 - [Zsh Completion Notes](mac-home/.config/zsh/README.completion.md)

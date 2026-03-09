@@ -54,7 +54,43 @@
 
 ---
 
-## 2. 首次链接（推荐先预览，再执行）
+## 2. 一键 bootstrap（推荐）
+
+仓库根目录提供了一个 `bootstrap.sh`，用于串联“安装前置依赖 + Brewfile + stow 部署”。
+
+- 首次安装：
+  
+  ```sh
+   "$HOME/_env/stow/bootstrap.sh"
+  ```
+
+- 如需显式包含主机模块：
+  
+  ```sh
+   "$HOME/_env/stow/bootstrap.sh" --host
+  ```
+
+- 后续更新（`git pull --ff-only` + `brew update` + `brew bundle` + `stowx restow`）：
+  
+  ```sh
+   "$HOME/_env/stow/bootstrap.sh" update
+  ```
+
+- 若仓库有本地改动，只想跳过 `git pull` 继续更新其余部分：
+  
+  ```sh
+   "$HOME/_env/stow/bootstrap.sh" update --allow-dirty
+  ```
+
+说明：
+
+- 默认会自动检测 `hosts/$(hostname)`；存在则一并 `apply/restow`，不存在则跳过。
+- `update` 在仓库工作区不干净时会中止，除非显式传 `--allow-dirty`。
+- `--skip-brew`、`--skip-stow`、`--skip-pull` 可用于局部执行。
+
+---
+
+## 3. 首次链接（手动流程：推荐先预览，再执行）
 
 无需提前把 `stowx` 加入 PATH，可直接通过仓库内路径调用。
 
@@ -80,7 +116,7 @@
 
 ---
 
-## 3. 常用工作流（stowx 优先）
+## 4. 常用工作流（stowx 优先）
 
 - 预览：
   
@@ -143,7 +179,7 @@
 
 ---
 
-## 4. 收编（adopt）与覆盖式部署（谨慎）
+## 5. 收编（adopt）与覆盖式部署（谨慎）
 
 当目标路径下已有同名“非链接”文件/目录时，会产生冲突。解决思路：
 
@@ -176,7 +212,7 @@
 
 ---
 
-## 5. 抓取（grab）：把散落文件归入包
+## 6. 抓取（grab）：把散落文件归入包
 
 当你在 `$HOME` 下新增/修改了零散配置，希望纳入 `mac-home` 包进行统一管理：
 
@@ -220,7 +256,7 @@
 
 ---
 
-## 6. 主机特定模块（`hosts/<hostname>`）
+## 7. 主机特定模块（`hosts/<hostname>`）
 
 当某台机器需要额外配置时，可在 `$STOW_DIR/hosts/<hostname>` 下维护主机专属模块：
 
@@ -235,7 +271,7 @@
 
 ---
 
-## 7. 冲突解析（--force：override/defer/ignore/adopt）
+## 8. 冲突解析（--force：override/defer/ignore/adopt）
 
 当目标路径已存在同名文件/目录时，stow 会报告冲突。stowx 提供统一的冲突解析：
 
@@ -273,7 +309,7 @@
 - `--defer` 适合目录顺序控制（触发目录折叠）；对“文件级 not owned”基本无效，故文件使用 `--ignore` 跳过更稳妥。
 - 所有删除操作在 `-n/--dry-run` 下仅打印 DRY-RUN 日志，不会修改文件。
 
-## 6. Zsh 补全（Git/JJ 分组版 + report-kit）
+## 9. Zsh 补全（Git/JJ 分组版 + report-kit）
 
 - 说明文档：`mac-home/.config/zsh/README.completion.md`
 - 功能要点：
@@ -315,7 +351,7 @@
  
  ---
 
-## 7. AI 提交助手（git / jj）
+## 10. AI 提交助手（git / jj）
 
 - 工具：`git-commit-ai`、`jj-commit-ai` 默认调用 **Codex** 后端，模型为 `gpt-5`。
 - 切换后端：`--api gemini` 可改用 Gemini；也可通过 `GIT_COMMIT_AI_BACKEND` / `JJ_COMMIT_AI_BACKEND` 环境变量。
@@ -340,7 +376,7 @@
 
 ---
 
-## 8. 验证与常见应用
+## 11. 验证与常见应用
 
 - WezTerm：保存 `~/.config/wezterm/wezterm.lua` 后自动热重载；偏好“浅色标题栏”已在配置中处理。
 - Yazi：
@@ -371,7 +407,7 @@
 
 ---
 
-## 9. 故障排查与回滚
+## 12. 故障排查与回滚
 
 - 预览输出包含 LINK/CONFLICT/REMOVE 等关键字时，请先停止执行并确认方案。
 - 冲突（目标存在非链接同名文件）：优先选择 adopt；若不想保留现状，可走“覆盖式部署”（谨慎）。
@@ -396,7 +432,7 @@
 
 ---
 
-## 10. 版本控制建议
+## 13. 版本控制建议
 
 - 小步提交：每次变更（尤其是 adopt/抓取）后，及时 `git add/commit`。
 - 推送前再次 `stowx preview`，确保没有意外路径。
@@ -404,7 +440,7 @@
 
 ---
 
-## 11. Warp 会话日志（可选）
+## 14. Warp 会话日志（可选）
 
 若你在 Warp 中使用日志脚本（例如 `warp-log` 系列），可参考：
 
@@ -425,7 +461,7 @@
 
 ---
 
-## 12. 速查表
+## 15. 速查表
 
 - 预览 → 应用：
   
@@ -483,7 +519,7 @@
 
 ---
 
-## 12. Zim（zimfw）安装与初始化
+## 16. Zim（zimfw）安装与初始化
 
 本仓库使用 Zim（zimfw）作为 zsh 框架；已在 `mac-home/.config/zsh/plugins.zsh` 中内置“首次自动安装”逻辑：首次启动 zsh 时若未检测到 `~/.zim`，会自动下载安装，并把 `~/.zimrc` 链接到仓库内的 `~/.config/zsh/zimrc`。
 
@@ -514,7 +550,7 @@
 
 ---
 
-## 13. Git/JJ 工作区工作流（wo / ws / wm / wsa / wma / wmsa）
+## 17. Git/JJ 工作区工作流（wo / ws / wm / wsa / wma / wmsa）
 
 - 目录与约定
   - Git 工作区：`$REPO/.jj/git-1|git-2|git-3`
