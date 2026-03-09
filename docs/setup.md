@@ -83,11 +83,24 @@
    "$HOME/_env/stow/bootstrap.sh" update --allow-dirty
   ```
 
+- 若你只想把当前仓库部署到当前机器，使用更轻量的 `deploy.sh`：
+  
+  ```sh
+   "$HOME/_env/stow/deploy.sh"
+  ```
+
+- 若部署时也要同步 Homebrew：
+  
+  ```sh
+   "$HOME/_env/stow/deploy.sh" --with-brew
+  ```
+
 说明：
 
 - 默认会自动检测 `hosts/$(hostname)`；存在则一并 `apply/restow`，不存在则跳过。
 - `update` 在仓库工作区不干净时会中止，除非显式传 `--allow-dirty`。
 - `--skip-brew`、`--skip-stow`、`--skip-pull` 可用于局部执行。
+- `deploy.sh` 默认等价于 `bootstrap.sh update --skip-brew`；`deploy.sh apply` 则等价于 `bootstrap.sh bootstrap --skip-brew`。
 
 ---
 
@@ -310,7 +323,37 @@
 - `--defer` 适合目录顺序控制（触发目录折叠）；对“文件级 not owned”基本无效，故文件使用 `--ignore` 跳过更稳妥。
 - 所有删除操作在 `-n/--dry-run` 下仅打印 DRY-RUN 日志，不会修改文件。
 
-## 9. Zsh 补全（Git/JJ 分组版 + report-kit）
+## 9. SSH 节点清单（`nodes`）
+
+为便于统一管理“登录过的远程节点”，仓库内提供了一个轻量工具：
+
+- 脚本位置：`mac-home/.local/bin/nodes`
+- 主机默认数据目录：`hosts/<hostname>/.config/nodes`
+- 文件约定：
+  - `nodes.tsv`：手工维护的稳定节点/别名
+  - `history.tsv`：`nodes scan-history` 从 shell 历史重建的结果
+- 读取优先级：`nodes.tsv` 优先于 `history.tsv`，避免重扫历史时覆盖手工条目
+
+常用命令：
+
+```sh
+ nodes scan-history
+ nodes scan-history --collapse-host
+ nodes list
+ nodes show <alias>
+ nodes ssh <alias>
+ nodes render-ssh-config
+```
+
+说明：
+
+- `scan-history` 会扫描 `~/.zsh_history`、`~/.bash_history`、`~/.zhistory` 中的 `ssh/scp/sftp/rsync/mosh` 目标，并写入 `history.tsv`。
+- 默认会保留有意义的 `host/user/port` 变体，只做轻量归一化：默认端口 `22` 会折叠为默认端口；同一主机若已存在明确用户，则匿名条目会被丢弃。
+- 若你只想保留每台机器一个“主入口”，可显式使用 `nodes scan-history --collapse-host`；它会按 host 压缩，并优先挑选明确用户、出现次数更高的那条。
+- `render-ssh-config` 默认生成 `nodes.generated.conf`；若你希望通过 `ssh <alias>` 直接使用这些别名，请在主 `~/.ssh/config` 中显式 `Include` 对应生成文件。
+- 建议把稳定命名、标签、端口修正，以及同机多账号/多端口等特殊入口放入 `nodes.tsv`；把“自动发现的主入口”交给 `history.tsv`。
+
+## 10. Zsh 补全（Git/JJ 分组版 + report-kit）
 
 - 说明文档：`mac-home/.config/zsh/README.completion.md`
 - 功能要点：

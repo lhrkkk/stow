@@ -58,6 +58,13 @@ run() {
   "$@"
 }
 
+sanitize_homebrew_env() {
+  if [[ -n "${HOMEBREW_CURL_PATH:-}" && ! -x "${HOMEBREW_CURL_PATH}" ]]; then
+    log "unset invalid HOMEBREW_CURL_PATH: ${HOMEBREW_CURL_PATH}"
+    unset HOMEBREW_CURL_PATH
+  fi
+}
+
 is_macos() {
   [[ "$(uname -s)" == "Darwin" ]]
 }
@@ -169,6 +176,7 @@ ensure_xcode_clt() {
 }
 
 ensure_homebrew() {
+  sanitize_homebrew_env
   if find_brew_bin >/dev/null 2>&1; then
     load_brew_env
     return 0

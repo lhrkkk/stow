@@ -2,6 +2,7 @@
 
 - **Setup Guide** – [docs/setup.md](./setup.md)
 - **Bootstrap Script** – [bootstrap.sh](../bootstrap.sh)
+- **Deploy Script** – [deploy.sh](../deploy.sh)
 - **Warp Workflow Notes** – [docs/warp.md](./warp.md)
 - **Alias Reference** – [docs/alias-reference.md](./alias-reference.md)
 - **Zsh Completion Notes** – [`mac-home/.config/zsh/README.completion.md`](../mac-home/.config/zsh/README.completion.md)

@@ -1,0 +1,681 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+用法:
+  nodes scan-history [--collapse-host]
+  nodes list
+  nodes show <alias>
+  nodes ssh <alias> [-- <ssh-extra-args...>]
+  nodes render-ssh-config [output]
+  nodes help
+
+说明:
+  - 手工节点清单:   nodes.tsv
+  - 历史扫描结果:   history.tsv（由 scan-history 重建）
+  - 默认优先使用 ~/.config/nodes；若不存在则回退到 hosts/<hostname>/.config/nodes
+  - list/show/ssh/render-ssh-config 会同时读取 nodes.tsv 与 history.tsv，手工条目优先
+
+示例:
+  nodes scan-history
+  nodes scan-history --collapse-host
+  nodes list
+  nodes show root-s1
+  nodes ssh openclaw-172-104-98-196
+  nodes render-ssh-config
+  nodes render-ssh-config "$HOME/.ssh/config.d/nodes.generated.conf"
+EOF
+}
+
+log() { printf "[nodes] %s\n" "$*"; }
+err() { printf "[nodes][ERR] %s\n" "$*" >&2; }
+die() { err "$*"; exit 1; }
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "未找到命令: $1"
+}
+
+default_host() {
+  local name
+  name=$(hostname 2>/dev/null || true)
+  if [[ -n "$name" ]]; then
+    printf '%s' "$name"
+    return 0
+  fi
+  name=$(uname -n 2>/dev/null || true)
+  if [[ -n "$name" ]]; then
+    printf '%s' "$name"
+    return 0
+  fi
+  printf '%s' "unknown-host"
+}
+
+DEFAULT_HOST="$(default_host)"
+STOW_DIR="${STOW_DIR:-$HOME/_env/stow}"
+HOST_PACKAGE_DIR="$STOW_DIR/hosts/$DEFAULT_HOST"
+
+resolve_nodes_dir() {
+  if [[ -d "$HOME/.config/nodes" || -f "$HOME/.config/nodes/nodes.tsv" || -f "$HOME/.config/nodes/history.tsv" ]]; then
+    printf '%s' "$HOME/.config/nodes"
+    return 0
+  fi
+
+  if [[ -d "$HOST_PACKAGE_DIR" || -f "$HOST_PACKAGE_DIR/.stow-local-ignore" ]]; then
+    printf '%s' "$HOST_PACKAGE_DIR/.config/nodes"
+    return 0
+  fi
+
+  printf '%s' "$HOME/.config/nodes"
+}
+
+resolve_render_output() {
+  local nodes_dir="$1"
+  if [[ "$nodes_dir" == "$HOME/.config/nodes" ]]; then
+    printf '%s' "$HOME/.ssh/config.d/nodes.generated.conf"
+    return 0
+  fi
+
+  if [[ "$nodes_dir" == "$HOST_PACKAGE_DIR/.config/nodes" ]]; then
+    printf '%s' "$HOST_PACKAGE_DIR/.ssh/config.d/nodes.generated.conf"
+    return 0
+  fi
+
+  printf '%s' "$HOME/.ssh/config.d/nodes.generated.conf"
+}
+
+NODES_DIR="${NODES_DIR:-$(resolve_nodes_dir)}"
+MANUAL_FILE="$NODES_DIR/nodes.tsv"
+HISTORY_FILE="$NODES_DIR/history.tsv"
+RENDER_OUTPUT_DEFAULT="$(resolve_render_output "$NODES_DIR")"
+
+ensure_nodes_dir() {
+  mkdir -p "$NODES_DIR"
+}
+
+ensure_manual_template() {
+  ensure_nodes_dir
+  if [[ -f "$MANUAL_FILE" ]]; then
+    return 0
+  fi
+
+  cat >"$MANUAL_FILE" <<'EOF'
+# alias	host	user	port	tags
+# 手工维护的节点清单；port 留空或写 - 表示默认端口。
+# 例:
+# lab-root	10.0.0.8	root	22	lab,manual
+EOF
+}
+
+sanitize_alias() {
+  local raw="$1"
+  printf '%s' "$raw" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
+}
+
+build_alias_base() {
+  local host="$1"
+  local user="$2"
+  local port="$3"
+  local base=""
+
+  if [[ "$user" != "-" && -n "$user" ]]; then
+    base="${user}-${host}"
+  else
+    base="${host}"
+  fi
+
+  if [[ "$port" != "-" && -n "$port" && "$port" != "22" ]]; then
+    base="${base}-p${port}"
+  fi
+
+  base="$(sanitize_alias "$base")"
+  if [[ -z "$base" ]]; then
+    die "无法为节点生成 alias: host=$host user=$user port=$port"
+  fi
+
+  printf '%s' "$base"
+}
+
+declare -A NODE_HOST=()
+declare -A NODE_USER=()
+declare -A NODE_PORT=()
+declare -A NODE_TAGS=()
+declare -A NODE_SOURCE=()
+declare -a NODE_ORDER=()
+
+load_nodes_file() {
+  local source_name="$1"
+  local file="$2"
+  local alias host user port tags _
+
+  [[ -f "$file" ]] || return 0
+
+  while IFS=$'\t' read -r alias host user port tags _; do
+    alias="${alias%$'\r'}"
+    host="${host%$'\r'}"
+    user="${user%$'\r'}"
+    port="${port%$'\r'}"
+    tags="${tags%$'\r'}"
+
+    [[ -z "$alias" ]] && continue
+    [[ "$alias" == \#* ]] && continue
+    [[ -z "$host" ]] && continue
+
+    if [[ -n "${NODE_HOST[$alias]+x}" ]]; then
+      continue
+    fi
+
+    NODE_HOST["$alias"]="$host"
+    NODE_USER["$alias"]="${user:--}"
+    NODE_PORT["$alias"]="${port:--}"
+    NODE_TAGS["$alias"]="${tags:-}"
+    NODE_SOURCE["$alias"]="$source_name"
+    NODE_ORDER+=("$alias")
+  done <"$file"
+}
+
+load_combined_nodes() {
+  NODE_HOST=()
+  NODE_USER=()
+  NODE_PORT=()
+  NODE_TAGS=()
+  NODE_SOURCE=()
+  NODE_ORDER=()
+
+  load_nodes_file "manual" "$MANUAL_FILE"
+  load_nodes_file "history" "$HISTORY_FILE"
+}
+
+scan_history_raw() {
+  need_cmd perl
+
+  LC_ALL=C perl -MText::ParseWords=shellwords -MEncode=decode,FB_QUIET -CSDA - \
+    "$HOME/.zsh_history" "$HOME/.bash_history" "$HOME/.zhistory" <<'PERL'
+use strict;
+use warnings;
+use Text::ParseWords qw(shellwords);
+use Encode qw(decode FB_QUIET);
+
+my %count;
+
+sub parse_remote {
+  my ($spec, $port, $need_colon) = @_;
+  return 0 if !defined $spec;
+
+  $spec =~ s/^\s+|\s+$//g;
+  return 0 if $spec eq q{};
+  return 0 if $spec =~ m{^[-~/]};
+  return 0 if $spec =~ m{^\./} || $spec =~ m{^\.\./};
+  return 0 if $need_colon && index($spec, q{:}) < 0;
+
+  my $target = $spec;
+  $target =~ s/:.*$//;
+  return 0 if $target eq q{};
+
+  my ($user, $host) = ('-', $target);
+  if ($target =~ /@/) {
+    ($user, $host) = $target =~ /^(.*)@([^@]+)$/;
+    $user = '-' if !defined $user || $user eq q{};
+  }
+
+  return 0 if !defined $host || $host eq q{};
+  return 0 if $host =~ m{^/};
+  return 0 if $host =~ /^(?:localhost|127\.0\.0\.1|0\.0\.0\.0)$/;
+
+  my $plausible = 0;
+  if ($user ne '-') {
+    $plausible = ($host =~ /^[A-Za-z0-9][A-Za-z0-9._-]*$/) ? 1 : 0;
+  } else {
+    $plausible = ($host =~ /^(?:(?:\d{1,3}\.){3}\d{1,3}|[A-Za-z0-9][A-Za-z0-9._-]*\.[A-Za-z0-9._-]+|s\d+|core(?:\.local)?|dsm(?:\.local)?|front|pbg|node\d+)$/) ? 1 : 0;
+  }
+  return 0 unless $plausible;
+
+  $port = '-' if !defined $port || $port eq q{};
+  my $key = join("\t", $host, $user, $port);
+  $count{$key}++;
+  return 1;
+}
+
+sub collect_ssh_like {
+  my ($tokens_ref, $port_ref) = @_;
+  my @tokens = @{$tokens_ref};
+  my @operands;
+
+  my %opt_with_arg = map { $_ => 1 } qw(-b -c -D -E -e -F -I -i -J -L -l -m -O -o -Q -R -S -W -w);
+
+  for (my $i = 0; $i <= $#tokens; $i++) {
+    my $t = $tokens[$i];
+    if ($t eq '--') {
+      push @operands, @tokens[$i + 1 .. $#tokens];
+      last;
+    }
+    if (($t eq '-p' || $t eq '-P') && defined $tokens[$i + 1]) {
+      $$port_ref = $tokens[++$i];
+      next;
+    }
+    if ($t =~ /^-(?:p|P)(\d+)$/) {
+      $$port_ref = $1;
+      next;
+    }
+    if ($opt_with_arg{$t}) {
+      $i++;
+      next;
+    }
+    next if $t =~ /^-/;
+    push @operands, $t;
+  }
+
+  return @operands;
+}
+
+sub collect_copy_like {
+  my ($tokens_ref, $port_ref, $kind) = @_;
+  my @tokens = @{$tokens_ref};
+  my @operands;
+
+  my %opt_with_arg = map { $_ => 1 } qw(-B -b -c -D -e -F -i -J -l -o -P -R -S -s);
+
+  for (my $i = 0; $i <= $#tokens; $i++) {
+    my $t = $tokens[$i];
+    if ($t eq '--') {
+      push @operands, @tokens[$i + 1 .. $#tokens];
+      last;
+    }
+    if (($t eq '-p' || $t eq '-P') && defined $tokens[$i + 1]) {
+      $$port_ref = $tokens[++$i];
+      next;
+    }
+    if ($t =~ /^-(?:p|P)(\d+)$/i) {
+      $$port_ref = $1;
+      next;
+    }
+    if ($opt_with_arg{$t}) {
+      $i++;
+      next;
+    }
+    next if $t =~ /^-/;
+    push @operands, $t;
+  }
+
+  return @operands;
+}
+
+sub collect_rsync {
+  my ($tokens_ref) = @_;
+  my @tokens = @{$tokens_ref};
+  my @operands;
+  my %opt_with_arg = map { $_ => 1 } qw(-e --rsh --rsync-path --files-from --exclude-from --include-from --log-file --password-file --temp-dir -f);
+
+  for (my $i = 0; $i <= $#tokens; $i++) {
+    my $t = $tokens[$i];
+    if ($t eq '--') {
+      push @operands, @tokens[$i + 1 .. $#tokens];
+      last;
+    }
+    if ($opt_with_arg{$t}) {
+      $i++;
+      next;
+    }
+    next if $t =~ /^-/;
+    push @operands, $t;
+  }
+
+  return @operands;
+}
+
+for my $file (@ARGV) {
+  next unless -f $file;
+  open my $fh, '<:raw', $file or next;
+
+  while (my $raw = <$fh>) {
+    my $line = decode('UTF-8', $raw, FB_QUIET);
+    chomp $line;
+    $line =~ s/^\s*: \d+:\d+;//;
+    $line =~ s/\s+\\$//;
+    $line =~ s/^\s+|\s+$//g;
+    next if $line eq q{};
+
+    my @tokens = eval { shellwords($line) };
+    next unless @tokens;
+
+    my $cmd = shift @tokens;
+    next unless $cmd =~ /^(?:ssh|mosh|scp|sftp|rsync)$/;
+
+    my $port = '-';
+
+    if ($cmd eq 'ssh' || $cmd eq 'mosh') {
+      my @operands = collect_ssh_like(\@tokens, \$port);
+      for my $spec (@operands) {
+        last if parse_remote($spec, $port, 0);
+      }
+      next;
+    }
+
+    if ($cmd eq 'scp' || $cmd eq 'sftp') {
+      my @operands = collect_copy_like(\@tokens, \$port, $cmd);
+      my $need_colon = $cmd eq 'scp' ? 1 : 0;
+      for my $spec (@operands) {
+        parse_remote($spec, $port, $need_colon);
+      }
+      next;
+    }
+
+    if ($cmd eq 'rsync') {
+      my @operands = collect_rsync(\@tokens);
+      for my $spec (@operands) {
+        parse_remote($spec, '-', 1);
+      }
+    }
+  }
+}
+
+for my $key (sort keys %count) {
+  print $key, "\t", $count{$key}, "\n";
+}
+PERL
+}
+
+cmd_scan_history() {
+  local collapse_host=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --collapse-host)
+        collapse_host=1
+        shift
+        ;;
+      -h|--help)
+        usage
+        return 0
+        ;;
+      *)
+        die "scan-history 未知参数: $1"
+        ;;
+    esac
+  done
+
+  ensure_manual_template
+
+  local tmp_raw tmp_norm tmp_best tmp_body tmp_out
+  tmp_raw="$(mktemp)"
+  tmp_norm="$(mktemp)"
+  tmp_body="$(mktemp)"
+  tmp_out="$(mktemp)"
+
+  scan_history_raw >"$tmp_raw"
+
+  # 默认保留有意义的 host/user/port 变体，只做轻量归一化:
+  # - 22 端口视为默认端口，折叠为 "-"
+  # - 同一 host 若存在明确 user，匿名 user="-"
+  #   仅作为兜底信息，不再重复保留
+  awk -F '\t' '
+    BEGIN { OFS = "\t" }
+    {
+      host = $1
+      user = $2
+      port = $3
+      hits = $4 + 0
+
+      if (port == "" || port == "22") {
+        port = "-"
+      }
+
+      key = host OFS user OFS port
+      count[key] += hits
+      if (user != "-") {
+        has_named_user[host] = 1
+      }
+    }
+    END {
+      for (key in count) {
+        split(key, parts, OFS)
+        host = parts[1]
+        user = parts[2]
+        port = parts[3]
+        if (!(user == "-" && has_named_user[host])) {
+          print host, user, port, count[key]
+        }
+      }
+    }
+  ' "$tmp_raw" | sort -t $'\t' -k1,1 -k2,2 -k3,3 >"$tmp_norm"
+
+  if [[ "$collapse_host" == "1" ]]; then
+    tmp_best="$(mktemp)"
+    awk -F '\t' '
+      BEGIN { OFS = "\t" }
+      {
+        host = $1
+        user = $2
+        port = $3
+        hits = $4 + 0
+
+        total_hits[host] += hits
+        variant_count[host]++
+
+        explicit = (user != "-") ? 1 : 0
+        nondefault_port = (port != "-") ? 1 : 0
+
+        if (!(host in best_hits)) {
+          best_user[host] = user
+          best_port[host] = port
+          best_hits[host] = hits
+          best_explicit[host] = explicit
+          best_nondefault[host] = nondefault_port
+          next
+        }
+
+        replace = 0
+        if (explicit > best_explicit[host]) {
+          replace = 1
+        } else if (explicit == best_explicit[host] && hits > best_hits[host]) {
+          replace = 1
+        } else if (explicit == best_explicit[host] && hits == best_hits[host] && nondefault_port > best_nondefault[host]) {
+          replace = 1
+        } else if (explicit == best_explicit[host] && hits == best_hits[host] && nondefault_port == best_nondefault[host]) {
+          candidate = user OFS port
+          current = best_user[host] OFS best_port[host]
+          if (candidate < current) {
+            replace = 1
+          }
+        }
+
+        if (replace) {
+          best_user[host] = user
+          best_port[host] = port
+          best_hits[host] = hits
+          best_explicit[host] = explicit
+          best_nondefault[host] = nondefault_port
+        }
+      }
+      END {
+        for (host in best_hits) {
+          print host, best_user[host], best_port[host], total_hits[host], variant_count[host]
+        }
+      }
+    ' "$tmp_norm" | sort -t $'\t' -k1,1 >"$tmp_best"
+  fi
+
+  declare -A USED_ALIAS=()
+  local host user port hits variants alias base suffix tags
+
+  while IFS=$'\t' read -r host user port hits variants; do
+    [[ -z "$host" ]] && continue
+    base="$(build_alias_base "$host" "${user:--}" "${port:--}")"
+    alias="$base"
+    suffix=2
+    while [[ -n "${USED_ALIAS[$alias]+x}" ]]; do
+      alias="${base}-${suffix}"
+      suffix=$((suffix + 1))
+    done
+    USED_ALIAS["$alias"]=1
+    tags="history:${hits:-1}"
+    if [[ "$collapse_host" == "1" && -n "${variants:-}" && "$variants" != "1" ]]; then
+      tags="${tags},variants:${variants}"
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\n' \
+      "$alias" "$host" "${user:--}" "${port:--}" "$tags" >>"$tmp_body"
+  done <"${tmp_best:-$tmp_norm}"
+
+  {
+    printf '# alias\thost\tuser\tport\ttags\n'
+    printf '# generated by nodes scan-history on %s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')"
+    if [[ -s "$tmp_body" ]]; then
+      sort -t $'\t' -k1,1 "$tmp_body"
+    fi
+  } >"$tmp_out"
+
+  mv "$tmp_out" "$HISTORY_FILE"
+  rm -f "$tmp_raw" "$tmp_norm" "$tmp_body"
+  if [[ -n "${tmp_best:-}" ]]; then
+    rm -f "$tmp_best"
+  fi
+
+  local count
+  count=$(grep -vc '^#' "$HISTORY_FILE" || true)
+  if [[ "$collapse_host" == "1" ]]; then
+    log "已写入 $HISTORY_FILE ($count 条历史节点，按 host 压缩)"
+  else
+    log "已写入 $HISTORY_FILE ($count 条历史节点，保留 user/port 变体)"
+  fi
+}
+
+print_node_table() {
+  {
+    printf 'ALIAS\tHOST\tUSER\tPORT\tSOURCE\tTAGS\n'
+    local alias
+    for alias in "${NODE_ORDER[@]}"; do
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$alias" \
+        "${NODE_HOST[$alias]}" \
+        "${NODE_USER[$alias]}" \
+        "${NODE_PORT[$alias]}" \
+        "${NODE_SOURCE[$alias]}" \
+        "${NODE_TAGS[$alias]}"
+    done
+  } | if command -v column >/dev/null 2>&1; then column -t -s $'\t'; else cat; fi
+}
+
+lookup_alias() {
+  local alias="$1"
+  load_combined_nodes
+  [[ -n "${NODE_HOST[$alias]+x}" ]] || die "未找到节点: $alias"
+}
+
+cmd_list() {
+  load_combined_nodes
+  print_node_table
+}
+
+cmd_show() {
+  local alias="${1:-}"
+  [[ -n "$alias" ]] || die "show 需要一个 alias"
+  lookup_alias "$alias"
+
+  printf 'alias: %s\n' "$alias"
+  printf 'host: %s\n' "${NODE_HOST[$alias]}"
+  printf 'user: %s\n' "${NODE_USER[$alias]}"
+  printf 'port: %s\n' "${NODE_PORT[$alias]}"
+  printf 'source: %s\n' "${NODE_SOURCE[$alias]}"
+  printf 'tags: %s\n' "${NODE_TAGS[$alias]}"
+
+  if [[ "${NODE_USER[$alias]}" != "-" ]]; then
+    if [[ "${NODE_PORT[$alias]}" != "-" ]]; then
+      printf 'ssh: ssh -p %s %s@%s\n' "${NODE_PORT[$alias]}" "${NODE_USER[$alias]}" "${NODE_HOST[$alias]}"
+    else
+      printf 'ssh: ssh %s@%s\n' "${NODE_USER[$alias]}" "${NODE_HOST[$alias]}"
+    fi
+  else
+    if [[ "${NODE_PORT[$alias]}" != "-" ]]; then
+      printf 'ssh: ssh -p %s %s\n' "${NODE_PORT[$alias]}" "${NODE_HOST[$alias]}"
+    else
+      printf 'ssh: ssh %s\n' "${NODE_HOST[$alias]}"
+    fi
+  fi
+}
+
+cmd_ssh() {
+  local alias="${1:-}"
+  shift || true
+  [[ -n "$alias" ]] || die "ssh 需要一个 alias"
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+
+  lookup_alias "$alias"
+
+  local host user port target
+  host="${NODE_HOST[$alias]}"
+  user="${NODE_USER[$alias]}"
+  port="${NODE_PORT[$alias]}"
+  target="$host"
+  if [[ "$user" != "-" ]]; then
+    target="${user}@${host}"
+  fi
+
+  if [[ "$port" != "-" ]]; then
+    exec ssh "$@" -p "$port" "$target"
+  fi
+  exec ssh "$@" "$target"
+}
+
+cmd_render_ssh_config() {
+  local output="${1:-$RENDER_OUTPUT_DEFAULT}"
+  local dir
+  dir="$(dirname "$output")"
+  mkdir -p "$dir"
+
+  load_combined_nodes
+
+  {
+    printf '# Generated by nodes render-ssh-config on %s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')"
+    printf '# Source dir: %s\n' "$NODES_DIR"
+    local alias
+    for alias in "${NODE_ORDER[@]}"; do
+      printf '\nHost %s\n' "$alias"
+      printf '    HostName %s\n' "${NODE_HOST[$alias]}"
+      if [[ "${NODE_USER[$alias]}" != "-" ]]; then
+        printf '    User %s\n' "${NODE_USER[$alias]}"
+      fi
+      if [[ "${NODE_PORT[$alias]}" != "-" ]]; then
+        printf '    Port %s\n' "${NODE_PORT[$alias]}"
+      fi
+      if [[ -n "${NODE_TAGS[$alias]}" ]]; then
+        printf '    # tags: %s\n' "${NODE_TAGS[$alias]}"
+      fi
+    done
+  } >"$output"
+
+  log "已写入 $output"
+}
+
+main() {
+  local cmd="${1:-help}"
+  shift || true
+
+  case "$cmd" in
+    scan-history)
+      cmd_scan_history "$@"
+      ;;
+    list)
+      cmd_list "$@"
+      ;;
+    show)
+      cmd_show "$@"
+      ;;
+    ssh)
+      cmd_ssh "$@"
+      ;;
+    render-ssh-config)
+      cmd_render_ssh_config "$@"
+      ;;
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      die "未知命令: $cmd"
+      ;;
+  esac
+}
+
+main "$@"
