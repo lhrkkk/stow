@@ -33,4 +33,4 @@ command = "git ls-files -z | xargs -0 wc -l"
 [[actions]]
 name = "写日志"
 icon = "tool"
-command = "jj ddr -y --model gpt-5.3-codex --reasoning-effort medium"
+command = "jj ddr -y --model gpt-5.4 --reasoning-effort medium"
