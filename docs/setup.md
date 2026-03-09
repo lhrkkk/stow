@@ -57,6 +57,7 @@
 ## 2. 一键 bootstrap（推荐）
 
 仓库根目录提供了一个 `bootstrap.sh`，用于串联“安装前置依赖 + Brewfile + stow 部署”。
+脚本会按平台自动选择 `mac-home/Brewfile`（macOS）或 `mac-home/Brewfile_linux`（Linux）。
 
 - 首次安装：
   

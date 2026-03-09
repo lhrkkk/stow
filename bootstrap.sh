@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$SCRIPT_DIR"
-BREWFILE="$REPO_ROOT/mac-home/Brewfile"
+BREWFILE=""
 STOWX="$REPO_ROOT/mac-home/.local/bin/stowx"
 
 COMMAND="bootstrap"
@@ -60,6 +60,20 @@ run() {
 
 is_macos() {
   [[ "$(uname -s)" == "Darwin" ]]
+}
+
+is_linux() {
+  [[ "$(uname -s)" == "Linux" ]]
+}
+
+select_brewfile() {
+  if is_macos; then
+    BREWFILE="$REPO_ROOT/mac-home/Brewfile"
+  elif is_linux; then
+    BREWFILE="$REPO_ROOT/mac-home/Brewfile_linux"
+  else
+    die "unsupported platform: $(uname -s)"
+  fi
 }
 
 find_brew_bin() {
@@ -140,11 +154,13 @@ resolve_host_name() {
 }
 
 ensure_repo_layout() {
+  [[ -n "$BREWFILE" ]] || die "brewfile has not been selected"
   [[ -f "$BREWFILE" ]] || die "missing Brewfile: $BREWFILE"
   [[ -x "$STOWX" ]] || die "missing stowx helper: $STOWX"
 }
 
 ensure_xcode_clt() {
+  is_macos || return 0
   if xcode-select -p >/dev/null 2>&1; then
     return 0
   fi
@@ -293,7 +309,7 @@ parse_args() {
 
 main() {
   parse_args "$@"
-  is_macos || die "this bootstrap script currently targets macOS"
+  select_brewfile
   case "$COMMAND" in
     bootstrap|install)
       cmd_bootstrap
